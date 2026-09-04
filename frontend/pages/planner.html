@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plan Trip - TripMind AI</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="navbar-brand"><span>🧠</span> TripMind AI</a>
+            <div class="navbar-links">
+                <a href="/">Home</a>
+                <a href="dashboard.html">Dashboard</a>
+                <a href="planner.html" class="active">Plan Trip</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container" style="padding-top:2rem;padding-bottom:4rem;max-width:900px;">
+        <div id="plannerForm">
+            <h1 style="font-size:1.75rem;font-weight:700;margin-bottom:0.5rem;">Plan Your Trip</h1>
+            <p class="text-sm text-muted mb-6">Describe your trip naturally or fill in the details below.</p>
+
+            <div class="card mb-4">
+                <div class="card-header"><div class="card-title">Describe Your Trip</div></div>
+                <div class="card-content">
+                    <textarea id="naturalInput" class="form-textarea natural-input"
+                        placeholder="e.g., I want to go from Coimbatore to New York for 7 days, 2 people, budget 1.5 lakh, vegetarian, we prefer comfortable travel..."></textarea>
+                    <button class="btn btn-outline mt-2" onclick="parseNatural()">Parse with AI</button>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header"><div class="card-title">Trip Details</div></div>
+                <div class="card-content">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                        <div class="form-group">
+                            <label class="form-label">Origin</label>
+                            <input id="origin" class="form-input" placeholder="e.g., Coimbatore">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Destination</label>
+                            <input id="destination" class="form-input" placeholder="e.g., New York">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Start Date</label>
+                            <input id="startDate" type="date" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">End Date</label>
+                            <input id="endDate" type="date" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Travelers</label>
+                            <input id="travelers" type="number" class="form-input" min="1" max="20" value="1">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Budget (INR)</label>
+                            <input id="budget" type="number" class="form-input" min="1000" value="50000">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Travel Style</label>
+                            <select id="travelStyle" class="form-select">
+                                <option value="BUDGET">Budget</option>
+                                <option value="BALANCED" selected>Balanced</option>
+                                <option value="PREMIUM">Premium</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Food Preference</label>
+                            <select id="foodPreference" class="form-select">
+                                <option value="">No preference</option>
+                                <option value="vegetarian">Vegetarian</option>
+                                <option value="non-vegetarian">Non-Vegetarian</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary btn-lg w-full mt-4" onclick="submitTrip()">Generate Travel Plans</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="processingScreen" class="hidden">
+            <div class="card">
+                <div class="card-content">
+                    <h2 style="text-align:center;margin-bottom:1.5rem;">Generating Your Travel Plans</h2>
+                    <div class="processing-steps">
+                        <div class="processing-step" id="step1"><div class="step-dot"></div><span>Searching flights...</span></div>
+                        <div class="processing-step" id="step2"><div class="step-dot"></div><span>Finding hotels...</span></div>
+                        <div class="processing-step" id="step3"><div class="step-dot"></div><span>Discovering activities...</span></div>
+                        <div class="processing-step" id="step4"><div class="step-dot"></div><span>Optimizing itinerary...</span></div>
+                        <div class="processing-step" id="step5"><div class="step-dot"></div><span>Generating recommendations...</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/utils.js"></script>
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('demo') === 'true') {
+            document.getElementById('naturalInput').value = 'Coimbatore to New York for 7 days, 2 people, 1.5 lakh budget, vegetarian, balanced travel style';
+            parseNatural();
+        }
+
+        function parseNatural() {
+            const text = document.getElementById('naturalInput').value;
+            const parsed = parseNaturalInput(text);
+            if (parsed.origin) document.getElementById('origin').value = parsed.origin;
+            if (parsed.destination) document.getElementById('destination').value = parsed.destination;
+            if (parsed.travelers) document.getElementById('travelers').value = parsed.travelers;
+            if (parsed.budget) document.getElementById('budget').value = parsed.budget;
+            if (parsed.travelStyle) document.getElementById('travelStyle').value = parsed.travelStyle;
+            if (parsed.foodPreference) document.getElementById('foodPreference').value = parsed.foodPreference;
+            if (parsed.days) {
+                const start = new Date();
+                start.setDate(start.getDate() + 7);
+                const end = new Date(start);
+                end.setDate(end.getDate() + parsed.days - 1);
+                document.getElementById('startDate').value = start.toISOString().split('T')[0];
+                document.getElementById('endDate').value = end.toISOString().split('T')[0];
+            }
+        }
+
+        async function submitTrip() {
+            const data = {
+                origin: document.getElementById('origin').value,
+                destination: document.getElementById('destination').value,
+                startDate: document.getElementById('startDate').value,
+                endDate: document.getElementById('endDate').value,
+                travelers: parseInt(document.getElementById('travelers').value),
+                budget: parseInt(document.getElementById('budget').value),
+                travelStyle: document.getElementById('travelStyle').value,
+                foodPreference: document.getElementById('foodPreference').value || null,
+            };
+
+            if (!data.origin || !data.destination || !data.startDate || !data.endDate) {
+                alert('Please fill in all required fields.'); return;
+            }
+
+            document.getElementById('plannerForm').classList.add('hidden');
+            document.getElementById('processingScreen').classList.remove('hidden');
+
+            try {
+                const steps = ['step1','step2','step3','step4','step5'];
+                for (let i = 0; i < steps.length; i++) {
+                    document.getElementById(steps[i]).classList.add('active');
+                    await new Promise(r => setTimeout(r, 600));
+                    document.getElementById(steps[i]).classList.remove('active');
+                    document.getElementById(steps[i]).classList.add('done');
+                }
+
+                const result = await api.createTrip(data);
+                await api.generatePlans(result.tripId);
+                window.location = `trip.html?id=${result.tripId}`;
+            } catch (e) {
+                alert('Error: ' + e.message);
+                document.getElementById('plannerForm').classList.remove('hidden');
+                document.getElementById('processingScreen').classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
