@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trip Details - TripMind AI</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="navbar-brand">
+                <span class="brand-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-7-7 18-2.5-7.5L3 11z"></path></svg>
+                </span>
+                TripMind AI
+            </a>
+            <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+            <div class="navbar-links" id="navLinks">
+                <a href="/">Home</a>
+                <a href="dashboard.html">Dashboard</a>
+                <a href="planner.html">Plan Trip</a>
+                <a href="mindmap.html">Route Map</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container" style="padding-top:2rem;padding-bottom:4rem;">
+        <div id="loading" class="text-center" style="padding:4rem;">
+            <div class="spinner"></div>
+            <p class="text-sm text-muted mt-2">Loading trip details...</p>
+        </div>
+
+        <div id="tripContent" class="hidden">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h1 id="tripTitle" style="font-size:1.5rem;font-weight:700;"></h1>
+                    <p id="tripMeta" class="text-sm text-muted mt-1"></p>
+                </div>
+                <div class="flex gap-2">
+                    <button class="btn btn-warning btn-sm" onclick="openDelayModal()">Simulate Delay</button>
+                    <button class="btn btn-success btn-sm" id="bookBtn" onclick="bookTrip()">Approve & Book</button>
+                </div>
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('overview')">Overview</button>
+                <button class="tab" onclick="switchTab('timeline')">Timeline</button>
+                <button class="tab" onclick="switchTab('cost')">Cost Breakdown</button>
+                <button class="tab" onclick="switchTab('compare')">Compare Plans</button>
+                <button class="tab" onclick="switchTab('events')">Events</button>
+            </div>
+
+            <div id="tab-overview" class="tab-content active"></div>
+            <div id="tab-timeline" class="tab-content"></div>
+            <div id="tab-cost" class="tab-content"></div>
+            <div id="tab-compare" class="tab-content"></div>
+            <div id="tab-events" class="tab-content"></div>
+        </div>
+    </div>
+
+    <!-- Booking Modal -->
+    <div id="bookingModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">Booking Confirmation</div>
+                <button class="modal-close" onclick="closeModal('bookingModal')">&times;</button>
+            </div>
+            <div class="modal-body" id="bookingModalBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('bookingModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delay Modal -->
+    <div id="delayModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">Simulate Flight Delay</div>
+                <button class="modal-close" onclick="closeModal('delayModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="text-sm text-muted mb-4">Select delay duration to see how the AI replans your itinerary.</p>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+                    <button class="btn btn-outline" onclick="simulateDelay(60)">1 Hour</button>
+                    <button class="btn btn-outline" onclick="simulateDelay(180)">3 Hours</button>
+                    <button class="btn btn-outline" onclick="simulateDelay(300)">5 Hours</button>
+                    <button class="btn btn-outline" onclick="simulateDelay(480)">8 Hours</button>
+                    <button class="btn btn-outline" onclick="simulateDelay(720)">12 Hours</button>
+                    <button class="btn btn-outline" onclick="simulateDelay(1440)">24 Hours</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('delayModal')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Replan Result Modal -->
+    <div id="replanModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">Replan Result</div>
+                <button class="modal-close" onclick="closeModal('replanModal')">&times;</button>
+            </div>
+            <div class="modal-body" id="replanModalBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="closeModal('replanModal')">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Widget -->
+    <div class="chat-widget">
+        <div id="chatPanel" class="chat-panel">
+            <div class="chat-header">AI Travel Assistant</div>
+            <div id="chatMessages" class="chat-messages"></div>
+            <div id="chatSuggestions" class="chat-suggestions"></div>
+            <div class="chat-input-area">
+                <input id="chatInput" type="text" placeholder="Ask about your trip...">
+                <button id="chatSend" class="chat-send">Send</button>
+            </div>
+        </div>
+        <button id="chatToggle" class="chat-toggle" aria-label="Open trip chat">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </button>
+    </div>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/chat.js"></script>
+    <script>
+        const navToggle = document.getElementById('navToggle');
+        const navLinks = document.getElementById('navLinks');
+        if (navToggle) navToggle.addEventListener('click', () => {
+            const open = navLinks.classList.toggle('open');
+            navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+    </script>
+    <script>
+        let tripData = null;
+        let selectedPlanIndex = 0;
+        const tripId = new URLSearchParams(window.location.search).get('id');
+
+        async function loadTrip() {
+            if (!(await guardLogin())) return;
+            if (!tripId) { window.location = 'dashboard.html'; return; }
+            try {
+                tripData = await api.getTrip(tripId);
+                if (!tripData.itineraries || !tripData.itineraries.length) {
+                    await api.generatePlans(tripId);
+                    tripData = await api.getTrip(tripId);
+                }
+                renderTrip();
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('tripContent').classList.remove('hidden');
+                initChat(tripId);
+            } catch (e) {
+                document.getElementById('loading').innerHTML = `<p>Error: ${e.message}</p>`;
+            }
+        }
+
+        function renderTrip() {
+            document.getElementById('tripTitle').innerHTML = `${tripData.origin} → ${tripData.destination} ${getStatusBadge(tripData.status)}`;
+            document.getElementById('tripMeta').textContent = `${formatDate(tripData.startDate)} - ${formatDate(tripData.endDate)} | ${tripData.travelers} travelers | ${tripData.travelStyle} | Budget: ${formatCurrency(tripData.budget)}`;
+            document.getElementById('bookBtn').disabled = tripData.status === 'BOOKED';
+            renderOverview();
+            renderTimeline();
+            renderCost();
+            renderCompare();
+            renderEvents();
+        }
+
+        function getSelectedItinerary() {
+            return tripData.itineraries?.find(i => i.status === 'SELECTED');
+        }
+
+        function renderOverview() {
+            const itin = getSelectedItinerary();
+            const rec = tripData.recommendations?.[0];
+            let html = '';
+            if (rec) {
+                html += `<div class="recommendation-box"><h3>AI Recommendation</h3><p>${rec.reasoning || rec.recommendation}</p></div>`;
+            }
+            if (itin) {
+                html += `<div class="card mb-4"><div class="card-header"><div class="card-title">Selected Plan — ${itin.planType}</div></div>`;
+                html += `<div class="card-content">`;
+                const flight = itin.items?.find(i => i.type === 'FLIGHT');
+                const hotel = itin.items?.find(i => i.type === 'HOTEL');
+                if (flight) html += `<div class="flex justify-between mb-2"><span><b class="cost-label">Flight</b> ${flight.title}</span><span class="font-bold">${formatCurrency(flight.cost)}</span></div>`;
+                if (hotel) html += `<div class="flex justify-between mb-2"><span><b class="cost-label">Stay</b> ${hotel.title}</span><span class="font-bold">${formatCurrency(hotel.cost)}</span></div>`;
+                html += `<div class="flex justify-between mb-2"><span>Estimated Total</span><span class="font-bold" style="color:var(--primary);">${formatCurrency(itin.totalCost)}</span></div>`;
+                if (itin.reasoning && itin.reasoning.length) {
+                    html += `<div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--slate-100);"><div class="text-xs font-bold text-muted mb-2">WHY THIS PLAN</div>`;
+                    itin.reasoning.forEach(r => { html += `<p class="text-sm" style="margin-bottom:0.25rem;">• ${r}</p>`; });
+                    html += `</div>`;
+                }
+                html += `</div></div>`;
+            }
+            document.getElementById('tab-overview').innerHTML = html;
+        }
+
+        function renderTimeline() {
+            const itin = getSelectedItinerary();
+            if (!itin || !itin.items) { document.getElementById('tab-timeline').innerHTML = '<p class="text-muted">No itinerary items.</p>'; return; }
+            const days = {};
+            itin.items.forEach(item => { const d = item.day || 1; if (!days[d]) days[d] = []; days[d].push(item); });
+            let html = '<div class="timeline">';
+            Object.keys(days).sort((a,b) => a - b).forEach(day => {
+                html += `<div class="timeline-day">Day ${day}</div>`;
+                days[day].forEach(item => {
+                    const cls = getTypeColor(item.type);
+                    html += `<div class="timeline-item ${cls} animate-fade-in">`;
+                    html += `<div class="timeline-type" style="color:var(--slate-500);">${item.type}</div>`;
+                    html += `<div style="font-weight:600;">${item.title}</div>`;
+                    if (item.provider) html += `<div class="text-xs text-muted">${item.provider}</div>`;
+                    if (item.startTime) html += `<div class="text-xs text-muted">${formatTime(item.startTime)}${item.endTime ? ' - ' + formatTime(item.endTime) : ''}</div>`;
+                    html += `<div class="flex justify-between align-center"><div class="text-sm font-bold" style="color:var(--primary);">${formatCurrency(item.cost)}</div>`;
+                    if (item.status !== 'BOOKED') html += `<button class="btn btn-outline btn-sm" onclick="removeItineraryItem('${item._id}')">Remove</button></div>`;
+                    if (item.status === 'DELAYED' || item.status === 'RESCHEDULED') html += `<span class="badge badge-warning" style="margin-top:0.25rem;">${item.status}</span>`;
+                    html += `</div>`;
+                });
+            });
+            html += '</div>';
+            document.getElementById('tab-timeline').innerHTML = html;
+        }
+
+        async function removeItineraryItem(itemId) {
+            if (!confirm('Remove this item from the itinerary?')) return;
+            const res = await api.editItineraryItems(tripId, 'remove', { itemId });
+            const current = getSelectedItinerary();
+            if (current && res.itinerary) {
+                current.items = res.itinerary.items || [];
+                if (res.itinerary.version) current.version = res.itinerary.version;
+                current.totalCost = (res.itinerary.items || []).reduce((s, it) => s + (it.cost || 0), 0);
+                tripData.totalEstimatedCost = current.totalCost;
+            }
+            renderOverview();
+            renderTimeline();
+            renderCost();
+            alert('Item removed.');
+        }
+
+        function renderCost() {
+            const itin = getSelectedItinerary();
+            if (!itin) { document.getElementById('tab-cost').innerHTML = '<p class="text-muted">No cost data.</p>'; return; }
+            const breakdown = itin.items?.reduce((acc, item) => {
+                const key = item.type === 'FLIGHT' || item.type === 'HOTEL' ? (item.type === 'FLIGHT' ? 'flights' : 'hotel') : (item.type === 'TRANSFER' || item.type === 'BUS' || item.type === 'TRAIN' || item.type === 'CAB' || item.type === 'AUTO') ? 'transport' : (item.type === 'ACTIVITY' ? 'activities' : 'food');
+                acc[key] = (acc[key] || 0) + item.cost;
+                return acc;
+            }, {}) || {};
+            const total = Object.values(breakdown).reduce((a, b) => a + b, 0);
+            const maxVal = Math.max(...Object.values(breakdown), 1);
+            let html = `<div class="card mb-4"><div class="card-header"><div class="card-title">Cost Breakdown</div></div><div class="card-content">`;
+            html += `<div class="cost-bars">`;
+            Object.entries(breakdown).forEach(([key, val]) => {
+                const pct = (val / maxVal) * 100;
+                const color = getCostBarColor(key);
+                html += `<div class="cost-bar"><div class="cost-bar-label">${key.charAt(0).toUpperCase() + key.slice(1)}</div><div class="cost-bar-track"><div class="cost-bar-fill" style="width:${pct}%;background:${color};"></div></div><div class="cost-bar-value">${formatCurrency(val)}</div></div>`;
+            });
+            html += `</div>`;
+            html += `<div class="flex justify-between mt-4" style="padding-top:1rem;border-top:1px solid var(--slate-100);"><span class="font-bold">Total</span><span class="font-bold" style="color:var(--primary);font-size:1.25rem;">${formatCurrency(total)}</span></div>`;
+            const remaining = tripData.budget - total;
+            if (remaining > 0) html += `<p class="text-sm text-muted mt-2">₹${remaining.toLocaleString('en-IN')} remaining from budget</p>`;
+            html += `</div></div>`;
+            document.getElementById('tab-cost').innerHTML = html;
+        }
+
+        function renderCompare() {
+            const itins = tripData.itineraries || [];
+            if (!itins.length) { document.getElementById('tab-compare').innerHTML = '<p class="text-muted">No plans to compare.</p>'; return; }
+            let html = '<div class="plans-grid">';
+            itins.forEach((itin, idx) => {
+                const sel = itin.status === 'SELECTED';
+                html += `<div class="plan-card ${sel ? 'selected' : ''}" onclick="selectPlan(${idx})">`;
+                html += `<div class="plan-header"><div class="plan-type">${itin.planType} ${sel ? '<span class="badge badge-success" style="font-size:0.65rem;">SELECTED</span>' : ''}</div><div class="plan-cost">${formatCurrency(itin.totalCost)}</div></div>`;
+                html += `<div class="plan-details">`;
+                html += `<div class="plan-detail"><span>Comfort</span><span>${(itin.comfortScore * 100).toFixed(0)}%</span></div>`;
+                html += `<div class="plan-detail"><span>Optimization</span><span>${(itin.optimizationScore * 100).toFixed(0)}%</span></div>`;
+                html += `<div class="plan-detail"><span>Travel Time</span><span>${itin.travelTime || 'N/A'}</span></div>`;
+                html += `<div class="plan-detail"><span>Days</span><span>${itin.items?.[itin.items.length-1]?.day || '?'}</span></div>`;
+                html += `</div></div>`;
+            });
+            html += '</div>';
+            document.getElementById('tab-compare').innerHTML = html;
+        }
+
+        function renderEvents() {
+            const events = tripData.events || [];
+            if (!events.length) { document.getElementById('tab-events').innerHTML = '<div class="empty-state"><h3>No Events</h3><p>No flight delays or disruptions recorded.</p></div>'; return; }
+            let html = '<div class="card"><div class="card-content">';
+            events.forEach(ev => {
+                html += `<div class="event-item"><div class="event-severity">${getSeverityBadge(ev.severity)}</div><div><div class="font-bold">${ev.title}</div><div class="text-sm text-muted">${ev.description || ''}</div><div class="text-xs text-muted">${formatDate(ev.occurredAt)}</div></div></div>`;
+            });
+            html += '</div></div>';
+            document.getElementById('tab-events').innerHTML = html;
+        }
+
+        function switchTab(name) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('tab-' + name).classList.add('active');
+        }
+
+        function selectPlan(idx) {
+            selectedPlanIndex = idx;
+            renderCompare();
+        }
+
+        async function bookTrip() {
+            try {
+                const result = await api.bookTrip(tripId);
+                let html = `<p class="mb-4">Trip booked successfully!</p>`;
+                result.bookings.forEach(b => {
+                    html += `<div class="flex justify-between mb-2"><span>${b.provider} (${b.bookingReference})</span><span class="font-bold">${formatCurrency(b.price)}</span></div>`;
+                });
+                html += `<div class="flex justify-between mt-4" style="padding-top:1rem;border-top:1px solid var(--slate-100);"><span class="font-bold">Total</span><span class="font-bold" style="color:var(--emerald);">${formatCurrency(result.totalCost)}</span></div>`;
+                document.getElementById('bookingModalBody').innerHTML = html;
+                document.getElementById('bookingModal').classList.add('active');
+                tripData = await api.getTrip(tripId);
+                renderTrip();
+            } catch (e) { alert('Booking error: ' + e.message); }
+        }
+
+        function openDelayModal() { document.getElementById('delayModal').classList.add('active'); }
+
+        async function simulateDelay(minutes) {
+            closeModal('delayModal');
+            try {
+                await api.simulateDelay(tripId, minutes);
+                const result = await api.replan(tripId, minutes);
+                let html = `<p class="mb-4">${result.explanation}</p>`;
+                if (result.affectedItems.length) {
+                    html += `<div class="mb-4"><div class="font-bold text-sm mb-2">Affected Items:</div>`;
+                    result.affectedItems.forEach(i => { html += `<div class="text-sm">• ${i}</div>`; });
+                    html += `</div>`;
+                }
+                html += `<div class="flex justify-between"><span>Original Cost</span><span>${formatCurrency(result.originalPlan.totalCost)}</span></div>`;
+                html += `<div class="flex justify-between"><span>Revised Cost</span><span class="font-bold">${formatCurrency(result.revisedPlan.totalCost)}</span></div>`;
+                if (result.additionalCost > 0) html += `<div class="flex justify-between" style="color:var(--red);"><span>Additional Cost</span><span class="font-bold">${formatCurrency(result.additionalCost)}</span></div>`;
+                document.getElementById('replanModalBody').innerHTML = html;
+                document.getElementById('replanModal').classList.add('active');
+                tripData = await api.getTrip(tripId);
+                renderTrip();
+            } catch (e) { alert('Replan error: ' + e.message); }
+        }
+
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+        document.querySelectorAll('.modal-overlay').forEach(m => {
+            m.addEventListener('click', (e) => { if (e.target === m) m.classList.remove('active'); });
+        });
+
+        loadTrip();
+    </script>
+</body>
+</html>

@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plan Trip - TripMind AI</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        .hr-label{font-weight:700;font-size:.9rem;color:var(--slate-600,#475569);margin-top:1rem;padding-top:.9rem;border-top:1px solid var(--slate-100,#e2e8f0);}
+        .spot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:1rem;margin-top:1rem;}
+        .spot-card{border:2px solid var(--slate-100,#e2e8f0);border-radius:.8rem;padding:.9rem;cursor:pointer;transition:.15s;position:relative;background:#fff;}
+        .spot-card:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(0,0,0,.08);}
+        .spot-card.picked{border-color:var(--amber,#eab308);background:linear-gradient(180deg,#fffbeb,#fff);}
+        .spot-card img{width:100%;height:130px;object-fit:cover;border-radius:.5rem;background:var(--slate-50,#f1f5f9);}
+        .spot-pick-badge{position:absolute;top:.6rem;right:.6rem;width:26px;height:26px;border-radius:50%;background:var(--amber,#eab308);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:.85rem;box-shadow:0 2px 6px rgba(0,0,0,.2);}
+        .star-mini{color:var(--amber,#eab308);}
+        .rank-chip{font-size:.7rem;font-weight:700;letter-spacing:.04em;padding:.15rem .5rem;border-radius:999px;background:var(--slate-100,#e2e8f0);color:var(--slate-600,#475569);}
+        .chip-p1{background:var(--amber,#eab308);color:#fff;}
+        .chip-p0{background:#ecfdf5;color:#059669;}
+        .sel-bar{position:sticky;bottom:1rem;background:rgba(255,255,255,.96);border:1px solid var(--slate-200,#e2e8f0);border-radius:.9rem;padding:.8rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem;box-shadow:0 10px 30px rgba(0,0,0,.12);z-index:5;}
+        .sel-bar .n{font-weight:700;color:var(--amber,#b45309);}
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="navbar-brand">
+                <span class="brand-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-7-7 18-2.5-7.5L3 11z"></path></svg>
+                </span>
+                TripMind AI
+            </a>
+            <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+            <div class="navbar-links" id="navLinks">
+                <a href="/">Home</a>
+                <a href="dashboard.html">Dashboard</a>
+                <a href="planner.html" class="active">Plan Trip</a>
+                <a href="mindmap.html">Route Map</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container" style="padding-top:2rem;padding-bottom:4rem;max-width:960px;">
+        <!-- STEP 1 : Trip details -->
+        <div id="stepDetails">
+            <h1 style="font-size:1.75rem;font-weight:700;margin-bottom:.5rem;">Plan Your Trip</h1>
+            <p class="text-sm text-muted mb-6">Fill in your trip details below — the AI plans the itinerary from your choices.</p>
+
+            <div class="card mb-4">
+                <div class="card-header"><div class="card-title">Trip Details</div></div>
+                <div class="card-content">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                        <div class="form-group">
+                            <label class="form-label">Origin</label>
+                            <input id="origin" class="form-input" placeholder="e.g., Coimbatore">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Destination</label>
+                            <input id="destination" class="form-input" placeholder="e.g., Chennai">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Start Date</label>
+                            <input id="startDate" type="date" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">End Date</label>
+                            <input id="endDate" type="date" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Travelers</label>
+                            <input id="travelers" type="number" class="form-input" min="1" max="20" value="2">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Budget per Traveler (INR)</label>
+                            <div style="display:flex;gap:.5rem;align-items:center;">
+                                <input id="budget" type="number" class="form-input" min="0" value="50000" style="flex:1;">
+                                <label class="form-label" style="white-space:nowrap;margin:0;">
+                                    <input type="checkbox" id="budgetUnlimited" style="accent-color:var(--amber,#eab308);"> Unlimited
+                                </label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Travel Style</label>
+                            <select id="travelStyle" class="form-select">
+                                <option value="BUDGET">Budget</option>
+                                <option value="BALANCED" selected>Balanced</option>
+                                <option value="PREMIUM">Premium</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Service Preference</label>
+                            <select id="servicePreference" class="form-select">
+                                <option value="">No preference</option>
+                                <option value="TRANSPORT">Comfortable transport</option>
+                                <option value="HOTELS">Better hotels</option>
+                                <option value="ACTIVITIES">More activities & spots</option>
+                                <option value="GUIDE">Local guides</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="hr-label">Starting point (Google Maps) <span style="color:#dc2626;">*</span></div>
+                    <p class="text-sm text-muted" style="margin:.35rem 0 .75rem;">Pick exactly where the trip starts — this is <b>mandatory</b> and the AI uses it for routing.</p>
+                    <div style="display:grid;grid-template-columns:1fr auto;gap:.5rem;">
+                        <div class="form-group">
+                            <input id="startAddr" class="form-input" placeholder="Search your starting location…">
+                        </div>
+                        <div class="form-group">
+                            <button class="btn btn-outline" type="button" onclick="openStartMap()">Pick on map</button>
+                        </div>
+                    </div>
+                    <input id="startLat" type="hidden"><input id="startLng" type="hidden">
+                    <div id="startMap" style="height:220px;border:1px solid var(--slate-100);border-radius:.6rem;display:none;margin-bottom:1rem;"></div>
+                    <p class="text-sm text-muted" id="startNote" style="font-size:.78rem;color:#dc2626;">Origin not selected yet — you must pick your starting point on the map.</p>
+                    <div class="hr-label" style="margin-top:1rem;">Destination (Google Maps)</div>
+                    <p class="text-sm text-muted" style="margin:.35rem 0 .75rem;">Pick where the trip ends — the destination coordinates improve routing. If you skip this, the Destination text above is used.</p>
+                    <div style="display:grid;grid-template-columns:1fr auto;gap:.5rem;">
+                        <div class="form-group">
+                            <input id="destAddr" class="form-input" placeholder="Search your destination…">
+                        </div>
+                        <div class="form-group">
+                            <button class="btn btn-outline" type="button" onclick="openDestMap()">Pick on map</button>
+                        </div>
+                    </div>
+                    <input id="destLat" type="hidden"><input id="destLng" type="hidden">
+                    <div id="destMap" style="height:220px;border:1px solid var(--slate-100);border-radius:.6rem;display:none;margin-bottom:1rem;"></div>
+                    <p class="text-sm text-muted" id="destNote" style="font-size:.78rem;">Destination location not selected — the Destination text will be used.</p>
+                    <button class="btn btn-primary btn-lg w-full mt-4" onclick="goToSpots()">Continue — Choose Tourist Spots →</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 2 : Tourist spot selection (ML-ranked, priority order) -->
+        <div id="stepSpots" class="hidden">
+            <h1 style="font-size:1.75rem;font-weight:700;margin-bottom:.5rem;">Choose Your Tourist Spots</h1>
+            <p class="text-sm text-muted mb-2">Spots are ranked by our recommendation engine. <b>Tap spots in the order you prefer</b> — your click order becomes the priority the optimizer must honor.</p>
+            <p class="text-sm text-muted" style="margin-bottom:1rem;">You can pick up to 4. If you don't care, just use <i>“I Have No Choice”</i>.</p>
+            <div class="flex gap" style="margin-bottom:.5rem;">
+                <button class="btn btn-outline" onclick="pickNone()">I Have No Choice — AI picks</button>
+                <button class="btn btn-outline" onclick="resetPicks()">Reset choices</button>
+            </div>
+            <div id="spotGrid" class="spot-grid">
+                <div class="text-muted">Loading recommendation engine…</div>
+            </div>
+            <div class="sel-bar" id="selBar" style="display:none;">
+                <div><span class="n" id="selCount">0</span> selected in priority order <span class="text-muted" id="selList"></span></div>
+                <div class="flex gap">
+                    <button class="btn btn-outline" onclick="resetPicks()">Reset</button>
+                    <button class="btn btn-primary" onclick="submitTrip()">Generate Travel Plans</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="processingScreen" class="hidden">
+            <div class="card">
+                <div class="card-content">
+                    <h2 style="text-align:center;margin-bottom:1.5rem;">Generating Your Travel Plans</h2>
+                    <div class="processing-steps">
+                        <div class="processing-step" id="step1"><div class="step-dot"></div><span>Matching transport & hotels…</span></div>
+                        <div class="processing-step" id="step2"><div class="step-dot"></div><span>Honouring your spot priorities…</span></div>
+                        <div class="processing-step" id="step3"><div class="step-dot"></div><span>Building the daily itinerary…</span></div>
+                        <div class="processing-step" id="step4"><div class="step-dot"></div><span>Optimizing budget & comfort…</span></div>
+                        <div class="processing-step" id="step5"><div class="step-dot"></div><span>Generating recommendations…</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/maps.js"></script>
+    <script>
+        const navToggle = document.getElementById('navToggle');
+        const navLinks = document.getElementById('navLinks');
+        if (navToggle) navToggle.addEventListener('click', () => {
+            const open = navLinks.classList.toggle('open');
+            navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+
+        const params = new URLSearchParams(window.location.search);
+        const picked = [];   // ordered spot ids (priority = position)
+
+        (async () => { await guardLogin(); })();
+
+        let TM_start = null;
+        async function openStartMap() {
+            const mapDiv = document.getElementById('startMap');
+            if (!TM_start && window.TM_MAPS && await window.TM_MAPS.init()) {
+                mapDiv.style.display = 'block';
+                TM_start = window.TM_MAPS.initLocationPicker({
+                    addressId: 'startAddr', latId: 'startLat', lngId: 'startLng', mapId: 'startMap', required: true,
+                });
+                document.getElementById('startNote').textContent = 'Click the map or drag the marker to set your exact starting point.';
+            } else if (!TM_start) {
+                alert('Google Maps is not configured. Please type the starting address manually.');
+            }
+        }
+        function readStartLocation() {
+            const lat = document.getElementById('startLat').value;
+            const lng = document.getElementById('startLng').value;
+            if (!lat || !lng) return null;
+            const address = document.getElementById('startAddr').value.trim();
+            return TM_start ? { lat: parseFloat(lat), lng: parseFloat(lng), address: address || `(${lat},${lng})` } : null;
+        }
+
+        let TM_dest = null;
+        async function openDestMap() {
+            const mapDiv = document.getElementById('destMap');
+            if (!TM_dest && window.TM_MAPS && await window.TM_MAPS.init()) {
+                mapDiv.style.display = 'block';
+                TM_dest = window.TM_MAPS.initLocationPicker({
+                    addressId: 'destAddr', latId: 'destLat', lngId: 'destLng', mapId: 'destMap',
+                });
+                document.getElementById('destNote').textContent = 'Click the map or drag the marker to set the destination.';
+            } else if (!TM_dest) {
+                alert('Google Maps is not configured. Please type the destination address manually.');
+            }
+        }
+        function readDestLocation() {
+            const lat = document.getElementById('destLat').value;
+            const lng = document.getElementById('destLng').value;
+            if (!lat || !lng) return null;
+            const address = document.getElementById('destAddr').value.trim();
+            return TM_dest ? { lat: parseFloat(lat), lng: parseFloat(lng), address: address || `(${lat},${lng})` } : null;
+        }
+
+        function goToSpots() {
+            const required = ['origin', 'destination', 'startDate', 'endDate'];
+            for (const id of required) {
+                if (!document.getElementById(id).value.trim()) {
+                    alert('Please fill in all required fields.'); return;
+                }
+            }
+            if (!readStartLocation()) {
+                alert('Please pick your exact starting point on the map — Origin is required.');
+                openStartMap();
+                return;
+            }
+            document.getElementById('stepDetails').classList.add('hidden');
+            document.getElementById('stepSpots').classList.remove('hidden');
+            loadSpotRanking();
+        }
+
+        async function loadSpotRanking() {
+            const grid = document.getElementById('spotGrid');
+            grid.innerHTML = '<div class="text-muted">Querying recommendation engine…</div>';
+            const dest = document.getElementById('destination').value.trim();
+            let resp;
+            try {
+                resp = await api.mlRecommendSpots({ city: dest || '', limit: 12 });
+            } catch (e) {
+                grid.innerHTML = `<div class="text-muted">${esc(e.message)}</div>`;
+                return;
+            }
+            const spots = (resp.result && resp.result.spots) || [];
+            if (!spots.length) { grid.innerHTML = '<div class="text-muted">No approved tourist spots are available yet — the Admin must approve spot content first.</div>'; return; }
+            const statusBadge = resp.status === 'COLD_START' || resp.status === 'INITIAL'
+                ? '<span class="rank-chip chip-p0">Cold start · ranked by popularity</span>'
+                : '<span class="rank-chip chip-p1">ML ranked</span>';
+            grid.innerHTML = spots.map(s => `
+                <div class="spot-card" data-id="${esc(s.id)}" data-name="${esc(s.name)}">
+                    ${esc(resp.status) === 'COLD_START' || resp.status === 'INITIAL'
+                        ? '<span class="rank-chip chip-p0" style="position:absolute;top:.6rem;left:.6rem;">cold-start</span>'
+                        : '<span class="rank-chip chip-p1" style="position:absolute;top:.6rem;left:.6rem;">AI pick</span>'}
+                    <div class="spot-pick-badge" style="display:none;"></div>
+                    <img src="${s.image || ''}" alt="${esc(s.name)}" onerror="this.style.display='none'">
+                    <div style="margin-top:.5rem;font-weight:700;">${esc(s.name)}</div>
+                    <div class="text-muted" style="font-size:.78rem;">${esc(s.city || s.category || '')}</div>
+                    <div style="font-size:.82rem;margin-top:.25rem;display:flex;justify-content:space-between;">
+                        <span class="star-mini">${'★'.repeat(Math.round(s.rating || 0)) || '—'}</span>
+                        <span>₹${Number(s.entryFee || 0).toLocaleString('en-IN')}</span>
+                    </div>
+                </div>`).join('');
+            grid.querySelectorAll('.spot-card').forEach(c => c.addEventListener('click', () => togglePick(c)));
+            const h = document.querySelector('#stepSpots h1');
+            if (h) h.insertAdjacentHTML('beforeend', ' ' + statusBadge);
+            updateSelBar();
+        }
+
+        function togglePick(card) {
+            const id = card.dataset.id;
+            const idx = picked.indexOf(id);
+            if (idx >= 0) { picked.splice(idx, 1); }
+            else if (picked.length < 4) { picked.push(id); }
+            else { alert('You can pick up to 4 spots. Clear one first if you want to swap.'); return; }
+            renderPicks();
+        }
+        function renderPicks() {
+            document.querySelectorAll('.spot-card').forEach(c => {
+                const i = picked.indexOf(c.dataset.id);
+                c.classList.toggle('picked', i >= 0);
+                const badge = c.querySelector('.spot-pick-badge');
+                badge.style.display = i >= 0 ? 'flex' : 'none';
+                badge.textContent = i >= 0 ? '#' + (i + 1) : '';
+            });
+            updateSelBar();
+        }
+        function updateSelBar() {
+            document.getElementById('selBar').style.display = 'flex';
+            document.getElementById('selCount').textContent = picked.length + '/4';
+            const names = [];
+            picked.forEach(id => {
+                const c = document.querySelector(`.spot-card[data-id="${id}"]`);
+                if (c) names.push(c.dataset.name || id);
+            });
+            document.getElementById('selList').textContent = names.length ? '→ ' + names.join(' → ') : '';
+        }
+        function resetPicks() { picked.length = 0; renderPicks(); }
+        function pickNone() {
+            picked.length = 0;
+            renderPicks();
+            submitTrip();
+        }
+
+        async function submitTrip() {
+            const startLocation = readStartLocation();
+            const destLocation = readDestLocation();
+            const unlimited = document.getElementById('budgetUnlimited').checked;
+            const data = {
+                origin: document.getElementById('origin').value || startLocation?.address || '',
+                destination: destLocation?.address || document.getElementById('destination').value,
+                startDate: document.getElementById('startDate').value,
+                endDate: document.getElementById('endDate').value,
+                travelers: parseInt(document.getElementById('travelers').value),
+                budget: unlimited ? 0 : parseInt(document.getElementById('budget').value),
+                budgetUnlimited: unlimited,
+                travelStyle: document.getElementById('travelStyle').value,
+                servicePreference: document.getElementById('servicePreference').value || null,
+                prioritizedSpotIds: picked,
+            };
+            if (startLocation) data.startLocation = startLocation;
+            if (destLocation) data.destinationLocation = destLocation;
+
+            document.getElementById('stepDetails').classList.add('hidden');
+            document.getElementById('stepSpots').classList.add('hidden');
+            document.getElementById('processingScreen').classList.remove('hidden');
+
+            try {
+                const steps = ['step1','step2','step3','step4','step5'];
+                for (let i = 0; i < steps.length; i++) {
+                    document.getElementById(steps[i]).classList.add('active');
+                    await new Promise(r => setTimeout(r, 550));
+                    document.getElementById(steps[i]).classList.remove('active');
+                    document.getElementById(steps[i]).classList.add('done');
+                }
+                const result = await api.createTrip(data);
+                await api.generatePlans(result.tripId);
+                window.location = `trip.html?id=${result.tripId}`;
+            } catch (e) {
+                alert('Error: ' + e.message);
+                document.getElementById('stepDetails').classList.remove('hidden');
+                document.getElementById('stepSpots').classList.remove('hidden');
+                document.getElementById('processingScreen').classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
