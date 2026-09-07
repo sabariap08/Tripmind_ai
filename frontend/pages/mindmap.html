@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Route Map - TripMind AI</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="navbar-brand">
+                <span class="brand-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-7-7 18-2.5-7.5L3 11z"></path></svg>
+                </span>
+                TripMind AI
+            </a>
+            <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+            <div class="navbar-links" id="navLinks">
+                <a href="/">Home</a>
+                <a href="dashboard.html">Dashboard</a>
+                <a href="planner.html">Plan Trip</a>
+                <a href="mindmap.html" class="active">Route Map</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container" style="padding-top:2rem;padding-bottom:4rem;max-width:860px;">
+        <div id="mmHeader" class="text-center mb-6">
+            <h1 style="font-size:1.75rem;font-weight:700;">KPR → Coimbatore → Chennai</h1>
+            <p class="text-sm text-muted mt-2" id="mmTagline"></p>
+        </div>
+
+        <!-- Path summary -->
+        <div id="pathSummary" class="mm-summary hidden">
+            <div class="mm-summary-label">Selected journey</div>
+            <div id="pathChips" class="mm-chips"></div>
+            <button class="btn btn-ghost btn-sm" onclick="resetJourney()">Reset</button>
+        </div>
+
+        <div id="loading" class="text-center" style="padding:4rem;">
+            <div class="spinner"></div>
+            <p class="text-sm text-muted mt-2">Loading journey map...</p>
+        </div>
+
+        <div id="mmError" class="empty-state hidden">
+            <h3>Could not load the journey map</h3>
+            <p id="mmErrorMsg" class="text-sm text-muted"></p>
+            <button class="btn btn-primary" onclick="loadFlow()">Try again</button>
+        </div>
+
+        <div id="journeyContainer" class="mm-root hidden"></div>
+    </div>
+
+    <script src="../js/api.js"></script>
+    <script>
+        const navToggle = document.getElementById('navToggle');
+        const navLinks = document.getElementById('navLinks');
+        if (navToggle) navToggle.addEventListener('click', () => {
+            const open = navLinks.classList.toggle('open');
+            navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+    </script>
+    <script>
+        let flow = null;
+        const state = {};          // stageId -> selected option id (or spots: [])
+        const STATE_ORDER = {};    // stageId -> [sub-stage ids] driven by flow
+
+        function initState() {
+            Object.keys(state).forEach(k => delete state[k]);
+            state.spots = [];
+            const byId = {};
+            (flow.stages || []).forEach(s => byId[s.id] = s);
+            (flow.stages || []).forEach(s => {
+                state[s.id] = null;
+                if (s.options && s.options.some(o => o.classes)) {
+                    // for a transport module with classes, track the class selection too
+                    STATE_ORDER[s.id] = [s.id, s.id + '-class'];
+                    state[s.id + '-class'] = null;
+                }
+            });
+        }
+
+        async function loadFlow() {
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('mmError').classList.add('hidden');
+            document.getElementById('journeyContainer').classList.add('hidden');
+            document.getElementById('pathSummary').classList.add('hidden');
+            try {
+                flow = await api.getMindmapFlow();
+                initState();
+                document.getElementById('mmHeader').querySelector('h1').textContent = flow.title;
+                document.getElementById('mmTagline').textContent = flow.tagline || '';
+                renderJourney();
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('journeyContainer').classList.remove('hidden');
+            } catch (e) {
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('mmErrorMsg').textContent = (e && e.message) || 'Unexpected error occurred.';
+                document.getElementById('mmError').classList.remove('hidden');
+            }
+        }
+
+        function resolveDisplayStageHidden(stage) {
+            if (!stage.depends) return false;
+            const dep = stage.depends;
+            if (dep.branch === 'hotel') return state.branch !== 'hotel';
+            if (dep.branch === 'set') return state.branch === null;
+            return false;
+        }
+
+        function stageById(id, stages) {
+            return (stages || flow.stages).find(s => s.id === id);
+        }
+
+        function renderJourney() {
+            const root = document.getElementById('journeyContainer');
+            root.innerHTML = '';
+            flow.stages.forEach((stage) => {
+                const el = document.createElement('div');
+                el.id = `stage-${stage.id}`;
+                el.className = 'mm-stage hidden';
+                root.appendChild(el);
+            });
+            flow.stages.forEach((stage) => {
+                renderStage(stage);
+            });
+            renderSummary();
+        }
+
+        function renderStage(stage) {
+            const el = document.getElementById(`stage-${stage.id}`);
+            if (!el) return;
+            if (resolveDisplayStageHidden(stage)) {
+                el.classList.add('hidden');
+                return;
+            }
+            el.classList.remove('hidden');
+            if (!el.dataset.rendered) {
+                el.innerHTML = stageMarkup(stage);
+                el.dataset.rendered = '1';
+                bindStage(stage, el);
+            } else {
+                refreshStage(stage, el);
+            }
+            updateStageHighlight(stage, el);
+        }
+
+        function refreshStage(stage, el) {
+            if (stage.type === 'spots') renderSpots();
+        }
+
+        function stageMarkup(stage) {
+            let inner = '';
+            switch (stage.type) {
+                case 'info':
+                    inner = `<div class="mm-node ${stage.icon ? 'mm-node-large' : ''}"><div class="mm-node-body"><div class="mm-node-icon">${stage.icon || ''}</div><div class="mm-node-title">${stage.title}</div><div class="mm-node-sub">${stage.subtitle || ''}</div></div></div>`;
+                    break;
+                case 'single':
+                    inner = stageHeader(stage) + `<div class="mm-options-grid">${stage.options.map(o => singleOptionMarkup(stage.id, o)).join('')}</div>`;
+                    break;
+                case 'group':
+                    inner = stageHeader(stage) + `<div class="mm-options-grid">${stage.options.map(o => groupOptionMarkup(stage, o)).join('')}</div><div id="classList-${stage.id}" class="mm-class-list"></div>`;
+                    break;
+                case 'branch':
+                    inner = stageHeader(stage) + `<div class="mm-options-grid mm-branch-grid">${stage.options.map(o => branchOptionMarkup(stage.id, o)).join('')}</div>`;
+                    break;
+                case 'hotels':
+                    inner = stageHeader(stage) + `<div class="mm-options-grid">${stage.categories.map(c => categoryOptionMarkup(stage.id, c)).join('')}</div><div id="hotelList" class="mm-hotel-list"></div>`;
+                    break;
+                case 'reach':
+                    inner = stageHeader(stage) + reachMarkup(stage.from, 'hotel-reach');
+                    break;
+                case 'spots':
+                    inner = stageHeader(stage) + `<div id="spotList" class="mm-spots-grid">${stage.spots.map(s => spotMarkup(s)).join('')}</div><div id="visitedSpots" class="mm-visited"></div>`;
+                    break;
+                case 'return':
+                    inner = stageHeader(stage) + `<div class="mm-options-grid">${stage.options.map(o => singleOptionMarkup(stage.id, o)).join('')}</div>`;
+                    break;
+            }
+            return inner;
+        }
+
+        function stageHeader(stage) {
+            return `<div class="mm-stage-head"><span class="mm-stage-icon">${stage.icon || ''}</span><div><div class="mm-stage-title">${stage.title}</div><div class="mm-stage-sub">${stage.subtitle || ''}</div></div></div>${stage.info ? `<div class="mm-stage-info">${stage.info}</div>` : ''}`;
+        }
+
+        function singleOptionMarkup(stageId, o) {
+            return `
+                <button class="mm-option" data-stage="${stageId}" data-id="${o.id}" data-name="${esc(o.name)}" data-icon="${o.icon || ''}">
+                    <span class="mm-opt-icon">${o.icon || ''}</span>
+                    <span class="mm-opt-name">${o.name}</span>
+                    ${o.note ? `<span class="mm-opt-note">${o.note}</span>` : ''}
+                    ${o.distance ? `<span class="mm-opt-meta">${o.distance} · ${o.duration || ''}</span>` : ''}
+                    ${o.code ? `<span class="mm-opt-code">${o.code}</span>` : ''}
+                    ${o.desc ? `<span class="mm-opt-desc">${o.desc}</span>` : ''}
+                    ${o.costRange ? `<span class="mm-opt-cost">≈ ${o.costRange}</span>` : ''}
+                    ${o.route ? `<span class="mm-opt-route">${o.route}</span>` : ''}
+                </button>`;
+        }
+
+        function groupOptionMarkup(stage, o) {
+            return `
+                <button class="mm-option" data-stage="${stage.id}" data-id="${o.id}" data-name="${esc(o.name)}" data-icon="${o.icon || ''}">
+                    <span class="mm-opt-icon">${o.icon || ''}</span>
+                    <span class="mm-opt-name">${o.name}</span>
+                    ${o.distance ? `<span class="mm-opt-meta">${o.distance} · ${o.duration || ''}</span>` : ''}
+                </button>`;
+        }
+
+        function branchOptionMarkup(stageId, o) {
+            return `
+                <button class="mm-option mm-branch-option" data-stage="${stageId}" data-id="${o.id}" data-name="${esc(o.name)}" data-icon="${o.icon || ''}">
+                    <span class="mm-opt-icon">${o.icon || ''}</span>
+                    <span class="mm-opt-name">${o.name}</span>
+                    <span class="mm-opt-desc">${o.desc || ''}</span>
+                </button>`;
+        }
+
+        function categoryOptionMarkup(stageId, c) {
+            return `
+                <button class="mm-option" data-stage="${stageId}" data-id="${c.id}" data-name="${esc(c.name)}" data-icon="${c.icon || ''}">
+                    <span class="mm-opt-icon">${c.icon || ''}</span>
+                    <span class="mm-opt-name">${c.name}</span>
+                    <span class="mm-opt-cost">≈ ${c.priceRange}</span>
+                </button>`;
+        }
+
+        function spotMarkup(s) {
+            return `
+                <button class="mm-option mm-spot" data-spot="${s.id}" data-name="${esc(s.name)}" data-icon="${s.icon || ''}">
+                    <span class="mm-opt-icon">${s.icon || ''}</span>
+                    <span class="mm-opt-name">${s.name}</span>
+                    <span class="mm-opt-note">${s.category}</span>
+                    <span class="mm-opt-route">Best: ${s.bestTime}</span>
+                </button>`;
+        }
+
+        function hotelMarkup(h, idx) {
+            return `
+                <button class="mm-option mm-hotel" data-hotel-idx="${idx}" data-name="${esc(h.name)}">
+                    <span class="mm-opt-icon"></span>
+                    <span class="mm-opt-name">${h.name}</span>
+                    <span class="mm-opt-note">${h.location} · ${h.rating}★</span>
+                    <span class="mm-opt-cost">≈ ${h.priceRange}</span>
+                    <span class="mm-opt-desc">${(h.amenities || []).join(' · ')}</span>
+                    <span class="mm-opt-route">From: ${h.distanceFrom}</span>
+                </button>`;
+        }
+
+        function reachMarkup(fromList, containerId) {
+            return `<div id="${containerId}" class="mm-reach">${fromList.map(r => `
+                <div class="mm-reach-block">
+                    <div class="mm-reach-from">From ${r.from}</div>
+                    <div class="mm-options-grid mm-reach-grid">
+                        ${r.methods.map(m => `
+                            <div class="mm-option mm-option-static">
+                                <span class="mm-opt-icon">${transportIcon(m.mode)}</span>
+                                <span class="mm-opt-name">${m.mode}</span>
+                                <span class="mm-opt-note">${m.distance || ''}</span>
+                                <span class="mm-opt-route">${m.duration}${m.route ? ' · ' + m.route : ''}</span>
+                            </div>`).join('')}
+                    </div>
+                </div>`).join('')}</div>`;
+        }
+
+        function transportIcon(mode) {
+            return '';
+        }
+
+        function bindStage(stage, el) {
+            if (stage.type === 'group') {
+                el.querySelectorAll('.mm-option').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        state[stage.id] = btn.dataset.id;
+                        state[stage.id + '-class'] = null;
+                        renderClassList();
+                        renderStages();
+                    });
+                });
+            } else if (stage.type === 'single' || stage.type === 'branch' || stage.type === 'return') {
+                el.querySelectorAll('.mm-option').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        state[stage.id] = btn.dataset.id;
+                        if (stage.type === 'branch' || stage.type === 'return') {
+                            handleBranchChange();
+                        }
+                        renderStages();
+                    });
+                });
+            } else if (stage.type === 'hotels') {
+                el.querySelectorAll('.mm-option[data-stage="' + stage.id + '"]').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        state[stage.id + '-cat'] = btn.dataset.id;
+                        state[stage.id + '-hotel'] = null;
+                        renderHotelList();
+                        renderStages();
+                    });
+                });
+            } else if (stage.type === 'spots') {
+                el.querySelectorAll('.mm-spot').forEach(btn => {
+                    btn.addEventListener('click', () => addSpot(btn.dataset.spot, btn.dataset.name, btn.dataset.icon));
+                });
+            }
+        }
+
+        function findStage(type) {
+            return (flow.stages || []).find(s => s.type === type) || null;
+        }
+
+        function handleBranchChange() {
+            if (state.branch === 'hotel') {
+                const hotelsStage = findStage('hotels');
+                if (hotelsStage && !state[hotelsStage.id + '-cat']) state[hotelsStage.id + '-cat'] = null;
+            }
+        }
+
+        function renderClassList() {
+            const stage = findStage('group');
+            if (!stage) return;
+            const listEl = document.getElementById(`classList-${stage.id}`);
+            const modeId = state[stage.id];
+            const mode = stage.options.find(m => m.id === modeId);
+            if (!mode || !listEl) return;
+            if (listEl.innerHTML === '' && !mode.classes) return;
+            listEl.innerHTML = `<div class="mm-stage-sub mm-class-head">${mode.name} services</div>` +
+                `<div class="mm-options-grid">${(mode.classes || []).map(c => `
+                    <button class="mm-option mm-class-opt" data-class="${c.id}" data-name="${esc(c.name)}" data-icon="">
+                        <span class="mm-opt-icon"></span>
+                        <span class="mm-opt-name">${c.name}</span>
+                        ${c.note ? `<span class="mm-opt-note">${c.note}</span>` : ''}
+                        ${c.costRange ? `<span class="mm-opt-cost">≈ ${c.costRange}</span>` : ''}
+                    </button>`).join('')}</div>`;
+            listEl.querySelectorAll('.mm-class-opt').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    state[stage.id + '-class'] = btn.dataset.class;
+                    renderStages();
+                });
+            });
+            if (state[stage.id + '-class']) {
+                listEl.querySelectorAll('.mm-class-opt').forEach(btn => {
+                    if (btn.dataset.class === state[stage.id + '-class']) btn.classList.add('selected');
+                });
+            }
+        }
+
+        function renderHotelList() {
+            const stage = findStage('hotels');
+            if (!stage) return;
+            const listEl = document.getElementById('hotelList');
+            const cat = stage.categories.find(c => c.id === state[stage.id + '-cat']);
+            if (!cat || !listEl) return;
+            listEl.innerHTML = `<div class="mm-stage-sub mm-class-head">Hotels — ${cat.name}</div>` +
+                `<div class="mm-options-grid">${(cat.hotels || []).map((h, i) => hotelMarkup(h, i)).join('')}</div>`;
+            listEl.querySelectorAll('.mm-hotel').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    state[stage.id + '-hotel'] = (cat.hotels || [])[parseInt(btn.dataset.hotelIdx)].name;
+                    renderStages();
+                });
+            });
+        }
+
+        function addSpot(id, name, icon) {
+            if (state.spots.some(s => s.id === id)) return;
+            state.spots.push({ id, name, icon });
+            renderSpots();
+            renderStages();
+            renderSummary();
+            const spotsStage = document.getElementById('stage-tourist-spots');
+            const next = spotsStage ? spotsStage.nextElementSibling : null;
+            if (next) next.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function renderSpots() {
+            const stage = stageById('tourist-spots');
+            if (!stage) return;
+            const visitedEl = document.getElementById('visitedSpots');
+            const spotsStageEl = document.getElementById('stage-tourist-spots');
+            const listEl = spotsStageEl ? spotsStageEl.querySelector('.mm-spots-grid') : null;
+            if (listEl) {
+                listEl.querySelectorAll('.mm-spot').forEach(btn => {
+                    const selected = state.spots.some(s => s.id === btn.dataset.spot);
+                    btn.classList.toggle('selected', selected);
+                });
+            }
+            if (visitedEl) {
+                if (!state.spots.length) { visitedEl.innerHTML = ''; return; }
+                visitedEl.innerHTML = `<div class="mm-visited-label">Your spot chain</div>` +
+                    `<div class="mm-chips">${state.spots.map((s, i) =>
+                        `<span class="mm-chip">${i + 1}. ${s.icon} ${s.name}</span>`
+                    ).join('')}</div>`;
+            }
+            if (stage.spots) {
+                const chain = state.spots;
+                if (chain.length) {
+                    const lastSpotId = chain[chain.length - 1].id;
+                    const lastSpot = stage.spots.find(s => s.id === lastSpotId);
+                    const reachEl = document.getElementById('spotReachDetail');
+                    if (lastSpot && lastSpot.reach) {
+                        if (reachEl) reachEl.remove();
+                        const holder = document.createElement('div');
+                        holder.id = 'spotReachDetail';
+                        holder.className = 'mm-reach-detail';
+                        holder.innerHTML = `<div class="mm-stage-sub mm-class-head">How to reach ${lastSpot.name} from your location</div>` +
+                            lastSpot.reach.map(r => `
+                                <div class="mm-reach-block">
+                                    <div class="mm-reach-from">From ${r.from}</div>
+                                    <div class="mm-options-grid mm-reach-grid">
+                                        ${r.methods.map(m => `
+                                            <div class="mm-option mm-option-static">
+                                                <span class="mm-opt-icon">${transportIcon(m.mode)}</span>
+                                                <span class="mm-opt-name">${m.mode}</span>
+                                                <span class="mm-opt-note">${m.distance || ''}</span>
+                                                <span class="mm-opt-route">${m.duration}${m.route ? ' · ' + m.route : ''}</span>
+                                            </div>`).join('')}
+                                    </div>
+                                </div>`).join('');
+                        const spotsStageEl2 = document.getElementById('stage-tourist-spots');
+                        if (spotsStageEl2) spotsStageEl2.appendChild(holder);
+                    }
+                }
+            }
+        }
+
+        function renderStages() {
+            (flow.stages).forEach(stage => {
+                const el = document.getElementById(`stage-${stage.id}`);
+                const hidden = resolveDisplayStageHidden(stage);
+                el.classList.toggle('hidden', hidden);
+                if (!hidden) {
+                    renderStage(stage);
+                }
+            });
+            renderSummary();
+        }
+
+        function updateStageHighlight(stage, el) {
+            if (stage.type === 'group') {
+                el.querySelectorAll('.mm-option').forEach(btn => {
+                    btn.classList.toggle('selected', btn.dataset.id === state[stage.id]);
+                });
+                renderClassList();
+                return;
+            }
+            if (stage.type === 'single' || stage.type === 'branch' || stage.type === 'return') {
+                el.querySelectorAll('.mm-option').forEach(btn => {
+                    btn.classList.toggle('selected', btn.dataset.id === state[stage.id]);
+                });
+                return;
+            }
+            if (stage.type === 'hotels') {
+                el.querySelectorAll('.mm-option[data-stage="' + stage.id + '"]').forEach(btn => {
+                    btn.classList.toggle('selected', btn.dataset.id === state[stage.id + '-cat']);
+                });
+                renderHotelList();
+                const sel = currentSelectedHotelBtn(el);
+                if (sel) sel.classList.add('selected');
+                return;
+            }
+            if (stage.type === 'spots') renderSpots();
+        }
+
+        function currentSelectedHotelBtn(el) {
+            const list = el.querySelector('#hotelList');
+            if (!list) return null;
+            const stage = findStage('hotels');
+            if (!stage) return null;
+            const btns = list.querySelectorAll('.mm-hotel');
+            let found = null;
+            btns.forEach(btn => {
+                const cat = stage.categories.find(c => c.id === state[stage.id + '-cat']);
+                const chosen = state[stage.id + '-hotel'];
+                if (cat && chosen && (cat.hotels || [])[parseInt(btn.dataset.hotelIdx)].name === chosen) {
+                    btn.classList.add('selected');
+                    found = btn;
+                } else {
+                    btn.classList.remove('selected');
+                }
+            });
+            return found;
+        }
+
+        function chipLabel(stage) {
+            const val = state[stage.id];
+            if (!val) return '';
+            if (stage.type === 'group') {
+                const mode = stage.options.find(o => o.id === val);
+                const cls = mode ? (mode.classes || []).find(c => c.id === state[stage.id + '-class']) : null;
+                return mode ? `${mode.name}${cls ? ' · ' + cls.name : ''}` : '';
+            }
+            if (stage.type === 'hotels') {
+                const cat = stage.categories.find(c => c.id === state[stage.id + '-cat']);
+                return cat ? cat.name : '';
+            }
+            if (stage.type === 'spots' || stage.type === 'reach' || stage.type === 'info') return '';
+            const opt = stage.options ? stage.options.find(o => o.id === val) : null;
+            return opt ? opt.name : val;
+        }
+
+        function renderSummary() {
+            const summaryEl = document.getElementById('pathSummary');
+            const chipsEl = document.getElementById('pathChips');
+            const chips = [];
+
+            (flow.stages || []).forEach(stage => {
+                if (stage.type === 'branch') {
+                    if (state[stage.id] === 'hotel') {
+                        chips.push('Hotel');
+                        const hotels = findStage('hotels');
+                        if (hotels && state[hotels.id + '-hotel']) chips.push(state[hotels.id + '-hotel']);
+                    } else if (state[stage.id] === 'direct') {
+                        chips.push('Tourist Spots directly');
+                    }
+                    return;
+                }
+                const label = chipLabel(stage);
+                if (label) chips.push(label);
+            });
+
+            state.spots.forEach(s => chips.push(s.name));
+
+            if (chips.length) {
+                chipsEl.innerHTML = chips.map(c => `<span class="mm-chip">${c}</span>`).join('');
+                summaryEl.classList.remove('hidden');
+            } else {
+                summaryEl.classList.add('hidden');
+            }
+        }
+
+        function resetJourney() {
+            Object.keys(state).forEach(k => { state[k] = null; });
+            state.spots = [];
+            document.querySelectorAll('.mm-stage').forEach(el => { el.dataset.rendered = ''; el.classList.add('hidden'); });
+            renderJourney();
+            document.getElementById('mmHeader').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function esc(v) {
+            return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        loadFlow();
+    </script>
+</body>
+</html>

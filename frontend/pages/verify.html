@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Ticket - TripMind AI</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="navbar-brand">
+                <span class="brand-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-7-7 18-2.5-7.5L3 11z"></path></svg>
+                </span>
+                TripMind AI
+            </a>
+            <div class="navbar-links" id="navLinks">
+                <a href="/">Home</a>
+                <a href="dashboard.html">Dashboard</a>
+                <a href="planner.html">Plan Trip</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container" style="padding-top:2rem;padding-bottom:4rem;max-width:560px;">
+        <div id="verifyResult" class="text-center" style="padding:2rem 0;"></div>
+    </div>
+
+    <script src="../js/api.js"></script>
+    <script>
+        const qs = new URLSearchParams(location.search);
+        const token = qs.get('token') || '';
+        const out = document.getElementById('verifyResult');
+
+        function render(ok, title, lines) {
+            out.innerHTML =
+                `<div class="card" style="text-align:center;">
+                    <div style="font-size:3rem;margin:.5rem 0;color:${ok ? '#059669' : '#b91c1c'};">${ok ? '&#10004;' : '&#10007;'}</div>
+                    <h2 style="font-weight:700;margin-bottom:.75rem;">${title}</h2>
+                    ${lines.map(l => `<p class="text-muted" style="margin:.25rem 0;">${l}</p>`).join('')}
+                    <a href="/" class="btn btn-outline mt-4">Go to Home</a>
+                </div>`;
+        }
+
+        (async () => {
+            if (!token) { render(false, 'No ticket provided', ['Scan the QR code on your ticket to verify it.']); return; }
+            try {
+                const r = await api.verifyTicket(token);
+                if (r.valid && r.status === 'CONFIRMED') {
+                    render(true, 'Valid ticket',
+                        [r.type + ' · ' + r.reference + ' · ' + r.date, 'This ticket is confirmed for travel.']);
+                } else if (r.valid) {
+                    render(false, 'Ticket status: ' + r.status,
+                        [r.type + ' · ' + r.reference, 'This ticket is no longer confirmed for travel.']);
+                } else {
+                    render(false, 'Invalid ticket', [r.reason || 'This ticket could not be verified.']);
+                }
+            } catch (e) {
+                render(false, 'Verification unavailable', [(e && e.message) || 'Please try again later.']);
+            }
+        })();
+    </script>
+</body>
+</html>

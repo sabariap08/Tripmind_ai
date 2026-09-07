@@ -1,10 +1,11 @@
-from datetime import datetime, timedelta
-from copy import deepcopy
-from services.mock_flight_service import search_flights
-from services.mock_hotel_service import search_hotels
-from services.mock_transport_service import search_transport, search_airport_transfer
-from services.mock_activity_service import search_activities, search_food
-from services.travel_optimizer import optimize_itinerary
+"""Travel plan orchestrator.
+
+Plans are built ONLY from registered catalogue data (transports, spots, tours,
+guides, hotels) present in the database. When no registered services exist for
+the requested corridor the API returns an explicit empty state — it never
+fabricates inventory or falls back to hardcoded mock services.
+"""
+from datetime import datetime
 
 
 def parse_trip_request(request_data):
@@ -28,123 +29,72 @@ def parse_trip_request(request_data):
         "currency": request_data.get("currency", "INR"),
         "travelStyle": request_data.get("travelStyle", "BALANCED"),
         "foodPreference": request_data.get("foodPreference"),
+        "transportType": request_data.get("transportType"),
+        # User-chosen starting point (lat/lng/address) from the Google Maps picker.
+        "startLocation": request_data.get("startLocation"),
+        # Manual structured-planning inputs (NEW flow)
+        "budgetUnlimited": bool(request_data.get("budgetUnlimited")) or request_data.get("budget") in (None, 0),
+        "servicePreference": request_data.get("servicePreference"),
+        "prioritizedSpotIds": request_data.get("prioritizedSpotIds") or [],
     }
 
 
-def generate_travel_plans(request_data):
+def generate_travel_plans(request_data, db_data=None):
     parsed = parse_trip_request(request_data)
-    style = parsed["travelStyle"]
 
-    flights = search_flights(parsed["origin"], parsed["destination"], parsed["startDate"], style, 5)
-    hotels = search_hotels(parsed["destination"], parsed["startDate"], parsed["endDate"], style, 3)
-    transports = search_transport(parsed["origin"], parsed["destination"], 3)
-    activities = search_activities(parsed["destination"], 4)
-    foods = search_food(parsed["destination"], parsed.get("foodPreference"), 2)
+    if not db_data or not (db_data.get("transports") or db_data.get("spots")
+                           or db_data.get("guides") or db_data.get("hotels")):
+        return {
+            "selectedPlan": None,
+            "plans": [],
+            "aiExplanation": (
+                f"No registered travel services are available for "
+                f"{parsed['origin'] or 'your origin'} → "
+                f"{parsed['destination'] or 'your destination'} yet. "
+                "To plan and book this trip, a transport provider (and optionally "
+                "hotel/guide/tour operators) must first register services here."),
+            "parsedRequest": parsed,
+            "ml": {},
+            "source": "empty",
+        }
 
-    plan_types = ["BUDGET", "BALANCED", "PREMIUM"]
+    return _generate_db_plans(parsed, db_data)
+
+
+def _generate_db_plans(parsed, db_data):
+    from services.trip_optimizer import build_db_plan
     plans = []
-    for pt in plan_types:
-        plan = optimize_itinerary(flights, hotels, transports, activities, foods, parsed, pt)
-        plans.append(plan)
-
+    for pt in ("BUDGET", "BALANCED", "PREMIUM"):
+        plans.append(build_db_plan(parsed, db_data, pt))
     plans.sort(key=lambda p: p["optimizationScore"], reverse=True)
-
-    selected_plan = plans[0]
-    ai_explanation = _generate_ai_explanation(selected_plan, parsed)
-
+    selected = plans[0]
+    ai = []
+    ai.append(f"Optimized a {parsed['durationDays']}-day itinerary for {parsed['destination']} "
+              f"using live catalogue data (transports, tourist spots, guides).")
+    budget_note = ("with an unlimited budget (premium eligible)."
+                   if parsed.get('budgetUnlimited')
+                   else f"within ₹{parsed['budget']:,.0f} budget.")
+    ai.append(f"Total estimated cost ₹{selected['totalCost']:,.0f} {budget_note}")
     return {
-        "selectedPlan": selected_plan,
+        "selectedPlan": selected,
         "plans": plans,
-        "aiExplanation": ai_explanation,
+        "aiExplanation": " ".join(ai) or "AI plan generated.",
         "parsedRequest": parsed,
+        "ml": _ml_predictions(parsed),
+        "source": "db",
     }
 
 
-def simulate_flight_delay(plan, delay_minutes):
-    affected_items = []
-    for day in plan.get("dailyPlan", []):
-        for item in day.get("items", []):
-            if item["type"] == "FLIGHT":
-                item["status"] = "DELAYED"
-                affected_items.append({
-                    "title": item["title"],
-                    "originalTime": item["startTime"],
-                    "delayMinutes": delay_minutes,
-                    "newTime": (datetime.fromisoformat(item["startTime"]) + timedelta(minutes=delay_minutes)).isoformat(),
-                })
-            elif item["type"] in ["TRANSFER", "HOTEL", "ACTIVITY", "FOOD"]:
-                if day["day"] == 1:
-                    item["status"] = "AFFECTED"
-                    affected_items.append({
-                        "title": item["title"],
-                        "reason": "Downstream impact from flight delay",
-                    })
-    return {
-        "affectedItems": affected_items,
-        "delayMinutes": delay_minutes,
-        "severity": "LOW" if delay_minutes < 120 else ("MEDIUM" if delay_minutes < 240 else "HIGH"),
-    }
-
-
-def generate_replan(original_plan, delay_minutes, request_data):
-    parsed = parse_trip_request(request_data)
-    new_plan = deepcopy(original_plan)
-    extra_cost = 0
-
-    for day in new_plan.get("dailyPlan", []):
-        for item in day.get("items", []):
-            if item["type"] == "FLIGHT":
-                dep = datetime.fromisoformat(item["startTime"])
-                arr = datetime.fromisoformat(item["endTime"])
-                item["startTime"] = (dep + timedelta(minutes=delay_minutes)).isoformat()
-                item["endTime"] = (arr + timedelta(minutes=delay_minutes)).isoformat()
-                item["status"] = "RESCHEDULED"
-                if delay_minutes > 180:
-                    extra_cost += int(delay_minutes / 60 * 500)
-            elif item["type"] == "TRANSFER" and day["day"] == 1:
-                st = datetime.fromisoformat(item["startTime"])
-                et = datetime.fromisoformat(item["endTime"])
-                item["startTime"] = (st + timedelta(minutes=delay_minutes)).isoformat()
-                item["endTime"] = (et + timedelta(minutes=delay_minutes)).isoformat()
-                item["status"] = "RESCHEDULED"
-            elif item["type"] == "HOTEL" and day["day"] == 1:
-                st = datetime.fromisoformat(item["startTime"])
-                item["startTime"] = (st + timedelta(minutes=delay_minutes)).isoformat()
-                item["status"] = "RESCHEDULED"
-
-    new_plan["totalCost"] = new_plan.get("totalCost", 0) + extra_cost
-    new_plan["reasoning"] = [
-        f"Replanned due to {delay_minutes}-minute delay.",
-        f"Additional cost: ₹{extra_cost:,}" if extra_cost else "No additional cost.",
-        "All affected items have been rescheduled.",
-    ]
-
-    affected_items = []
-    for day in new_plan.get("dailyPlan", []):
-        for item in day.get("items", []):
-            if item.get("status") == "RESCHEDULED":
-                affected_items.append(item["title"])
-
-    return {
-        "revisedPlan": new_plan,
-        "originalCost": original_plan.get("totalCost", 0),
-        "revisedCost": new_plan["totalCost"],
-        "additionalCost": extra_cost,
-        "affectedItems": affected_items,
-        "explanation": f"Flight delayed by {delay_minutes} minutes. All downstream items rescheduled. {'Additional charges of ₹' + str(extra_cost) + ' applied for rebooking.' if extra_cost else 'No additional charges.'}",
-    }
-
-
-def _generate_ai_explanation(plan, parsed):
-    parts = []
-    parts.append(f"Based on your {parsed['travelStyle'].lower()} travel preference for {parsed['destination']},")
-    if plan.get("flight"):
-        parts.append(f"I recommend flying with {plan['flight']['airline']} (₹{plan['flight']['price']:,})")
-    if plan.get("hotel"):
-        parts.append(f"and staying at {plan['hotel']['name']} ({plan['hotel']['stars']}★, ₹{plan['hotel']['pricePerNight']:,}/night)")
-    parts.append(f"for your {parsed['durationDays']}-day trip.")
-    parts.append(f"Total estimated cost: ₹{plan['totalCost']:,} out of your ₹{parsed['budget']:,} budget.")
-    remaining = parsed['budget'] - plan['totalCost']
-    if remaining > 0:
-        parts.append(f"You'll have ₹{remaining:,} remaining for additional expenses.")
-    return " ".join(parts)
+def _ml_predictions(parsed):
+    ml = {}
+    try:
+        from services.ml.injector import predict_delay, predict_trip_cost
+        delay = predict_delay(parsed["origin"], parsed["destination"])
+        if delay:
+            ml["delayPrediction"] = delay
+        cost = predict_trip_cost(parsed)
+        if cost:
+            ml["costPrediction"] = cost
+    except Exception:
+        pass
+    return ml

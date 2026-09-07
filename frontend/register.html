@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account - TripMind AI</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .auth-wrap { min-height: calc(100vh - 70px); display: flex; align-items: center; justify-content: center; padding: 3rem 1rem; }
+        .auth-card { width: 100%; max-width: 640px; }
+        .auth-msg { min-height: 1.5rem; }
+        .hint { font-size: .78rem; color: var(--muted,#6b7280); }
+        .hint2 { font-size: .74rem; color: var(--muted,#6b7280); margin-top: .25rem; }
+
+        /* Wizard stepper */
+        .wiz-steps { display: flex; gap: .5rem; margin-bottom: 1.5rem; }
+        .wiz-step { flex: 1; text-align: center; font-size: .72rem; color: var(--muted,#6b7280);
+            padding: .45rem .25rem; border-radius: .5rem; background: var(--slate-100,#f1f5f9); position: relative; }
+        .wiz-step.active { color: var(--primary,#2563eb); background: var(--primary-soft,#dbeafe); font-weight: 600; }
+        .wiz-step.done { color: var(--success,#16a34a); background: var(--success-soft,#dcfce7); }
+
+        /* Account type cards */
+        .role-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .75rem; }
+        .role-card { display: block; width: 100%; text-align: left; padding: 1rem; border-radius: .75rem; cursor: pointer;
+            border: 1.5px solid var(--slate-200,#e2e8f0); background: var(--slate-50,#f8fafc); transition: all .15s ease; }
+        .role-card:hover { border-color: var(--primary,#2563eb); }
+        .role-card.selected { border-color: var(--primary,#2563eb); background: var(--primary-soft,#dbeafe); }
+        .role-card-icon { display: flex; align-items: center; justify-content: center; width: 2.6rem; height: 2.6rem;
+            border-radius: .65rem; background: var(--primary-soft,#dbeafe); color: var(--primary,#2563eb); margin-bottom: .6rem; }
+        .role-card-icon svg { width: 1.4rem; height: 1.4rem; }
+        .role-card-title { font-weight: 600; margin-bottom: .3rem; }
+        .role-card-desc { font-size: .78rem; color: var(--muted,#6b7280); margin-bottom: .5rem; }
+        .role-card-note { font-size: .7rem; font-weight: 600; color: var(--primary,#2563eb); }
+        .reg-section-title { margin: 1.1rem 0 .5rem; font-weight: 700; color: var(--text,#0f172a); }
+        .wiz-sub { font-size: .85rem; color: var(--muted,#6b7280); margin-bottom: 1rem; }
+        .detail-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: .35rem .75rem; }
+        .detail-item { padding: .3rem 0; border-bottom: 1px dashed var(--slate-200,#e2e8f0); font-size: .85rem;
+            display: flex; justify-content: space-between; gap: .5rem; }
+        .detail-item .k { color: var(--muted,#6b7280); }
+        .summary-note { margin-top: .5rem; font-size: .78rem; color: var(--success,#16a34a); }
+        .wiz-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; gap: .5rem; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="navbar-brand">
+                <span class="brand-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-7-7 18-2.5-7.5L3 11z"></path></svg>
+                </span>
+                TripMind AI
+            </a>
+            <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+            <div class="navbar-links" id="navLinks">
+                <a href="/">Home</a>
+                <a href="/login.html">Sign In</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="auth-wrap">
+        <div class="card auth-card">
+            <div class="card-header"><div class="card-title" id="wizTitle">Create your account</div></div>
+            <div class="card-content">
+                <div class="wiz-steps" id="wizSteps">
+                    <div class="wiz-step">Account Type</div>
+                    <div class="wiz-step">Basic Details</div>
+                    <div class="wiz-step">Identity &amp; Contact</div>
+                    <div class="wiz-step">Review &amp; Confirm</div>
+                </div>
+                <div class="auth-msg" id="authMsg"></div>
+                <div id="wizContent"></div>
+                <div class="wiz-actions">
+                    <button class="btn btn-outline" id="wizBack" style="display:none;">Back</button>
+                    <button class="btn btn-primary" id="wizNext">Choose Account Type</button>
+                </div>
+                <p class="text-muted mt-4" style="text-align:center;">
+                    Already have an account? <a href="/login.html">Sign in</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/maps.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/register.js"></script>
+</body>
+</html>

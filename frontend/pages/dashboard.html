@@ -9,11 +9,20 @@
 <body>
     <nav class="navbar">
         <div class="container">
-            <a href="/" class="navbar-brand"><span>🧠</span> TripMind AI</a>
-            <div class="navbar-links">
+            <a href="/" class="navbar-brand">
+                <span class="brand-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-7-7 18-2.5-7.5L3 11z"></path></svg>
+                </span>
+                TripMind AI
+            </a>
+            <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+            <div class="navbar-links" id="navLinks">
                 <a href="/">Home</a>
                 <a href="dashboard.html" class="active">Dashboard</a>
                 <a href="planner.html">Plan Trip</a>
+                <a href="mindmap.html">Route Map</a>
             </div>
         </div>
     </nav>
@@ -25,7 +34,6 @@
                 <p class="text-sm text-muted mt-1">Manage and track all your travel plans</p>
             </div>
             <div class="flex gap-2">
-                <button class="btn btn-outline" onclick="loadDemoTrip()">Load Demo Trip</button>
                 <a href="planner.html" class="btn btn-primary">+ New Trip</a>
             </div>
         </div>
@@ -54,8 +62,18 @@
     <script src="../js/api.js"></script>
     <script src="../js/utils.js"></script>
     <script>
+        const navToggle = document.getElementById('navToggle');
+        const navLinks = document.getElementById('navLinks');
+        if (navToggle) navToggle.addEventListener('click', () => {
+            const open = navLinks.classList.toggle('open');
+            navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+    </script>
+    <script>
         async function loadTrips() {
             try {
+                const me = await guardLogin();
+                if (!me) return;
                 const trips = await api.getTrips();
                 document.getElementById('loading').classList.add('hidden');
                 if (!trips.length) {
@@ -83,9 +101,9 @@
                                 ${getStatusBadge(trip.status)}
                             </div>
                             <div class="trip-meta">
-                                <span>📅 ${formatDate(trip.startDate)} - ${formatDate(trip.endDate)}</span>
-                                <span>👥 ${trip.travelers} traveler${trip.travelers > 1 ? 's' : ''}</span>
-                                <span>🎨 ${trip.travelStyle}</span>
+                                <span>${formatDate(trip.startDate)} – ${formatDate(trip.endDate)}</span>
+                                <span>${trip.travelers} traveler${trip.travelers > 1 ? 's' : ''}</span>
+                                <span>${trip.travelStyle}</span>
                             </div>
                             <div class="trip-cost">
                                 <div>
@@ -103,20 +121,6 @@
                 `).join('');
             } catch (e) {
                 document.getElementById('loading').innerHTML = `<p class="text-muted">Error loading trips: ${e.message}</p>`;
-            }
-        }
-
-        async function loadDemoTrip() {
-            try {
-                const result = await api.createTrip({
-                    origin: 'Coimbatore', destination: 'New York',
-                    startDate: '2026-03-15', endDate: '2026-03-22',
-                    travelers: 2, budget: 150000, travelStyle: 'BALANCED',
-                });
-                await api.generatePlans(result.tripId);
-                window.location = `trip.html?id=${result.tripId}`;
-            } catch (e) {
-                alert('Error creating demo trip: ' + e.message);
             }
         }
 

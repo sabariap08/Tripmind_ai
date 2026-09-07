@@ -9,11 +9,20 @@
 <body>
     <nav class="navbar">
         <div class="container">
-            <a href="/" class="navbar-brand"><span>🧠</span> TripMind AI</a>
-            <div class="navbar-links">
+            <a href="/" class="navbar-brand">
+                <span class="brand-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-7-7 18-2.5-7.5L3 11z"></path></svg>
+                </span>
+                TripMind AI
+            </a>
+            <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+            <div class="navbar-links" id="navLinks">
                 <a href="/">Home</a>
                 <a href="dashboard.html">Dashboard</a>
                 <a href="planner.html">Plan Trip</a>
+                <a href="mindmap.html">Route Map</a>
             </div>
         </div>
     </nav>
@@ -115,18 +124,29 @@
                 <button id="chatSend" class="chat-send">Send</button>
             </div>
         </div>
-        <button id="chatToggle" class="chat-toggle">💬</button>
+        <button id="chatToggle" class="chat-toggle" aria-label="Open trip chat">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </button>
     </div>
 
     <script src="../js/api.js"></script>
     <script src="../js/utils.js"></script>
     <script src="../js/chat.js"></script>
     <script>
+        const navToggle = document.getElementById('navToggle');
+        const navLinks = document.getElementById('navLinks');
+        if (navToggle) navToggle.addEventListener('click', () => {
+            const open = navLinks.classList.toggle('open');
+            navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+    </script>
+    <script>
         let tripData = null;
         let selectedPlanIndex = 0;
         const tripId = new URLSearchParams(window.location.search).get('id');
 
         async function loadTrip() {
+            if (!(await guardLogin())) return;
             if (!tripId) { window.location = 'dashboard.html'; return; }
             try {
                 tripData = await api.getTrip(tripId);
@@ -170,8 +190,8 @@
                 html += `<div class="card-content">`;
                 const flight = itin.items?.find(i => i.type === 'FLIGHT');
                 const hotel = itin.items?.find(i => i.type === 'HOTEL');
-                if (flight) html += `<div class="flex justify-between mb-2"><span>✈️ ${flight.title}</span><span class="font-bold">${formatCurrency(flight.cost)}</span></div>`;
-                if (hotel) html += `<div class="flex justify-between mb-2"><span>🏨 ${hotel.title}</span><span class="font-bold">${formatCurrency(hotel.cost)}</span></div>`;
+                if (flight) html += `<div class="flex justify-between mb-2"><span><b class="cost-label">Flight</b> ${flight.title}</span><span class="font-bold">${formatCurrency(flight.cost)}</span></div>`;
+                if (hotel) html += `<div class="flex justify-between mb-2"><span><b class="cost-label">Stay</b> ${hotel.title}</span><span class="font-bold">${formatCurrency(hotel.cost)}</span></div>`;
                 html += `<div class="flex justify-between mb-2"><span>Estimated Total</span><span class="font-bold" style="color:var(--primary);">${formatCurrency(itin.totalCost)}</span></div>`;
                 if (itin.reasoning && itin.reasoning.length) {
                     html += `<div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--slate-100);"><div class="text-xs font-bold text-muted mb-2">WHY THIS PLAN</div>`;
@@ -194,11 +214,12 @@
                 days[day].forEach(item => {
                     const cls = getTypeColor(item.type);
                     html += `<div class="timeline-item ${cls} animate-fade-in">`;
-                    html += `<div class="timeline-type" style="color:var(--slate-500);">${getTypeIcon(item.type)} ${item.type}</div>`;
+                    html += `<div class="timeline-type" style="color:var(--slate-500);">${item.type}</div>`;
                     html += `<div style="font-weight:600;">${item.title}</div>`;
                     if (item.provider) html += `<div class="text-xs text-muted">${item.provider}</div>`;
                     if (item.startTime) html += `<div class="text-xs text-muted">${formatTime(item.startTime)}${item.endTime ? ' - ' + formatTime(item.endTime) : ''}</div>`;
-                    html += `<div class="text-sm font-bold" style="color:var(--primary);">${formatCurrency(item.cost)}</div>`;
+                    html += `<div class="flex justify-between align-center"><div class="text-sm font-bold" style="color:var(--primary);">${formatCurrency(item.cost)}</div>`;
+                    if (item.status !== 'BOOKED') html += `<button class="btn btn-outline btn-sm" onclick="removeItineraryItem('${item._id}')">Remove</button></div>`;
                     if (item.status === 'DELAYED' || item.status === 'RESCHEDULED') html += `<span class="badge badge-warning" style="margin-top:0.25rem;">${item.status}</span>`;
                     html += `</div>`;
                 });
@@ -207,11 +228,27 @@
             document.getElementById('tab-timeline').innerHTML = html;
         }
 
+        async function removeItineraryItem(itemId) {
+            if (!confirm('Remove this item from the itinerary?')) return;
+            const res = await api.editItineraryItems(tripId, 'remove', { itemId });
+            const current = getSelectedItinerary();
+            if (current && res.itinerary) {
+                current.items = res.itinerary.items || [];
+                if (res.itinerary.version) current.version = res.itinerary.version;
+                current.totalCost = (res.itinerary.items || []).reduce((s, it) => s + (it.cost || 0), 0);
+                tripData.totalEstimatedCost = current.totalCost;
+            }
+            renderOverview();
+            renderTimeline();
+            renderCost();
+            alert('Item removed.');
+        }
+
         function renderCost() {
             const itin = getSelectedItinerary();
             if (!itin) { document.getElementById('tab-cost').innerHTML = '<p class="text-muted">No cost data.</p>'; return; }
             const breakdown = itin.items?.reduce((acc, item) => {
-                const key = item.type === 'FLIGHT' ? 'flights' : item.type === 'HOTEL' ? 'hotel' : item.type === 'TRANSFER' ? 'transport' : item.type === 'ACTIVITY' ? 'activities' : 'food';
+                const key = item.type === 'FLIGHT' || item.type === 'HOTEL' ? (item.type === 'FLIGHT' ? 'flights' : 'hotel') : (item.type === 'TRANSFER' || item.type === 'BUS' || item.type === 'TRAIN' || item.type === 'CAB' || item.type === 'AUTO') ? 'transport' : (item.type === 'ACTIVITY' ? 'activities' : 'food');
                 acc[key] = (acc[key] || 0) + item.cost;
                 return acc;
             }, {}) || {};

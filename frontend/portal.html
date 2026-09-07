@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal · TripMind AI</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* ============ TripMind AI Portal shell (all roles) ============ */
+        :root {
+            --tm-accent: #f59e0b;
+            --tm-accent-dark: #d97706;
+            --tm-accent-soft: #fef3c7;
+            --tm-ink: #0f172a;
+            --tm-body: #64748b;
+            --tm-line: #e2e8f0;
+            --tm-line-soft: #f1f5f9;
+            --tm-surface: #ffffff;
+            --tm-danger: #dc2626;
+            --tm-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+        html, body.portal-page { overflow-x: hidden; }
+        body.portal-page {
+            background: #f4f5f7;
+            font-family: var(--tm-font);
+            color: var(--slate-800);
+        }
+
+        /* ---------- Top bar (full viewport, always shows hamburger) ---------- */
+        .portal-topbar {
+            position: sticky; top: 0; z-index: 80;
+            background: #ffffff;
+            border-bottom: 1px solid var(--tm-line);
+            height: 60px;
+        }
+        .portal-topbar-inner {
+            display: flex; align-items: center; gap: .9rem;
+            height: 100%; padding: 0 1.25rem; max-width: 100%;
+        }
+        .portal-menu-btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            background: none; border: 1px solid var(--tm-line);
+            border-radius: .55rem; color: var(--slate-700);
+            width: 2.45rem; height: 2.45rem; cursor: pointer; flex: 0 0 auto;
+            transition: background .15s, border-color .15s;
+        }
+        .portal-menu-btn:hover { background: var(--slate-50); border-color: var(--slate-300); }
+        .portal-menu-btn svg { width: 1.3rem; height: 1.3rem; }
+        .portal-brand {
+            display: flex; align-items: center; gap: .55rem; color: var(--slate-900);
+            font-weight: 800; font-size: 1.05rem; text-decoration: none; white-space: nowrap;
+        }
+        .portal-brand:hover { text-decoration: none; }
+        .portal-brand-mark {
+            width: 2rem; height: 2rem; border-radius: .5rem; flex: 0 0 auto;
+            background: linear-gradient(135deg, var(--tm-accent), var(--tm-accent-dark));
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+        .portal-brand-mark svg { width: 1.15rem; height: 1.15rem; }
+        .portal-title {
+            margin-left: .5rem; font-size: .95rem; font-weight: 600; color: var(--slate-600);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            border-left: 1px solid var(--tm-line); padding-left: 1rem;
+        }
+        .portal-topbar-user { margin-left: auto; display: flex; align-items: center; gap: .5rem; }
+        .user-chip {
+            display: inline-flex; align-items: center; gap: .55rem;
+            background: var(--tm-line-soft); border: 1px solid var(--tm-line);
+            padding: .3rem .8rem; border-radius: 99px; font-size: .82rem; color: var(--slate-700);
+            max-width: 260px; overflow: hidden;
+        }
+        .user-chip .user-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .role-badge {
+            background: var(--tm-accent-soft); color: var(--tm-accent-dark);
+            font-size: .66rem; font-weight: 800; padding: .12rem .5rem;
+            border-radius: 99px; letter-spacing: .04em; white-space: nowrap;
+        }
+
+        /* ---------- Drawer (off-canvas on ALL viewports) ---------- */
+        .portal-scrim {
+            position: fixed; inset: 0; background: rgba(15, 23, 42, .55); z-index: 65;
+            opacity: 0; visibility: hidden; transition: opacity .22s ease, visibility .22s ease;
+        }
+        .portal-scrim.open { opacity: 1; visibility: visible; }
+        .portal-sidebar {
+            position: fixed; top: 0; left: 0; bottom: 0; width: 300px; max-width: 86vw;
+            background: #fff; z-index: 70; overflow-y: auto;
+            transform: translateX(-100%); transition: transform .25s ease;
+            box-shadow: 0 20px 50px rgba(0,0,0,.22);
+            padding: 1.1rem 1rem 1.5rem;
+        }
+        .portal-sidebar.open { transform: translateX(0); }
+        .portal-sidebar-head {
+            display: flex; align-items: center; justify-content: space-between; gap: .5rem;
+            border-bottom: 1px solid var(--tm-line); padding-bottom: .9rem; margin-bottom: .75rem;
+        }
+        .portal-sidebar-head .user-name { font-weight: 800; color: var(--slate-800); font-size: .95rem; }
+        .portal-sidebar-head .user-sub { font-size: .75rem; color: var(--slate-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .portal-close-btn {
+            display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+            background: none; border: 1px solid var(--tm-line); border-radius: .5rem;
+            color: var(--slate-500); width: 2rem; height: 2rem; cursor: pointer;
+        }
+        .portal-close-btn:hover { background: var(--slate-50); color: var(--slate-700); }
+        .portal-close-btn svg { width: 1rem; height: 1rem; }
+        .portal-nav { display: flex; flex-direction: column; gap: .3rem; }
+        .portal-nav-group {
+            font-size: .68rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+            color: var(--slate-400); padding: .9rem .85rem .25rem;
+        }
+        .portal-nav a {
+            display: flex; align-items: center; gap: .65rem; text-decoration: none;
+            color: var(--slate-600); padding: .55rem .85rem; border-radius: .5rem;
+            font-weight: 600; font-size: .9rem; transition: background .15s, color .15s;
+        }
+        .portal-nav a:hover { background: var(--slate-50); color: var(--slate-900); text-decoration: none; }
+        .portal-nav a.active { background: var(--tm-accent); color: #fff; }
+        .portal-nav a.active:hover { background: var(--tm-accent); color: #fff; }
+        .portal-nav a .nav-icon { flex: 0 0 auto; width: 1.15rem; height: 1.15rem; }
+        .portal-nav a.portal-nav-logout {
+            margin-top: .75rem; color: var(--tm-danger); border-top: 1px solid var(--tm-line);
+            padding-top: .9rem;
+        }
+        .portal-nav a.portal-nav-logout:hover { background: #fef2f2; color: var(--tm-danger); }
+
+        /* ---------- Main content: FULL VIEWPORT ---------- */
+        .portal-main { width: 100%; padding: 1.35rem 1.25rem 3rem; }
+        .admin-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.1rem; }
+        .admin-head h1 { font-size: 1.45rem; font-weight: 800; color: var(--slate-900); letter-spacing: -.01em; margin: 0; }
+        .admin-head .admin-head-sub { font-size: .82rem; color: var(--slate-500); margin-top: .2rem; }
+
+        /* ---------- Admin panels (flat, structured — not cards) ---------- */
+        .admin-section {
+            background: var(--tm-surface); border: 1px solid var(--tm-line);
+            border-radius: .7rem; padding: 1.25rem 1.4rem; margin-bottom: 1.25rem;
+        }
+        .admin-section-title {
+            display: flex; align-items: center; gap: .6rem;
+            font-size: .76rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
+            color: var(--slate-500); margin-bottom: 1rem;
+        }
+        .admin-section-title::before { content: ''; width: 4px; height: 15px; border-radius: 2px; background: var(--tm-accent); }
+        .subsection-title { font-size: .8rem; font-weight: 700; color: var(--slate-700); margin-bottom: .6rem; }
+        .admin-section-note { margin-top: .8rem; font-size: .78rem; color: var(--slate-500); }
+        .admin-section-note .em { color: var(--slate-700); font-weight: 700; }
+
+        /* ---------- Tables ---------- */
+        .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .portal-main .row-table { width: 100%; border-collapse: collapse; }
+        .portal-main .row-table th {
+            text-align: left; font-size: .7rem; font-weight: 800; text-transform: uppercase;
+            letter-spacing: .05em; color: var(--slate-500);
+            padding: .55rem .75rem; border-bottom: 1px solid var(--tm-line); white-space: nowrap; background: var(--slate-50);
+        }
+        .portal-main .row-table td { padding: .65rem .75rem; border-bottom: 1px solid var(--tm-line-soft); vertical-align: middle; word-break: break-word; }
+        .portal-main .row-table tbody tr:hover { background: var(--slate-50); }
+
+        /* ---------- Card grids (fleet / rooms / food) ---------- */
+        .vehicle-grid, .room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: .85rem; }
+        .vehicle-card, .room-card { transition: transform .12s, box-shadow .12s; }
+        .vehicle-card:hover, .room-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.08); }
+        .mt-3 { margin-top: .75rem; }
+        .text-link { color: var(--tm-accent-dark); font-weight: 600; text-decoration: underline; cursor: pointer; }
+        .admin-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+        .admin-table th {
+            text-align: left; font-size: .7rem; font-weight: 800; text-transform: uppercase;
+            letter-spacing: .05em; color: var(--slate-500);
+            padding: .55rem .75rem; border-bottom: 1px solid var(--tm-line); white-space: nowrap; background: var(--slate-50);
+        }
+        .admin-table th:first-child { border-top-left-radius: 6px; }
+        .admin-table th:last-child { border-top-right-radius: 6px; }
+        .admin-table td { padding: .68rem .75rem; border-bottom: 1px solid var(--tm-line-soft); vertical-align: middle; }
+        .admin-table tbody tr { transition: background .12s; }
+        .admin-table tbody tr:hover { background: var(--slate-50); }
+        .admin-table tbody tr:last-child td { border-bottom: 0; }
+        .admin-table .u-name { font-weight: 700; color: var(--slate-800); }
+        .admin-table .u-email { font-size: .78rem; color: var(--slate-500); }
+        .mg-row { display: flex; align-items: center; gap: .85rem; padding: .42rem 0; }
+        .mg-label { width: 175px; font-size: .85rem; font-weight: 600; color: var(--slate-700); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mg-track { flex: 1; height: 10px; background: var(--slate-100); border-radius: 99px; overflow: hidden; }
+        .mg-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--tm-accent), var(--tm-accent-dark)); }
+        .mg-value { min-width: 2.2rem; text-align: right; font-weight: 700; color: var(--slate-800); font-size: .85rem; }
+
+        /* ---------- Dashboard metrics ---------- */
+        .metric-band { display: flex; flex-wrap: wrap; gap: 3rem; padding: .2rem 0 1.1rem; border-bottom: 1px solid var(--tm-line-soft); margin-bottom: 1.15rem; }
+        .metric { display: flex; flex-direction: column; gap: .1rem; }
+        .metric-value { font-size: 1.95rem; font-weight: 800; color: var(--slate-900); line-height: 1.1; letter-spacing: -.01em; }
+        .metric-label { font-size: .72rem; font-weight: 700; color: var(--slate-500); text-transform: uppercase; letter-spacing: .05em; }
+        .overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.9rem; }
+
+        /* ---------- Trips chart ---------- */
+        .chart-wrap { position: relative; min-height: 240px; }
+        .chart-grid { position: absolute; left: 0; right: 0; top: 0; bottom: 34px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
+        .chart-grid i { display: block; border-top: 1px dashed var(--tm-line); }
+        .trips-chart { position: relative; display: flex; align-items: flex-end; gap: 1.1rem; height: 240px; }
+        .trip-col { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: .35rem; }
+        .trip-value { font-size: .7rem; font-weight: 700; color: var(--slate-600); }
+        .trip-bar { width: 100%; max-width: 44px; background: linear-gradient(180deg, var(--tm-accent), var(--tm-accent-dark)); border-radius: .35rem .35rem 0 0; min-height: 3px; transition: height .5s ease; }
+        .trip-week { font-size: .7rem; color: var(--slate-500); white-space: nowrap; }
+
+        /* ---------- Toolbar (filters / search) ---------- */
+        .toolbar { display: flex; flex-wrap: wrap; gap: .55rem; align-items: center; margin-bottom: 1rem; }
+        .toolbar .toolbar-spacer { flex: 1 1 100%; }
+        .toolbar .form-input { width: auto; flex: 1 1 260px; min-width: 200px; }
+        .toolbar .form-select { width: auto; }
+
+        /* ---------- Status pills ---------- */
+        .pill { display: inline-flex; align-items: center; font-size: .72rem; font-weight: 700; padding: .18rem .6rem; border-radius: 99px; white-space: nowrap; }
+        .pill.ok { background: #d1fae5; color: #065f46; }
+        .pill.warn { background: #fef3c7; color: #92400e; }
+        .pill.bad { background: #fee2e2; color: #991b1b; }
+        .pill.info { background: #dbeafe; color: #1e40af; }
+        .pill.neutral { background: var(--slate-100); color: var(--slate-600); }
+        .pill.dark { background: var(--slate-800); color: #fff; }
+        .pill.soft { background: var(--tm-accent-soft); color: var(--tm-accent-dark); }
+
+        /* ---------- User details ---------- */
+        .ud-head { display: flex; align-items: center; justify-content: space-between; gap: .9rem; flex-wrap: wrap; margin-bottom: 1.1rem; }
+        .ud-title { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+        .ud-title h2 { font-size: 1.3rem; font-weight: 800; color: var(--slate-900); margin: 0; }
+        .ud-title .ud-email { font-size: .85rem; color: var(--slate-500); }
+        .details-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem; }
+        .detail-list { display: block; width: 100%; }
+        .detail-item { display: flex; justify-content: space-between; gap: 1.25rem; padding: .5rem 0; border-bottom: 1px dashed var(--tm-line-soft); }
+        .detail-item:last-child { border-bottom: 0; }
+        .detail-item .k { color: var(--slate-500); font-size: .8rem; flex: 0 0 45%; }
+        .detail-item .v { font-weight: 600; text-align: right; font-size: .84rem; color: var(--slate-800); word-break: break-word; }
+        .detail-item .v .muted2 { color: var(--slate-500); }
+        .image-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .75rem; }
+        .image-tile {
+            position: relative; aspect-ratio: 4 / 3; border-radius: .55rem; overflow: hidden;
+            background: var(--slate-100); border: 1px solid var(--tm-line); cursor: zoom-in;
+        }
+        .image-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .image-tile .tile-empty { display: flex; align-items: center; justify-content: center; height: 100%; padding: .5rem; color: var(--slate-400); font-size: .72rem; text-align: center; }
+        .doc-list { display: flex; flex-wrap: wrap; gap: .5rem; }
+        .doc-chip {
+            display: inline-flex; align-items: center; gap: .4rem; font-size: .76rem; font-weight: 600;
+            color: var(--slate-600); background: var(--slate-50); border: 1px solid var(--tm-line);
+            border-radius: 99px; padding: .3rem .7rem;
+        }
+        .doc-chip a { color: var(--slate-700); }
+        .doc-chip.small-img { padding: .2rem; border-radius: .5rem; overflow: hidden; }
+        .doc-chip.small-img img { width: 44px; height: 44px; object-fit: cover; display: block; }
+        .lightbox-img { display: flex; align-items: center; justify-content: center; margin-bottom: .9rem; }
+        .lightbox-img img { max-width: 100%; max-height: 66vh; border-radius: .5rem; }
+
+        /* ---------- State messages ---------- */
+        .state-msg { padding: 2.5rem 1rem; text-align: center; color: var(--slate-500); font-size: .9rem; }
+        .state-msg .state-title { font-size: 1rem; font-weight: 700; color: var(--slate-700); margin-bottom: .35rem; }
+        .state-msg .spinner { margin: 0 auto .9rem; }
+
+        /* ---------- Buttons (portal refinements) ---------- */
+        .portal-main .btn { border-radius: .5rem; font-weight: 600; }
+        .btn-danger { background: var(--tm-danger); color: #fff; }
+        .btn-danger:hover { background: #b91c1c; }
+        .btn-check { width: 100%; }
+
+        /* ---------- Dialogs (moved from inline portal.js injection) ---------- */
+        .modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: flex; align-items: center; justify-content: center; z-index: 90; padding: 1rem; }
+        .modal-box { background: #fff; border-radius: .85rem; box-shadow: 0 20px 50px rgba(0,0,0,.25); max-width: 520px; width: 100%; padding: 1.4rem 1.5rem; max-height: 90vh; overflow: auto; }
+        .modal-box.wide { max-width: 760px; }
+        .modal-box h3 { margin: 0 0 .4rem; font-size: 1.05rem; }
+        .modal-box .detail-list { margin-top: .75rem; }
+        .flex.gap { display: flex; gap: .5rem; }
+        .flex.end { justify-content: flex-end; }
+        .room-type-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .55rem 0; border-bottom: 1px solid var(--tm-line-soft); }
+        .star-row { display: flex; gap: .35rem; }
+        .star-btn { background: none; border: none; font-size: 1.6rem; color: var(--slate-300); cursor: pointer; line-height: 1; transition: transform .1s; }
+        .star-btn:hover { transform: scale(1.2); }
+
+        @media (max-width: 640px) {
+            .portal-title { display: none; }
+            .user-chip { max-width: 150px; }
+            .admin-section { padding: 1rem 1rem; }
+            .metric-band { gap: 1.75rem; }
+            .portal-main { padding: 1rem .9rem 2.5rem; }
+        }
+    </style>
+</head>
+<body class="portal-page">
+    <header class="portal-topbar">
+        <div class="portal-topbar-inner">
+            <button class="portal-menu-btn" id="portalMenuBtn" aria-label="Open menu" aria-expanded="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+            <a href="/" class="portal-brand">
+                <span class="portal-brand-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l18-7-7 18-2.5-7.5L3 11z"></path></svg>
+                </span>
+                TripMind AI
+            </a>
+            <div class="portal-title" id="portalTitle">Portal</div>
+            <div class="portal-topbar-user">
+                <div class="user-chip" id="userChip"></div>
+            </div>
+        </div>
+    </header>
+
+    <aside class="portal-sidebar" id="portalSidebar" aria-label="Portal navigation">
+        <div class="portal-sidebar-head">
+            <div style="min-width:0;">
+                <div class="user-name" id="userName">Portal</div>
+                <div class="user-sub" id="userSub">Signed out</div>
+            </div>
+            <button class="portal-close-btn" id="portalCloseBtn" aria-label="Close menu">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+            </button>
+        </div>
+        <nav class="portal-nav" id="portalNav"></nav>
+    </aside>
+    <div class="portal-scrim" id="portalScrim"></div>
+
+    <main class="portal-main" id="portalContent"></main>
+
+    <div id="toast" style="position:fixed;right:1rem;bottom:1rem;z-index:99;display:none;background:#0f172a;color:#fff;padding:.7rem 1.1rem;border-radius:.6rem;font-size:.85rem;max-width:340px;box-shadow:0 8px 24px rgba(0,0,0,.25);"></div>
+
+    <script src="js/api.js"></script>
+    <script src="js/maps.js"></script>
+    <script src="js/portal.js"></script>
+</body>
+</html>
