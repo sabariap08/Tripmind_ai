@@ -6,3 +6,4 @@ groq==0.28.0
 reportlab==5.0.0
 qrcode
 Pillow
+gunicorn==23.0.0
