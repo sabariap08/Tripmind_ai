@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TripMind AI - Intelligent Travel Planning</title>
+    <meta name="description" content="TripMind AI — plan, optimize and manage complete Indian journeys with AI orchestration. Own your itinerary, your bookings and your ticket in one place.">
+    <title>TripMind AI - Journey Beyond Imagination</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <nav class="navbar">
+    <nav class="navbar navbar-glass">
         <div class="container">
             <a href="/" class="navbar-brand">
                 <span class="brand-mark">
@@ -30,59 +31,121 @@
         </div>
     </nav>
 
-    <section class="hero">
-        <div class="container">
-            <span class="hero-eyebrow">AI-powered travel orchestration</span>
-            <h1>Your journey,<br><span class="gradient-text">intelligently planned</span></h1>
-            <p>Plan, optimize, and manage complete trips with AI assistance — from transport and stays to sightseeing and guides, all in one place.</p>
-            <div class="hero-actions">
-                <a href="/register.html" class="btn btn-primary btn-lg">Register Now</a>
-                <a href="/login.html" class="btn btn-outline btn-lg">Sign In</a>
+    <section class="cin-hero">
+        <img class="cin-hero-bg" src="https://images.unsplash.com/photo-1524492412937-b28074a5d7da?auto=format&fit=crop&w=1920&q=80"
+             alt="" fetchpriority="high" decoding="async"
+             onerror="if(window.tmDestFallback){this.classList.add('cin-hero-bg-fallback');}">
+        <span class="cin-hero-veil"></span>
+        <div class="cin-hero-inner container">
+            <span class="cin-eyebrow reveal-inline">AI-POWERED TRAVEL ORCHESTRATION</span>
+            <h1 class="cin-display">Journey beyond<br><em>imagination</em></h1>
+            <p class="cin-lede">Tell us where you dream of going. TripMind's AI builds budget, balanced and premium
+                itineraries across transport, stays, food and experiences — then books them all and hands you
+                <strong>one complete journey, one ticket, one QR</strong>.</p>
+            <div class="cin-ctas">
+                <a href="/register.html" class="btn btn-primary btn-lg">Start Planning Free</a>
+                <a href="#explore" class="btn btn-ghost btn-lg">Explore India</a>
             </div>
+            <div class="cin-stats">
+                <div class="cin-stat"><strong>3</strong><span>Itinerary styles</span></div>
+                <div class="cin-stat"><strong>1</strong><span>Journey ticket</span></div>
+                <div class="cin-stat"><strong>24/7</strong><span>AI co-pilot</span></div>
+            </div>
+        </div>
+        <a href="#explore" class="cin-scroll" aria-label="Scroll to explore">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+        </a>
+    </section>
+
+    <section class="cin-section" id="explore">
+        <div class="container">
+            <div class="cin-head" data-reveal>
+                <span class="cin-eyebrow">EXPLORE INDIA</span>
+                <h2 class="cin-title">Seven journeys,<br><em>one beautiful country</em></h2>
+                <p class="cin-sub">Hand-picked destinations to spark your next plan. Click any card to begin.</p>
+            </div>
+            <div class="dest-grid" id="destGrid"></div>
         </div>
     </section>
 
-    <section class="steps">
+    <section class="cin-section cin-section-alt">
         <div class="container">
-            <h2>How It Works</h2>
-            <div class="steps-grid">
-                <div class="step-card">
+            <div class="cin-head" data-reveal>
+                <span class="cin-eyebrow">HOW IT WORKS</span>
+                <h2 class="cin-title">From a spark<br>to a <em>booked journey</em></h2>
+            </div>
+            <div class="steps-grid cin-steps">
+                <div class="step-card" data-reveal>
                     <div class="step-icon" style="background:#fff7ed;color:#b45309;">
-                        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 10h18"></path></svg>
+                        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
                     </div>
                     <h3>Tell Us Your Trip</h3>
-                    <p>Enter destinations, dates, prefered stays and your budget — or go Unlimited.</p>
+                    <p>Pick destinations, dates, travellers and your budget — or set it Unlimited.</p>
                 </div>
-                <div class="step-card">
+                <div class="step-card" data-reveal>
                     <div class="step-icon" style="background:#eff6ff;color:#1d4ed8;">
                         <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
                     </div>
                     <h3>AI Builds Itineraries</h3>
-                    <p>The planning engine optimizes routes, transport, hotels and activities for you.</p>
+                    <p>Budget, Balanced and Premium plans optimize routes, stays, food and activities.</p>
                 </div>
-                <div class="step-card">
+                <div class="step-card" data-reveal>
                     <div class="step-icon" style="background:#fef3c7;color:#b45309;">
                         <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"></path><rect x="7" y="11" width="3" height="6"></rect><rect x="13" y="7" width="3" height="10"></rect></svg>
                     </div>
                     <h3>Compare &amp; Choose</h3>
-                    <p>Review Budget, Balanced and Premium plans side by side before you decide.</p>
+                    <p>Review every option side by side, then pick the plan that feels right.</p>
                 </div>
-                <div class="step-card">
+                <div class="step-card" data-reveal>
                     <div class="step-icon" style="background:#ecfdf5;color:#047857;">
                         <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9"></path><polyline points="22 3 12 13 9 10"></polyline></svg>
                     </div>
-                    <h3>Instant Replanning</h3>
-                    <p>Delays or plan changes? Your itinerary is rebuilt automatically around them.</p>
+                    <h3>Live Replanning</h3>
+                    <p>Delays or changes? Your itinerary is rebuilt instantly around what's real.</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <section class="features">
+    <section class="cin-band">
+        <div class="container cin-band-inner">
+            <div data-reveal>
+                <span class="cin-eyebrow">ONE TRIP. ONE TICKET.</span>
+                <h2 class="cin-title cin-title-light">Every booking, beautifully<br>united in a <em>single ticket</em></h2>
+                <p class="cin-sub cin-sub-light">Transport, stays, food, guides — booked through verified providers,
+                    packed into one PDF with one scannable QR for verification and check-in.</p>
+                <div class="cin-ctas">
+                    <a href="/register.html" class="btn btn-primary btn-lg">Create My Journey</a>
+                    <a href="/login.html" class="btn btn-ghost btn-lg">Sign In</a>
+                </div>
+            </div>
+            <div class="cin-taking" aria-hidden="true">
+                <div class="taking-ghost taking-a"></div>
+                <div class="taking-ghost taking-b"></div>
+                <div class="taking-card">
+                    <span class="tk-eyebrow">TRIPMIND <span class="tk-special">JOURNEY PASS</span></span>
+                    <div class="tk-qr">
+                        <svg viewBox="0 0 32 32" width="64" height="64" aria-hidden="true">
+                            <path d="M6 6h8v8H6zM18 6h8v8h-8zM6 18h8v8H6z" fill="none" stroke="#0f172a" stroke-width="2.4"/>
+                            <path d="M24 16h2v2h-2zM16 24h2v2h-2zM20 18h4v4h-2v-2h-2zM22 22h4v4h-4z" fill="#0f172a"/>
+                        </svg>
+                    </div>
+                    <div class="tk-line"></div>
+                    <div class="tk-route">Delhi <span></span> Udaipur</div>
+                    <div class="tk-beam"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="cin-section">
         <div class="container">
-            <h2>Why TripMind AI?</h2>
+            <div class="cin-head" data-reveal>
+                <span class="cin-eyebrow">WHY TRIPMIND AI</span>
+                <h2 class="cin-title">Planned smarter.<br><em>Travel lighter.</em></h2>
+            </div>
             <div class="features-grid">
-                <div class="card">
+                <div class="card" data-reveal>
                     <div class="card-content">
                         <div class="feature-icon">
                             <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#b45309" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 7.7l5.4-.8L12 2z"></path></svg>
@@ -91,44 +154,59 @@
                         <p class="text-sm text-muted">Multi-criteria optimization balancing cost, comfort, time and convenience.</p>
                     </div>
                 </div>
-                <div class="card">
+                <div class="card" data-reveal>
                     <div class="card-content">
                         <div class="feature-icon">
-                            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#1d4ed8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 15"></polyline></svg>
+                            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#1d4ed8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
                         </div>
                         <div class="card-title">Verified Providers</div>
-                        <p class="text-sm text-muted">Every transport, stay, spot and guide is reviewed and approved before going live.</p>
+                        <p class="text-sm text-muted">Every transport, stay, spot and guide is reviewed before going live.</p>
                     </div>
                 </div>
-                <div class="card">
+                <div class="card" data-reveal>
                     <div class="card-content">
                         <div class="feature-icon">
                             <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#047857" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M3 10h18"></path><path d="M7 15h3"></path></svg>
                         </div>
                         <div class="card-title">Smart Budgeting</div>
-                        <p class="text-sm text-muted">Cost-aware allocation across transport, stays, food and activities — or go Unlimited.</p>
+                        <p class="text-sm text-muted">Cost-aware allocation across transport, stays, food and activities.</p>
                     </div>
                 </div>
-                <div class="card">
+                <div class="card" data-reveal>
                     <div class="card-content">
                         <div class="feature-icon">
                             <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.3l2.7-11z"></path><path d="M7 22H4a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3"></path></svg>
                         </div>
                         <div class="card-title">Personalized Guidance</div>
-                        <p class="text-sm text-muted">Learning recommendations that improve with every trip, booking and rating.</p>
+                        <p class="text-sm text-muted">Recommendations that improve with every trip, booking and rating.</p>
                     </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <footer style="padding:2rem 0;text-align:center;color:var(--slate-500);font-size:0.875rem;border-top:1px solid var(--slate-200);margin-top:4rem;">
+    <section class="cin-cta-bar">
+        <div class="container cin-cta-inner">
+            <div>
+                <h2 class="cin-title cin-title-light">Your India is waiting.</h2>
+                <p class="cin-sub cin-sub-light">Plan your first journey in under two minutes — free, no card required.</p>
+            </div>
+            <div class="cin-ctas">
+                <a href="/register.html" class="btn btn-primary btn-lg">Get Started</a>
+                <a href="/login.html" class="btn btn-outline btn-lg">Sign In</a>
+            </div>
+        </div>
+    </section>
+
+    <footer style="padding:2.5rem 0;text-align:center;color:var(--slate-500);font-size:0.875rem;border-top:1px solid var(--slate-200);background:#fff;">
         <div class="container">
-            <p>TripMind AI — Intelligent Travel Orchestration</p>
+            <p>TripMind AI — Journey Beyond Imagination. Intelligent Travel Orchestration.</p>
+            <p style="margin-top:.25rem;font-size:.8rem;">Images via Unsplash · Each journey comes with one unified ticket &amp; QR</p>
         </div>
     </footer>
 
     <script src="js/api.js"></script>
+    <script src="js/destinations.js"></script>
     <script>
         const toggle = document.getElementById('navToggle');
         const links = document.getElementById('navLinks');
@@ -140,6 +218,9 @@
             links.classList.remove('open');
             toggle.setAttribute('aria-expanded', 'false');
         }));
+
+        tmRenderDestGrid('#destGrid');
+        tmReveal(document);
 
         (async () => {
             try {

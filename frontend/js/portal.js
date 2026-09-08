@@ -363,9 +363,165 @@
 
     /* ---------------- USER ---------------- */
 
+    const tripsStatusPill = (s) => `<span class="pill ${s === 'BOOKED' ? 'good' : s === 'COMPLETED' ? 'ok' : s === 'PLANNED' ? 'info' : 'warn'}">${esc(s)}</span>`;
+
+    const destCover = (destName) => {
+        if (!window.TM_DESTINATIONS) return '';
+        const name = String(destName || '').trim().toLowerCase();
+        const hit = TM_DESTINATIONS.find(d =>
+            d.name.toLowerCase() === name ||
+            name.includes(d.name.toLowerCase()) ||
+            d.name.toLowerCase().includes(name));
+        const id = (hit || TM_DESTINATIONS[0] || {}).imgId || '';
+        return id ? `https://images.unsplash.com/${id}?auto=format&fit=crop&w=900&q=70` : '';
+    };
+
+    const daysBetween = (a, b) => {
+        if (!a || !b) return 1;
+        const d = Math.round((new Date(b) - new Date(a)) / 86400000);
+        return Number.isFinite(d) && d >= 0 ? d + 1 : 1;
+    };
+
+    const tripMeta = (x) => {
+        const d = daysBetween(x.startDate, x.endDate);
+        const n = (x.startDate && x.endDate) ? Math.max(0, d - 1) : 1;
+        return `${esc((x.startDate || '').slice(0, 10))} → ${esc((x.endDate || '').slice(0, 10))} · ${d} day${d > 1 ? 's' : ''} / ${n} night${n === 1 ? '' : 's'} · ${x.travelers} traveler${x.travelers > 1 ? 's' : ''}`;
+    };
+
+    /* One cinematic card per complete trip, shared by the dashboard and My Bookings. */
+    function tripCinCard(x) {
+        const cover = destCover(x.destination);
+        const isTicketable = x.status === 'BOOKED' || x.status === 'COMPLETED';
+        const unpaid = x.paymentStatus === 'PENDING' || x.paymentStatus === 'FAILED';
+        return `
+        <article class="cin-trip" data-reveal>
+            <div class="cin-cover ${cover ? '' : 'cin-cover-fb'}">
+                ${cover ? `<img src="${cover}" alt="${esc(x.destination)}" loading="lazy" decoding="async" onerror="this.closest('.cin-cover').classList.add('cin-cover-fb')">` : ''}
+                <span class="cin-cover-shade"></span>
+                <div class="cin-route-cap">
+                    <span class="cin-orig">${esc(x.origin)}</span><i></i><span class="cin-dest">${esc(x.destination)}</span>
+                </div>
+            </div>
+            <div class="cin-body">
+                <div class="cin-meta">${tripMeta(x)}</div>
+                <div class="cin-pills">
+                    ${tripsStatusPill(x.status)}<span class="pill ${unpaid ? 'warn' : 'good'}">${unpaid ? 'Payment pending' : 'Paid'}</span>
+                    ${x.delay && x.delay.status === 'ACTIVE' ? `<span class="pill warn">Delay ${esc(String(x.delay.minutes))} min</span>` : ''}
+                </div>
+                <div class="cin-actions">
+                    <button class="btn btn-primary btn-sm" onclick="TM.tripDetail('${x._id}')">View details</button>
+                    ${isTicketable ? `<button class="btn btn-outline btn-sm" onclick="TM.tripTicket('${x._id}', this)">Download PDF</button>` : ''}
+                    ${unpaid ? `<button class="btn btn-outline btn-sm" onclick="TM.tripPay('${x._id}', this)">Pay from wallet</button>` : ''}
+                    <a class="btn btn-outline btn-sm" href="/pages/trip.html?id=${x._id}">Open trip</a>
+                    ${isTicketable ? `<button class="btn btn-outline btn-sm" onclick="TM.reviewTrip('${x._id}', '${esc(x.origin)}', '${esc(x.destination)}')">Rate</button>` : ''}
+                </div>
+                ${(x.bookingErrors || []).length ? `<p class="cin-note">Some services could not be booked: ${esc(x.bookingErrors.join('; '))}</p>` : ''}
+            </div>
+        </article>`;
+    }
+
+    function tripPlannedCard(x) {
+        return `
+        <article class="cin-trip cin-trip-planned" data-reveal>
+            <div class="cin-body">
+                <div class="cin-route-cap">
+                    <span class="cin-orig">${esc(x.origin)}</span><i></i><span class="cin-dest">${esc(x.destination)}</span>
+                </div>
+                <div class="cin-meta">${tripMeta(x)}</div>
+                <div class="cin-pills">${tripsStatusPill(x.status)}<span class="pill info">${esc(x.travelStyle || '—')}</span></div>
+                <div class="cin-actions">
+                    <a class="btn btn-primary btn-sm" href="/pages/trip.html?id=${x._id}">Review &amp; Book</a>
+                    <button class="btn btn-outline btn-sm" onclick="TM.tripDetail('${x._id}')">Preview</button>
+                </div>
+            </div>
+        </article>`;
+    }
+
+    const bookingDetailText = (b) => {
+        const dt = b.details || {};
+        const parts = [];
+        if (dt.checkin) parts.push('In ' + esc(String(dt.checkin).slice(0, 10)));
+        if (dt.checkout) parts.push('Out ' + esc(String(dt.checkout).slice(0, 10)));
+        if (dt.startTime) parts.push(esc(dt.startTime) + (dt.endTime ? '–' + esc(dt.endTime) : ''));
+        if (dt.distanceKm) parts.push(esc(dt.distanceKm) + ' km');
+        if (dt.seatType) parts.push('Seat ' + esc(dt.seatType));
+        if (dt.location) parts.push(esc(dt.location));
+        return parts.length ? parts.join(' · ') : '—';
+    };
+
+    window.TM.tripTicket = async (id, btn) => run(async () => {
+        btn.disabled = true;
+        try { await api.downloadTripTicket(id); toast('Trip ticket downloaded.'); }
+        finally { btn.disabled = false; }
+    });
+
+    window.TM.tripPay = async (id, btn) => run(async () => {
+        btn.disabled = true;
+        try {
+            const res = await api.tripPay(id);
+            toast(res.message || 'Payment complete.');
+            if (currentPanel === 'overview') await userOverview();
+            else await userMyBookings();
+        } finally { btn.disabled = false; }
+    });
+
+    window.TM.tripDetail = async (id) => run(async () => {
+        const trip = await api.getTrip(id);
+        const d = trip.trip || {};
+        const its = (d.bookings || []).filter(b => b.status !== 'CANCELLED');
+        const unpaid = its.filter(b => b.paymentStatus === 'PENDING' || b.paymentStatus === 'FAILED');
+        const totalPaid = its.filter(b => b.paymentStatus === 'WALLET' || b.paymentStatus === 'COMPLETED')
+            .reduce((s, b) => s + (+b.total || 0), 0);
+        const bookRows = its.map(b => `<tr>
+            <td>${esc((b.date || '').slice(0, 10) || '—')}</td>
+            <td><span class="pill info">${esc(b.type)}</span> ${esc(b.itemTitle || b.foodName || (b.details && b.details.location) || '—')}</td>
+            <td>${bookingDetailText(b)}</td>
+            <td>${esc(b.provider || '—')}</td>
+            <td>${money(b.total)}</td>
+            <td><span class="pill ${b.status === 'CONFIRMED' ? 'good' : b.status === 'CANCELLED' || b.status === 'REJECTED' ? 'bad' : 'info'}">${esc(b.status)}</span></td>
+            <td><span class="pill ${b.paymentStatus === 'WALLET' || b.paymentStatus === 'COMPLETED' || b.paymentStatus === 'PAID' ? 'good' : b.paymentStatus === 'FAILED' ? 'bad' : 'warn'}">${esc(b.paymentStatus)}</span></td>
+        </tr>`).join('')
+            || '<tr><td colspan="7" class="text-muted">No active bookings on this trip.</td></tr>';
+        const token = await api.tripToken(id).catch(() => null);
+        const m = dialog(`
+            <div class="cin-modal-head">
+                <div class="cin-modal-route">${esc(d.origin)} <i></i> ${esc(d.destination)}</div>
+                <div class="cin-modal-meta">${esc(d.reference)} · ${esc((d.startDate || '').slice(0, 10))} → ${esc((d.endDate || '').slice(0, 10))} · ${d.travelers} traveler${d.travelers > 1 ? 's' : ''}</div>
+                <div class="cin-pills">
+                    ${tripsStatusPill(d.status)}<span class="pill ${unpaid.length ? 'warn' : 'good'}">${unpaid.length ? 'Payment pending' : 'Paid'}</span>
+                    ${d.delay && d.delay.status === 'ACTIVE' ? `<span class="pill warn">Delay ${esc(String(d.delay.minutes))} min</span>` : ''}
+                </div>
+            </div>
+            <div class="table-scroll"><table class="row-table cin-trip-table" style="width:100%">
+                <tr><th>Date</th><th>Service</th><th>Details</th><th>Provider</th><th>Amount</th><th>Status</th><th>Payment</th></tr>
+                ${bookRows}</table></div>
+            <p class="cin-sub" style="margin-top:.7rem;">Paid via wallet: <strong>${money(totalPaid)}</strong>${unpaid.length ? ` · ${unpaid.length} booking(s) still unpaid` : ''}</p>
+            <div class="flex end gap" style="margin-top:1rem;">
+                ${token ? `<a class="btn btn-outline" target="_blank" href="/pages/verify.html?token=${encodeURIComponent(token.token)}#trip">Verify QR</a>` : ''}
+                ${d.status === 'BOOKED' || d.status === 'COMPLETED' ? `<button class="btn btn-outline" onclick="TM.tripTicket('${id}', this)">Download PDF</button>` : ''}
+                <button class="btn btn-outline" data-close>Close</button>
+                ${unpaid.length ? `<button class="btn btn-primary" id="__paynow">Pay from wallet</button>` : ''}
+            </div>`);
+        const payNow = m.get('#__paynow');
+        if (payNow) payNow.addEventListener('click', () => run(async () => {
+            await api.tripPay(id);
+            toast('Trip payment completed.');
+            m.close();
+            if (currentPanel === 'overview') await userOverview();
+            else await userMyBookings();
+        }));
+    });
+
     async function userOverview() {
-        const b = await api.getBookings();
-        const rows = b.bookings.length ? b.bookings.map(x => `
+        const [bk, tr] = await Promise.all([
+            api.getBookings().catch(() => ({ bookings: [] })),
+            api.getTrips().catch(() => []),
+        ]);
+        const trips = tr || [];
+        const booked = trips.filter(t => t.status === 'BOOKED' || t.status === 'COMPLETED');
+        const planned = trips.filter(t => t.status === 'PLANNED');
+        const shown = [...booked, ...planned];
+        const rows = (bk.bookings || []).length ? (bk.bookings || []).map(x => `
             <tr>
                 <td>${esc(x.reference)}</td><td><span class="pill info">${esc(x.type)}</span></td>
                 <td>${money(x.total)}</td><td><span class="pill ${x.status === 'CONFIRMED' ? 'good' : x.status === 'CANCELLED' || x.status === 'REJECTED' ? 'bad' : 'info'}">${esc(x.status)}</span></td>
@@ -375,20 +531,54 @@
                     <button class="btn btn-outline btn-sm" onclick="TM.cancel('${x._id}', this)" ${x.status !== 'CONFIRMED' ? 'disabled' : ''}>Cancel</button>
                 </td>
             </tr>`).join('')
-            : '<tr><td colspan="6" class="text-muted">No bookings yet.</td></tr>';
-        $('portalContent').innerHTML =
-            card('Welcome back, ' + user.name,
-                `<p>Quick actions:</p>
-                 <div class="flex" style="gap:.5rem;flex-wrap:wrap;">
-                    <a href="/pages/planner.html" class="btn btn-primary">Plan an AI Trip</a>
-                    <a href="/pages/mindmap.html" class="btn btn-outline">View Route Map</a>
-                    <button class="btn btn-outline" onclick="showPanel('plantrip')">Book a Transport</button>
-                 </div>`) +
-            card('My Bookings',
-                `<table class="row-table" style="width:100%">${rows}</table>
-                 <p class="text-muted mt-4">Tip: open a booking below to see its journey timeline and download your PDF ticket.</p>
-                 <div id="ub_timeline"></div>`);
-        await renderBookingDetails(b.bookings);
+            : '<tr><td colspan="6" class="text-muted">No individual service bookings yet.</td></tr>';
+        $('portalContent').innerHTML = `
+            <div class="overview-head">
+                <section class="cin-hero-dash">
+                    <div class="cin-hero-dash-inner">
+                        <span class="cin-eyebrow">Welcome back</span>
+                        <h1 class="cin-display">Namaste,<br><em>${esc((user.name || 'Traveller').split(' ')[0])}</em></h1>
+                        <p class="cin-lede">Plan your perfect journey, book it in seconds, and carry it all on one ticket.</p>
+                        <div class="cin-ctas">
+                            <button class="btn btn-primary btn-lg" onclick="showPanel('plantrip')">Plan My Trip</button>
+                            <button class="btn btn-ghost btn-lg" onclick="showPanel('book')">My Bookings</button>
+                            <a class="btn btn-ghost btn-lg" href="/pages/planner.html">AI Planner</a>
+                        </div>
+                    </div>
+                </section>
+            </div>
+            ${shown.length ? `
+            <section class="cin-section">
+                <div class="cin-head"><span class="cin-eyebrow">MY TRAVELS</span><h2 class="cin-title">One journey,<br>one ticket</h2></div>
+                <div class="cin-trip-grid">
+                    ${booked.map(tripCinCard).join('')}
+                </div>
+                ${planned.length ? `
+                    <div class="cin-head" style="margin-top:2.5rem;"><span class="cin-eyebrow">PLANNED AHEAD</span><h2 class="cin-title">Ready when you are</h2></div>
+                    <div class="cin-trip-grid">${planned.map(tripPlannedCard).join('')}</div>` : ''}
+            </section>` : `
+            <section class="cin-section">
+                <div class="cin-head"><span class="cin-eyebrow">YOUR NEXT JOURNEY</span><h2 class="cin-title">Ready when<br>you are</h2></div>
+                <div class="cin-empty">
+                    <p>No trips yet. Plan your first journey with TripMind AI and carry it on a single beautiful ticket.</p>
+                    <div class="cin-ctas"><a class="btn btn-primary btn-lg" href="/pages/planner.html">Plan My First Trip</a></div>
+                </div>
+            </section>`}
+            <section class="cin-section cin-section-alt">
+                <div class="cin-head"><span class="cin-eyebrow">EXPLORE INDIA</span><h2 class="cin-title">Wander<br><em>able India</em></h2></div>
+                <div class="dest-grid" id="dashDestGrid"></div>
+            </section>
+            <section class="cin-section">
+                <div class="cin-head"><span class="cin-eyebrow">INDIVIDUAL BOOKINGS</span><h2 class="cin-title">Standalone<br>services</h2></div>
+                <div class="table-scroll"><table class="row-table" style="width:100%">
+                    <tr><th>Reference</th><th>Type</th><th>Total</th><th>Status</th><th>Date</th><th></th></tr>
+                    ${rows}
+                </table></div>
+                <div id="ub_timeline"></div>
+            </section>`;
+        if (window.tmRenderDestGrid) window.tmRenderDestGrid('#dashDestGrid', { limit: 4 });
+        if (window.tmReveal) window.tmReveal(document.getElementById('portalContent'));
+        await renderBookingDetails(bk.bookings || []);
         window.TM.cancel = async (id, btn) => run(async () => {
             await api.cancelBooking(id);
             toast('Booking cancelled.');
@@ -467,64 +657,15 @@
             api.getTrips().catch(() => []),
         ]);
         const list = bk.bookings || [];
-        const badge = (s) => `<span class="pill ${s === 'CONFIRMED' ? 'good' : s === 'COMPLETED' ? 'ok' : s === 'CANCELLED' || s === 'REJECTED' ? 'bad' : 'info'}">${esc(s)}</span>`;
-        const payPill = (x) => {
-            const pmt = x.paymentStatus || 'PENDING';
-            const paid = pmt === 'WALLET' || pmt === 'COMPLETED' || pmt === 'PAID';
-            return `<span class="pill ${paid ? 'good' : pmt === 'FAILED' ? 'bad' : 'warn'}">Payment: ${esc(pmt)}</span>`;
-        };
-        const delayPill = (x) => (x.delay && x.delay.status === 'ACTIVE')
-            ? `<span class="pill warn">Delay: ${esc(String(x.delay.minutes))} min</span>` : '';
         const booked = (trips || []).filter(t => t.status === 'BOOKED' || t.status === 'COMPLETED');
         const planned = (trips || []).filter(t => t.status === 'PLANNED');
-        const tripCard = (x) => `
-            <div class="card mb-4">
-                <div class="card-content">
-                    <div class="flex justify-between" style="flex-wrap:wrap;gap:.5rem;">
-                        <div>
-                            <div class="card-title">${esc(x.origin)} → ${esc(x.destination)}</div>
-                            <div class="text-muted" style="font-size:.82rem;">
-                                ${esc(x.reference || x._id.slice(0, 12).toUpperCase())} ·
-                                ${esc((x.startDate || '').slice(0, 10))} → ${esc((x.endDate || '').slice(0, 10))} ·
-                                ${x.travelers} traveler${x.travelers > 1 ? 's' : ''}
-                            </div>
-                        </div>
-                        <div class="flex" style="gap:.4rem;flex-wrap:wrap;align-items:center;">${badge(x.status)}${payPill(x)}${delayPill(x)}</div>
-                    </div>
-                    <div class="flex" style="gap:.5rem;margin-top:.8rem;flex-wrap:wrap;">
-                        <button class="btn btn-primary btn-sm" onclick="TM.tripDetail('${x._id}')">View details</button>
-                        <button class="btn btn-outline btn-sm" onclick="TM.tripTicket('${x._id}', this)">Download ticket (PDF)</button>
-                        ${x.paymentStatus === 'PENDING' || x.paymentStatus === 'FAILED'
-                            ? `<button class="btn btn-outline btn-sm" onclick="TM.tripPay('${x._id}', this)">Pay from wallet</button>` : ''}
-                        <a class="btn btn-outline btn-sm" href="/pages/trip.html?id=${x._id}">Open trip</a>
-                        ${x.status === 'BOOKED' || x.status === 'COMPLETED'
-                            ? `<button class="btn btn-outline btn-sm" onclick="TM.reviewTrip('${x._id}', '${esc(x.origin)}', '${esc(x.destination)}')">Rate trip</button>` : ''}
-                    </div>
-                    ${(x.bookingErrors || []).length ? `<p class="text-muted" style="font-size:.8rem;margin-top:.5rem;">Some services could not be booked: ${esc(x.bookingErrors.join('; '))}</p>` : ''}
-                </div>
-            </div>`;
-        const plannedCard = (x) => `
-            <div class="card mb-4" style="background:var(--slate-50);">
-                <div class="card-content">
-                    <div class="flex justify-between" style="flex-wrap:wrap;gap:.5rem;">
-                        <div>
-                            <div class="card-title">${esc(x.origin)} → ${esc(x.destination)}</div>
-                            <div class="text-muted" style="font-size:.82rem;">${esc((x.startDate || '').slice(0, 10))} → ${esc((x.endDate || '').slice(0, 10))} · ${x.travelers} traveler${x.travelers > 1 ? 's' : ''}</div>
-                        </div>
-                        ${badge(x.status)}
-                    </div>
-                    <div class="flex" style="gap:.5rem;margin-top:.8rem;flex-wrap:wrap;">
-                        <a class="btn btn-primary btn-sm" href="/pages/trip.html?id=${x._id}">Review &amp; Book</a>
-                    </div>
-                </div>
-            </div>`;
         const rows = list.length ? list.map(x => `
             <tr>
                 <td>${esc(x.reference)}</td>
                 <td><span class="pill info">${esc(x.type)}</span></td>
                 <td>${esc(x.date)}</td>
                 <td>${money(x.total)}</td>
-                <td>${badge(x.status)}</td>
+                <td><span class="pill ${x.status === 'CONFIRMED' ? 'good' : x.status === 'CANCELLED' || x.status === 'REJECTED' ? 'bad' : 'info'}">${esc(x.status)}</span></td>
                 <td>
                     ${x.status === 'CONFIRMED' ? `<button class="btn btn-outline btn-sm" onclick="TM.ticket('${x._id}', this)">PDF</button>` : ''}
                     <button class="btn btn-outline btn-sm" onclick="TM.verify('${x._id}', this)" ${x.status !== 'CONFIRMED' ? 'disabled' : ''}>Verify</button>
@@ -532,20 +673,35 @@
                 </td>
             </tr>`).join('')
             : '<tr><td colspan="6" class="text-muted">No individual service bookings yet.</td></tr>';
-        $('portalContent').innerHTML =
-            card('My Bookings',
-                `<p class="text-muted">Every booked trip is issued as ONE consolidated PDF ticket with a single QR code.</p>
-                 ${booked.length ? `<h3>Booked trips</h3>${booked.map(tripCard).join('')}` : '<p class="text-muted mt-4">No booked trips yet — plan a trip with TripMind AI.</p>'}
-                 ${planned.length ? `<h3 class="mt-4">Planned trips</h3>${planned.map(plannedCard).join('')}` : ''}
-                 <h3 class="mt-4">Service bookings</h3>
-                 <p class="text-muted">Individual transport, stays and experiences booked outside an AI trip.</p>
-                 <div class="table-scroll">
-                 <table class="row-table" style="width:100%">
+        $('portalContent').innerHTML = `
+            <div class="bookings-head">
+                <span class="cin-eyebrow">MY BOOKINGS</span>
+                <h1 class="cin-title">Every booked trip arrives<br>as <em>one ticket</em></h1>
+                <p class="cin-sub">A single consolidated PDF with one QR code — transport, stays, food and experiences together.</p>
+            </div>
+            ${booked.length ? `
+                <section class="cin-section">
+                    <div class="cin-head"><span class="cin-eyebrow">BOOKED TRIPS</span><h2 class="cin-title">Your journeys</h2></div>
+                    <div class="cin-trip-grid">${booked.map(tripCinCard).join('')}</div>
+                </section>` : `
+                <section class="cin-section">
+                    <div class="cin-empty"><p>No booked trips yet — plan a trip with TripMind AI and every service will land on one ticket.</p></div>
+                </section>`}
+            ${planned.length ? `
+                <section class="cin-section">
+                    <div class="cin-head"><span class="cin-eyebrow">PLANNED AHEAD</span><h2 class="cin-title">Almost there</h2></div>
+                    <div class="cin-trip-grid">${planned.map(tripPlannedCard).join('')}</div>
+                </section>` : ''}
+            <section class="cin-section cin-section-alt">
+                <div class="cin-head"><span class="cin-eyebrow">INDIVIDUAL BOOKINGS</span><h2 class="cin-title">Standalone<br>services</h2></div>
+                <p class="cin-sub">Transport, stays and experiences booked outside an AI trip.</p>
+                <div class="table-scroll"><table class="row-table" style="width:100%">
                     <tr><th>Reference</th><th>Type</th><th>Date</th><th>Total</th><th>Status</th><th></th></tr>
                     ${rows}
-                 </table>
-                 </div>
-                 <div id="ub_timeline"></div>`);
+                </table></div>
+                <div id="ub_timeline"></div>
+            </section>`;
+        if (window.tmReveal) window.tmReveal(document.getElementById('portalContent'));
         renderBookingDetails(list);
         window.TM.cancel = async (id, btn) => run(async () => {
             await api.cancelBooking(id);
@@ -556,47 +712,6 @@
             btn.disabled = true;
             try { await api.downloadTicket(id); toast('Ticket downloaded.'); }
             finally { btn.disabled = false; }
-        });
-        window.TM.tripPay = async (id, btn) => run(async () => {
-            btn.disabled = true;
-            try {
-                const res = await api.tripPay(id);
-                toast(res.message || 'Payment complete.');
-                await userMyBookings();
-            } finally { btn.disabled = false; }
-        });
-        window.TM.tripDetail = async (id, btn) => run(async () => {
-            const trip = await api.getTrip(id);
-            const d = trip.trip || {};
-            const its = (d.bookings || []).filter(b => b.status !== 'CANCELLED');
-            const unpaid = its.filter(b => b.paymentStatus === 'PENDING' || b.paymentStatus === 'FAILED');
-            const totalPaid = its.filter(b => b.paymentStatus === 'WALLET' || b.paymentStatus === 'COMPLETED')
-                .reduce((s, b) => s + (+b.total || 0), 0);
-            const bookRows = its.map(b => `<tr>
-                <td>${esc(b.reference)}</td><td><span class="pill info">${esc(b.type)}</span></td>
-                <td>${esc(b.itemTitle || b.foodName || (b.details && b.details.location) || '—')}</td>
-                <td>${money(b.total)}</td><td>${badge(b.status)}</td><td>${payPill(b)}</td></tr>`).join('')
-                || '<tr><td colspan="6" class="text-muted">No active bookings on this trip.</td></tr>';
-            const token = await api.tripToken(id).catch(() => null);
-            const m = dialog(`
-                <h3>${esc(d.origin)} → ${esc(d.destination)}</h3>
-                <p class="text-muted">${esc(d.reference)} · ${esc((d.startDate || '').slice(0, 10))} → ${esc((d.endDate || '').slice(0, 10))} · ${d.travelers} traveler${d.travelers > 1 ? 's' : ''} &nbsp; ${badge(d.status)} ${payPill(d)} ${delayPill(d)}</p>
-                <div class="table-scroll"><table class="row-table" style="width:100%">
-                    <tr><th>Reference</th><th>Type</th><th>Service</th><th>Total</th><th>Status</th><th>Payment</th></tr>
-                    ${bookRows}</table></div>
-                <p class="text-muted" style="margin-top:.6rem;">Paid via wallet: ${money(totalPaid)}${unpaid.length ? ` · ${unpaid.length} booking(s) still unpaid` : ''}</p>
-                <div class="flex end gap" style="margin-top:1rem;">
-                    ${token ? `<a class="btn btn-outline" target="_blank" href="/pages/verify.html?token=${encodeURIComponent(token.token)}#trip">Verify QR</a>` : ''}
-                    <button class="btn btn-outline" data-close>Close</button>
-                    ${unpaid.length ? `<button class="btn btn-primary" id="__okpay">Pay from wallet</button>` : ''}
-                </div>`);
-            const ok = m.get('#__okpay');
-            if (ok) ok.addEventListener('click', () => run(async () => {
-                await api.tripPay(id);
-                toast('Trip payment completed.');
-                m.close();
-                await userMyBookings();
-            }));
         });
         window.TM.reviewTrip = async (id, origin, destination) => {
             const m = dialog(`<h3>Review your trip</h3>
