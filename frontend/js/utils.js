@@ -140,6 +140,7 @@ async function checkAvailable(field, value) {
  * approval detail viewer to label each submitted value. */
 const REGISTRABLE_ROLES = [
     { value: 'USER', label: 'Normal User / Passenger', approval: 'No approval required' },
+    { value: 'RAILWAY_ADMIN', label: 'Railways / IRCTC', approval: 'Admin approval required' },
     { value: 'TRANSPORT_ADMIN', label: 'Transport Admin', approval: 'Admin approval required' },
     { value: 'HOTEL_ADMIN', label: 'Hotel Admin', approval: 'Admin approval required' },
     { value: 'RESTAURANT_ADMIN', label: 'Restaurant Admin', approval: 'Admin approval required' },

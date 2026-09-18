@@ -10,6 +10,11 @@ AI_PROVIDER = os.getenv("AI_PROVIDER", "mock")
 AI_API_KEY = os.getenv("AI_API_KEY", "")
 AI_MODEL = os.getenv("AI_MODEL", "llama-3.3-70b-versatile")
 
+# Google Gemini AI — primary planning/chat backend (replaces the legacy
+# Groq-based integration).
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
+
 APP_URL = os.getenv("APP_URL", "http://localhost:5000")
 
 SECRET_KEY = os.getenv("SECRET_KEY", "tripmind-dev-secret-key")
@@ -22,6 +27,7 @@ DEV_MODE = os.getenv("DEV_MODE", "true").lower() in ("1", "true", "yes")
 # Role constants (single source of truth)
 ROLES = {
     "ADMIN": "ADMIN",
+    "RAILWAY_ADMIN": "RAILWAY_ADMIN",
     "TRANSPORT_ADMIN": "TRANSPORT_ADMIN",
     "TOURIST_SPOT_ADMIN": "TOURIST_SPOT_ADMIN",
     "HOTEL_ADMIN": "HOTEL_ADMIN",
@@ -42,7 +48,7 @@ TRANSPORT_TYPES = {
 }
 
 # Roles that must pass Admin approval before operating on the platform.
-PROVIDER_ROLES = {ROLES["TRANSPORT_ADMIN"], ROLES["TOURIST_SPOT_ADMIN"],
+PROVIDER_ROLES = {ROLES["RAILWAY_ADMIN"], ROLES["TRANSPORT_ADMIN"], ROLES["TOURIST_SPOT_ADMIN"],
                   ROLES["HOTEL_ADMIN"], ROLES["RESTAURANT_ADMIN"],
                   ROLES["GUIDE"]}
 

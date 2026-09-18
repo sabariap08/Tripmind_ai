@@ -45,6 +45,8 @@ def ensure_unique_indexes():
         ("hotels", [("ownerId", 1), ("name", 1)], {"unique": True, "collation": _CI}),
         ("restaurants", [("ownerId", 1), ("name", 1)], {"unique": True, "collation": _CI}),
         ("guide_locations", [("name", 1)], {"unique": True, "collation": _CI}),
+        ("lounges", [("ownerId", 1), ("name", 1)], {"unique": True, "collation": _CI}),
+        ("bookings", [("uniquenessKey", 1)], {"unique": True, "sparse": True}),
     ]
     for coll_name, keys, opts in specs:
         try:

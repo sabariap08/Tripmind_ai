@@ -171,7 +171,7 @@ def _public_user(user):
         "gst": user.get("gst", ""),
         "preferences": user.get("preferences", {}),
     }
-    if user.get("role") == ROLES["TRANSPORT_ADMIN"]:
+    if user.get("role") in (ROLES["TRANSPORT_ADMIN"], ROLES["RAILWAY_ADMIN"]):
         pub["transportServiceId"] = str(user["_id"])
     return pub
 

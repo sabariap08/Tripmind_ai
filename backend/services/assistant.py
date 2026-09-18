@@ -1,19 +1,19 @@
 """Action-capable AI travel assistant.
 
-A thin Groq layer over a deterministic, server-side tool set. The model can
+A thin Gemini layer over a deterministic, server-side tool set. The model can
 only *propose* an action (switch transport, pay a trip, remove a place from a
 plan); every mutation is executed on a separate, re-validated endpoint
 (POST /api/assistant/action) so no chat message can silently change a booking.
 
 The whole tool layer also runs on local keyword matching, so the assistant
-keeps working even when the Groq API or key is unavailable.
+keeps working even when the Gemini API or key is unavailable.
 """
 import json
 import re
 from datetime import datetime
 
 from services.mongodb import get_collection
-from services.groq_service import call_ai, is_ai_available
+from services.ai_service import call_ai, is_ai_available
 from services.transport_service import available_transports
 
 
@@ -125,7 +125,8 @@ def _local_intent(message, user, trip_id=None):
 
     if any(k in m for k in ["change transport", "switch transport", "change bus", "switch bus",
                             "change train", "switch train", "another transport", "different transport",
-                            "replace transport"]):
+                            "replace transport", "switch my transport", "change my transport",
+                            "switch my bus", "change my bus", "switch my train", "change my train"]):
         routes = [(t.get("origin"), t.get("destination"), t.get("reference"), t)
                   for t in get_collection("trips").find({"userId": user["id"]})
                   if any(b.get("type") == "TRANSPORT" and b.get("status") not in ("CANCELLED", "REJECTED")
@@ -152,8 +153,8 @@ def _local_intent(message, user, trip_id=None):
                      "mode": opts[0]["mode"]}},
             "suggestions": ["Confirm", "Show other options", "Show my bookings"]}
 
-    if any(k in m for k in ["pay trip", "pay my trip", "pay for trip", "complete payment",
-                            "pay bookings", "pay now"]):
+    if any(k in m for k in ["pay trip", "pay my trip", "pay for trip", "pay for my trip",
+                            "complete payment", "pay bookings", "pay now", "pay the trip"]):
         if not trip:
             trips = list(get_collection("trips").find({"userId": user["id"]}))
             unpaid = [t for t in trips if (t.get("paymentStatus") or "PENDING") not in ("WALLET", "COMPLETED")]
@@ -190,9 +191,23 @@ def _extract_place(m):
 
 
 def find_transport_options(trip):
-    """Registered, approved alternate transports for the trip route."""
+    """Registered, approved alternate transports for the trip route.
+
+    Excludes the transport already booked on this trip so the assistant never
+    proposes switching to the same service (that stubs out with
+    "That transport is already booked on this trip.").
+    """
+    booked_ids = {
+        str(b.get("transportId"))
+        for b in (trip.get("bookings") or [])
+        if b.get("type") == "TRANSPORT"
+        and b.get("status") not in ("CANCELLED", "REJECTED")
+        and b.get("transportId")
+    }
     out = []
     for t in available_transports(trip.get("origin", ""), trip.get("destination", ""))[:6]:
+        if str(t["_id"]) in booked_ids:
+            continue
         fare = t.get("fare")
         if isinstance(fare, dict):
             price = fare.get("price") or fare.get("baseFare") or fare.get("pricePerKm") or 0

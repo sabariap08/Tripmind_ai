@@ -41,7 +41,7 @@
                 </div>
                 <div class="flex gap-2">
                     <button class="btn btn-warning btn-sm" onclick="openDelayModal()">Simulate Delay</button>
-                    <button class="btn btn-success btn-sm" id="bookBtn" onclick="bookTrip()">Approve & Book</button>
+                    <button class="btn btn-success btn-sm" id="bookBtn" onclick="bookTrip()">Confirm & Book</button>
                 </div>
             </div>
 
@@ -313,8 +313,14 @@
 
         async function bookTrip() {
             try {
-                const result = await api.bookTrip(tripId);
-                let html = `<p class="mb-4">Trip booked successfully!</p>`;
+                // Unified Confirm & Book: validates live availability, books and
+                // pays from the wallet in one step. Populate the wallet first if
+                // the passenger wants wallet payment for every item.
+                const result = await api.confirmBookTrip(tripId, true);
+                let html = result.walletStatus && !result.walletStatus.sufficient
+                    ? `<p class="mb-2" style="color:var(--amber);">Wallet balance ₹${result.walletStatus.balance.toLocaleString('en-IN')} was less than the ₹${result.walletStatus.required.toLocaleString('en-IN')} required — bookings created with payment PENDING. Top up your wallet and pay from My Wallet.</p>`
+                    : `<p class="mb-4">Trip booked${result.paymentStatus === 'COMPLETED' ? ' and payment completed from wallet' : ' — payment is pending'}!</p>`;
+                html += `<p class="mb-2 text-sm text-muted">${esc(result.message || '')}</p>`;
                 result.bookings.forEach(b => {
                     html += `<div class="flex justify-between mb-2"><span>${b.provider} (${b.bookingReference})</span><span class="font-bold">${formatCurrency(b.price)}</span></div>`;
                 });

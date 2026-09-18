@@ -221,6 +221,24 @@ GUIDE_SPECIALTIES = ("Historical", "Cultural", "Adventure", "Food", "Nature",
 # The `gst` field is special-cased by the wizard (live duplicate check, stored
 # on the account top level) and is therefore always sent back to the client.
 ROLE_FIELDS = {
+    ROLES["RAILWAY_ADMIN"]: [
+        {"id": "companyName", "label": "Railway / IRCTC division", "required": True,
+         "placeholder": "e.g. Southern Railway, Coimbatore Division"},
+        {"id": "serviceArea", "label": "Network served", "required": True,
+         "placeholder": "e.g. Coimbatore - Chennai corridor"},
+        {"id": "companyCity", "label": "City", "required": True,
+         "placeholder": "e.g. Coimbatore"},
+        {"id": "companyAddress", "label": "Divisional office address", "required": True,
+         "placeholder": "Registered office address"},
+        {"id": "companyPhone", "label": "Contact number", "required": True,
+         "placeholder": "10-digit mobile"},
+        {"id": "gst", "label": "GST number", "required": False,
+         "placeholder": "15-character GST number (optional)"},
+        {"id": "driverCount", "label": "Number of stations served", "type": "number",
+         "required": False, "placeholder": "Optional"},
+        {"id": "description", "label": "Network description", "type": "textarea",
+         "required": False, "placeholder": "Tell travellers about your rail network"},
+    ],
     ROLES["TRANSPORT_ADMIN"]: [
         {"id": "companyName", "label": "Company / service name", "required": True,
          "placeholder": "e.g. SRL Travels"},

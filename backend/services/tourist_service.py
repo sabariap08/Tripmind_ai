@@ -12,12 +12,22 @@ def _id():
 
 
 def _ok(user, owner_id):
+    """True when `user` (id string or user dict) is the owner or an admin."""
     from services.auth import is_admin
-    return is_admin(user) or user["id"] == owner_id
+    if user is None:
+        return False
+    if isinstance(user, dict):
+        if is_admin(user):
+            return True
+        user = user["id"]
+    return str(user) == str(owner_id)
 
 
 def _loc(data):
     loc = data.get("location") or {}
+    if isinstance(loc, str):
+        # Accept a plain location/address string as shorthand for the location name.
+        loc = {"name": loc, "address": loc}
     return {
         "name": defer(data.get("locationName")) or loc.get("name"),
         "address": data.get("address") or loc.get("address"),
@@ -96,11 +106,15 @@ def create_spot(data, owner_id):
 def _slots(raw):
     out = []
     for s in raw or []:
-        ft = defer(s.get("from"))
-        tt = defer(s.get("to"))
+        if isinstance(s, str):
+            # Tour availableTimes may be plain "HH:MM" strings.
+            ft = tt = defer(s)
+        else:
+            ft = defer(s.get("from"))
+            tt = defer(s.get("to"))
         if not ft or not tt:
             continue
-        out.append({"from": ft, "to": tt, "note": s.get("note") or ""})
+        out.append({"from": ft, "to": tt, "note": (s.get("note") if isinstance(s, dict) else "")})
     return out
 
 

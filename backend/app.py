@@ -16,6 +16,7 @@ from routes.trips import trips_bp
 from routes.ai import ai_bp
 from routes.auth import auth_bp
 from routes.transport import transport_bp
+from routes.lounge import lounge_bp
 from routes.tourist import tourist_bp
 from routes.guides import guide_bp
 from routes.hotel import hotel_bp
@@ -31,6 +32,7 @@ app.register_blueprint(trips_bp)
 app.register_blueprint(ai_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(transport_bp)
+app.register_blueprint(lounge_bp)
 app.register_blueprint(tourist_bp)
 app.register_blueprint(guide_bp)
 app.register_blueprint(hotel_bp)

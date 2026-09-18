@@ -39,8 +39,13 @@
         },
         TRANSPORT_ADMIN: {
             title: 'Transport Admin',
-            desc: 'Run a fleet of buses, trains, flights, cabs and autos.',
+            desc: 'Run a fleet of buses, flights, cabs and autos.',
             icon: '<rect x="5" y="4" width="14" height="12" rx="2"></rect><path d="M5 10h14"></path><path d="M8 16v3"></path><path d="M16 16v3"></path>',
+        },
+        RAILWAY_ADMIN: {
+            title: 'Railways / IRCTC',
+            desc: 'Manage trains and railway lounges on the Coimbatore–Chennai line.',
+            icon: '<rect x="4" y="6" width="16" height="10" rx="2"></rect><path d="M4 16v3"></path><path d="M20 16v3"></path><path d="M3 12h18"></path><circle cx="7" cy="15" r="1"></circle><circle cx="17" cy="15" r="1"></circle>',
         },
         HOTEL_ADMIN: {
             title: 'Hotel Admin',
@@ -101,7 +106,7 @@
     /* ---- step rendering ---------------------------------------------------- */
 
     function renderType() {
-        const cards = ['USER', 'TRANSPORT_ADMIN', 'HOTEL_ADMIN', 'RESTAURANT_ADMIN', 'GUIDE'].map(r => {
+        const cards = ['USER', 'RAILWAY_ADMIN', 'TRANSPORT_ADMIN', 'HOTEL_ADMIN', 'RESTAURANT_ADMIN', 'GUIDE'].map(r => {
                 const info = roleInfo[r] || {};
                 return `<button type="button" class="role-card ${state.role === r ? 'selected' : ''}" data-role="${r}">
                     <span class="role-card-icon">${info.icon || ''}</span>

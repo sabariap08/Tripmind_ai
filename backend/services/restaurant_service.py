@@ -149,6 +149,7 @@ def list_food_items(rid, user=None, only_available=True):
 
 
 def add_food_item(owner_id, rid, data):
+    from services.auth import new_user_id
     doc = _own_restaurant(owner_id, rid)
     if not doc:
         return None, "Restaurant not found in your catalogue."
@@ -167,7 +168,7 @@ def add_food_item(owner_id, rid, data):
     if category not in FOOD_CATEGORIES:
         category = "OTHER"
     f = {
-        "_id": get_collection("food_items").insert_one({}).inserted_id,
+        "_id": new_user_id(),
         "restaurantId": str(rid),
         "name": name,
         "price": price,
@@ -178,7 +179,7 @@ def add_food_item(owner_id, rid, data):
         "image": image,
         "createdAt": _now(),
     }
-    get_collection("food_items").update_one({"_id": f["_id"]}, {"$set": f})
+    get_collection("food_items").insert_one(f)
     return _public_food(f), None
 
 

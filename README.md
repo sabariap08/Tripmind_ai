@@ -13,7 +13,7 @@ An AI-powered travel orchestration platform that plans, optimizes, books, and ad
 | Frontend | HTML5, CSS3, Vanilla JavaScript |
 | Backend | Python, Flask |
 | Database | MongoDB Atlas |
-| AI | Groq API (llama-3.3-70b-versatile) |
+| AI | Google Gemini API (primary; OpenRouter fallback) |
 | ML | Pure-Python online models (no external libs) |
 | Optimization | ML-enhanced multi-criteria scoring engine |
 
@@ -70,7 +70,8 @@ tripmind-ai/
 │   └── services/
 │       ├── mongodb.py       # MongoDB connection
 │       ├── auth.py          # RBAC: sessions, hashed passwords, role decorators
-│       ├── groq_service.py  # Groq API integration
+│       ├── gemini_service.py  # Google Gemini integration (REST)
+│       ├── ai_service.py      # AI provider chain: Gemini → OpenRouter → deterministic
 │       ├── travel_orchestrator.py  # Plan generation (DB catalogue preferred, mock fallback)
 │       ├── travel_optimizer.py     # Multi-criteria optimizer (ML budget split)
 │       ├── trip_optimizer.py       # DB-backed planner (real transports/spots/guides + ML timings)
@@ -154,9 +155,11 @@ Create a `.env` file in the project root:
 ```env
 MONGODB_URI="mongodb+srv://your-connection-string"
 
-AI_PROVIDER="groq"
-AI_API_KEY="your_groq_api_key"
-AI_MODEL="llama-3.3-70b-versatile"
+GEMINI_API_KEY="your_google_gemini_api_key"
+AI_MODEL="gemini-2.5-flash"
+
+# Optional fallback if no GEMINI_API_KEY is set
+OPENROUTER_API_KEY="your_openrouter_api_key"
 
 APP_URL="http://localhost:5000"
 

@@ -34,6 +34,7 @@ const api = {
     getTrip: (id) => apiRequest(`/api/trips/${id}`),
     generatePlans: (id) => apiRequest(`/api/trips/${id}/generate`, { method: 'POST' }),
     bookTrip: (id) => apiRequest(`/api/trips/${id}/book`, { method: 'POST' }),
+    confirmBookTrip: (id, payFromWallet) => apiRequest(`/api/trips/${id}/confirm-book`, { method: 'POST', body: { payFromWallet }}),
     getEvents: (id) => apiRequest(`/api/trips/${id}/events`),
     getItinerary: (id) => apiRequest(`/api/trips/${id}/itinerary`),
     editItineraryItems: (id, action, payload = {}) => apiRequest(`/api/trips/${id}/itinerary/items`, { method: 'POST', body: { action, ...payload } }),
@@ -117,6 +118,14 @@ const api = {
     createFoodItem: (rid, data) => apiRequest(`/api/restaurants/${rid}/food-items`, { method: 'POST', body: data }),
     updateFoodItem: (rid, fid, data) => apiRequest(`/api/restaurants/${rid}/food-items/${fid}`, { method: 'PUT', body: data }),
     deleteFoodItem: (rid, fid) => apiRequest(`/api/restaurants/${rid}/food-items/${fid}`, { method: 'DELETE' }),
+
+    // Railway lounges (RAILWAY_ADMIN)
+    getLounges: () => apiRequest('/api/lounge'),
+    getLounge: (id) => apiRequest(`/api/lounge/${id}`),
+    createLounge: (data) => apiRequest('/api/lounge', { method: 'POST', body: data }),
+    updateLounge: (id, data) => apiRequest(`/api/lounge/${id}`, { method: 'PUT', body: data }),
+    deleteLounge: (id) => apiRequest(`/api/lounge/${id}`, { method: 'DELETE' }),
+    setLoungeStatus: (id, status) => apiRequest(`/api/lounge/${id}/status`, { method: 'POST', body: { status } }),
 
     // Guides
     getGuideProfile: () => apiRequest('/api/guide/profile'),

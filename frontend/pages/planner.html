@@ -7,11 +7,18 @@
     <link rel="stylesheet" href="../css/style.css">
     <style>
         .hr-label{font-weight:700;font-size:.9rem;color:var(--slate-600,#475569);margin-top:1rem;padding-top:.9rem;border-top:1px solid var(--slate-100,#e2e8f0);}
-        .spot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:1rem;margin-top:1rem;}
-        .spot-card{border:2px solid var(--slate-100,#e2e8f0);border-radius:.8rem;padding:.9rem;cursor:pointer;transition:.15s;position:relative;background:#fff;}
+        .spot-grid{display:grid;grid-template-columns:1fr;gap:.9rem;margin-top:1rem;}
+        .spot-card{border:2px solid var(--slate-100,#e2e8f0);border-radius:.8rem;padding:.9rem;cursor:pointer;transition:.15s;position:relative;background:#fff;display:flex;align-items:center;gap:1rem;}
         .spot-card:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(0,0,0,.08);}
         .spot-card.picked{border-color:var(--amber,#eab308);background:linear-gradient(180deg,#fffbeb,#fff);}
-        .spot-card img{width:100%;height:130px;object-fit:cover;border-radius:.5rem;background:var(--slate-50,#f1f5f9);}
+        .spot-card img{width:220px;height:132px;flex:none;object-fit:cover;border-radius:.5rem;background:var(--slate-50,#f1f5f9);}
+        .spot-card .spot-main{flex:1;min-width:0;}
+        .spot-card .spot-side{flex:none;text-align:right;}
+        @media (max-width:640px){
+            .spot-card{flex-direction:column;align-items:stretch;text-align:left;}
+            .spot-card img{width:100%;height:150px;}
+            .spot-card .spot-side{text-align:left;}
+        }
         .spot-pick-badge{position:absolute;top:.6rem;right:.6rem;width:26px;height:26px;border-radius:50%;background:var(--amber,#eab308);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:.85rem;box-shadow:0 2px 6px rgba(0,0,0,.2);}
         .star-mini{color:var(--amber,#eab308);}
         .rank-chip{font-size:.7rem;font-weight:700;letter-spacing:.04em;padding:.15rem .5rem;border-radius:999px;background:var(--slate-100,#e2e8f0);color:var(--slate-600,#475569);}
@@ -37,7 +44,6 @@
                 <a href="/">Home</a>
                 <a href="dashboard.html">Dashboard</a>
                 <a href="planner.html" class="active">Plan Trip</a>
-                <a href="mindmap.html">Route Map</a>
             </div>
         </div>
     </nav>
@@ -46,19 +52,15 @@
         <!-- STEP 1 : Trip details -->
         <div id="stepDetails">
             <h1 style="font-size:1.75rem;font-weight:700;margin-bottom:.5rem;">Plan Your Trip</h1>
-            <p class="text-sm text-muted mb-6">Fill in your trip details below — the AI plans the itinerary from your choices.</p>
+            <p class="text-sm text-muted mb-6">Tell us where you start and how you want to travel — the AI plans the Coimbatore ↔ Chennai itinerary from your choices.</p>
 
             <div class="card mb-4">
                 <div class="card-header"><div class="card-title">Trip Details</div></div>
                 <div class="card-content">
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
                         <div class="form-group">
-                            <label class="form-label">Origin</label>
+                            <label class="form-label">Origin city</label>
                             <input id="origin" class="form-input" placeholder="e.g., Coimbatore">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Destination</label>
-                            <input id="destination" class="form-input" placeholder="e.g., Chennai">
                         </div>
                         <div class="form-group">
                             <label class="form-label">Start Date</label>
@@ -100,7 +102,13 @@
                             </select>
                         </div>
                     </div>
-                    <div class="hr-label">Starting point (Google Maps) <span style="color:#dc2626;">*</span></div>
+                    <div class="hr-label">Tell the AI how you'd like to travel <span style="color:#dc2626;">*</span></div>
+                    <p class="text-sm text-muted" style="margin:.35rem 0 .75rem;">Describe your preferences in your own words — the AI plans your trip around them. This is <b>mandatory</b>.</p>
+                    <div class="form-group">
+                        <textarea id="preferences" class="form-input" rows="5"
+                                  placeholder="e.g. I want a relaxed trip with a direct AC train in the morning, a good vegetarian restaurant near the hotel, a guide for the cultural spots, and a rooftop cafe to end the day…"></textarea>
+                    </div>
+                    <div class="hr-label" style="margin-top:1rem;">Starting point (Google Maps) <span style="color:#dc2626;">*</span></div>
                     <p class="text-sm text-muted" style="margin:.35rem 0 .75rem;">Pick exactly where the trip starts — this is <b>mandatory</b> and the AI uses it for routing.</p>
                     <div style="display:grid;grid-template-columns:1fr auto;gap:.5rem;">
                         <div class="form-group">
@@ -113,19 +121,6 @@
                     <input id="startLat" type="hidden"><input id="startLng" type="hidden">
                     <div id="startMap" style="height:220px;border:1px solid var(--slate-100);border-radius:.6rem;display:none;margin-bottom:1rem;"></div>
                     <p class="text-sm text-muted" id="startNote" style="font-size:.78rem;color:#dc2626;">Origin not selected yet — you must pick your starting point on the map.</p>
-                    <div class="hr-label" style="margin-top:1rem;">Destination (Google Maps)</div>
-                    <p class="text-sm text-muted" style="margin:.35rem 0 .75rem;">Pick where the trip ends — the destination coordinates improve routing. If you skip this, the Destination text above is used.</p>
-                    <div style="display:grid;grid-template-columns:1fr auto;gap:.5rem;">
-                        <div class="form-group">
-                            <input id="destAddr" class="form-input" placeholder="Search your destination…">
-                        </div>
-                        <div class="form-group">
-                            <button class="btn btn-outline" type="button" onclick="openDestMap()">Pick on map</button>
-                        </div>
-                    </div>
-                    <input id="destLat" type="hidden"><input id="destLng" type="hidden">
-                    <div id="destMap" style="height:220px;border:1px solid var(--slate-100);border-radius:.6rem;display:none;margin-bottom:1rem;"></div>
-                    <p class="text-sm text-muted" id="destNote" style="font-size:.78rem;">Destination location not selected — the Destination text will be used.</p>
                     <button class="btn btn-primary btn-lg w-full mt-4" onclick="goToSpots()">Continue — Choose Tourist Spots →</button>
                 </div>
             </div>
@@ -184,6 +179,21 @@
 
         (async () => { await guardLogin(); })();
 
+        /* The corridor is Coimbatore <-> Chennai: the destination is inferred
+           from the chosen starting point, so no destination input exists here. */
+        const budgetInput = document.getElementById('budget');
+        const budgetUnlimited = document.getElementById('budgetUnlimited');
+        budgetUnlimited.addEventListener('change', () => {
+            budgetInput.disabled = budgetUnlimited.checked;
+            if (budgetUnlimited.checked) { budgetInput.value = ''; }
+            else if (!budgetInput.value) { budgetInput.value = '50000'; }
+        });
+
+        const originInput = document.getElementById('origin');
+        if (params.get('origin') || params.get('from')) {
+            originInput.value = (params.get('origin') || params.get('from') || '').trim();
+        }
+
         let TM_start = null;
         async function openStartMap() {
             const mapDiv = document.getElementById('startMap');
@@ -205,33 +215,18 @@
             return TM_start ? { lat: parseFloat(lat), lng: parseFloat(lng), address: address || `(${lat},${lng})` } : null;
         }
 
-        let TM_dest = null;
-        async function openDestMap() {
-            const mapDiv = document.getElementById('destMap');
-            if (!TM_dest && window.TM_MAPS && await window.TM_MAPS.init()) {
-                mapDiv.style.display = 'block';
-                TM_dest = window.TM_MAPS.initLocationPicker({
-                    addressId: 'destAddr', latId: 'destLat', lngId: 'destLng', mapId: 'destMap',
-                });
-                document.getElementById('destNote').textContent = 'Click the map or drag the marker to set the destination.';
-            } else if (!TM_dest) {
-                alert('Google Maps is not configured. Please type the destination address manually.');
-            }
-        }
-        function readDestLocation() {
-            const lat = document.getElementById('destLat').value;
-            const lng = document.getElementById('destLng').value;
-            if (!lat || !lng) return null;
-            const address = document.getElementById('destAddr').value.trim();
-            return TM_dest ? { lat: parseFloat(lat), lng: parseFloat(lng), address: address || `(${lat},${lng})` } : null;
-        }
-
         function goToSpots() {
-            const required = ['origin', 'destination', 'startDate', 'endDate'];
+            const required = ['origin', 'startDate', 'endDate'];
             for (const id of required) {
                 if (!document.getElementById(id).value.trim()) {
                     alert('Please fill in all required fields.'); return;
                 }
+            }
+            if (!document.getElementById('preferences').value.trim() ||
+                    document.getElementById('preferences').value.trim().length < 10) {
+                alert('Please describe how you\'d like to travel (at least a sentence) — the AI plans around your preferences.');
+                document.getElementById('preferences').focus();
+                return;
             }
             if (!readStartLocation()) {
                 alert('Please pick your exact starting point on the map — Origin is required.');
@@ -246,10 +241,9 @@
         async function loadSpotRanking() {
             const grid = document.getElementById('spotGrid');
             grid.innerHTML = '<div class="text-muted">Querying recommendation engine…</div>';
-            const dest = document.getElementById('destination').value.trim();
             let resp;
             try {
-                resp = await api.mlRecommendSpots({ city: dest || '', limit: 12 });
+                resp = await api.mlRecommendSpots({ limit: 12 });
             } catch (e) {
                 grid.innerHTML = `<div class="text-muted">${esc(e.message)}</div>`;
                 return;
@@ -266,11 +260,14 @@
                         : '<span class="rank-chip chip-p1" style="position:absolute;top:.6rem;left:.6rem;">AI pick</span>'}
                     <div class="spot-pick-badge" style="display:none;"></div>
                     <img src="${s.image || ''}" alt="${esc(s.name)}" onerror="this.style.display='none'">
-                    <div style="margin-top:.5rem;font-weight:700;">${esc(s.name)}</div>
-                    <div class="text-muted" style="font-size:.78rem;">${esc(s.city || s.category || '')}</div>
-                    <div style="font-size:.82rem;margin-top:.25rem;display:flex;justify-content:space-between;">
-                        <span class="star-mini">${'★'.repeat(Math.round(s.rating || 0)) || '—'}</span>
-                        <span>₹${Number(s.entryFee || 0).toLocaleString('en-IN')}</span>
+                    <div class="spot-main">
+                        <div style="font-weight:700;font-size:1.05rem;">${esc(s.name)}</div>
+                        <div class="text-muted" style="font-size:.8rem;margin-top:.15rem;">${esc(s.city || '')}${s.category ? ' · ' + esc(s.category) : ''}</div>
+                        <div class="star-mini" style="margin-top:.35rem;">${'★'.repeat(Math.round(s.rating || 0)) || '—'}</div>
+                    </div>
+                    <div class="spot-side">
+                        <div style="font-weight:700;font-size:.95rem;">${s.entryFee === 0 ? 'Free' : '₹' + Number(s.entryFee || 0).toLocaleString('en-IN')}</div>
+                        <div style="font-size:.72rem;margin-top:.25rem;color:var(--slate-500,#64748b);">${esc(s.category || '')}</div>
                     </div>
                 </div>`).join('');
             grid.querySelectorAll('.spot-card').forEach(c => c.addEventListener('click', () => togglePick(c)));
@@ -316,22 +313,22 @@
 
         async function submitTrip() {
             const startLocation = readStartLocation();
-            const destLocation = readDestLocation();
             const unlimited = document.getElementById('budgetUnlimited').checked;
+            const prefs = document.getElementById('preferences').value.trim();
+            if (!prefs) { alert('Please describe your travel preferences.'); return; }
             const data = {
                 origin: document.getElementById('origin').value || startLocation?.address || '',
-                destination: destLocation?.address || document.getElementById('destination').value,
                 startDate: document.getElementById('startDate').value,
                 endDate: document.getElementById('endDate').value,
                 travelers: parseInt(document.getElementById('travelers').value),
-                budget: unlimited ? 0 : parseInt(document.getElementById('budget').value),
+                budget: unlimited ? 0 : (parseInt(document.getElementById('budget').value) || 0),
                 budgetUnlimited: unlimited,
                 travelStyle: document.getElementById('travelStyle').value,
                 servicePreference: document.getElementById('servicePreference').value || null,
+                preferences: prefs,
                 prioritizedSpotIds: picked,
             };
             if (startLocation) data.startLocation = startLocation;
-            if (destLocation) data.destinationLocation = destLocation;
 
             document.getElementById('stepDetails').classList.add('hidden');
             document.getElementById('stepSpots').classList.add('hidden');

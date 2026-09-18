@@ -1,9 +1,15 @@
 """Travel plan orchestrator.
 
-Plans are built ONLY from registered catalogue data (transports, spots, tours,
-guides, hotels) present in the database. When no registered services exist for
-the requested corridor the API returns an explicit empty state — it never
-fabricates inventory or falls back to hardcoded mock services.
+Plans are generated EXCLUSIVELY by the AI planner (services/ai_plan_builder):
+the model composes every itinerary from the registered catalogue data
+(transports, spots, tours, guides, hotels, food) that is present in the
+database. The backend validates the model's resource ids and recomputes every
+price from catalogue rows — the AI never invents inventory or numbers.
+
+There is NO deterministic/code-rule plan generator, so planning always reflects
+AI judgement. When no registered services exist for the requested corridor the
+API returns an explicit empty state; when the AI backend is unavailable the API
+returns an explicit AI-unavailable state. It never fabricates inventory.
 """
 from datetime import datetime
 
@@ -36,11 +42,13 @@ def parse_trip_request(request_data):
         "budgetUnlimited": bool(request_data.get("budgetUnlimited")) or request_data.get("budget") in (None, 0),
         "servicePreference": request_data.get("servicePreference"),
         "prioritizedSpotIds": request_data.get("prioritizedSpotIds") or [],
+        "preferences": (request_data.get("preferences") or "").strip(),
     }
 
 
 def generate_travel_plans(request_data, db_data=None):
     parsed = parse_trip_request(request_data)
+    request_data = parsed
 
     if not db_data or not (db_data.get("transports") or db_data.get("spots")
                            or db_data.get("guides") or db_data.get("hotels")):
@@ -58,19 +66,31 @@ def generate_travel_plans(request_data, db_data=None):
             "source": "empty",
         }
 
-    return _generate_db_plans(parsed, db_data)
+    # AI-ONLY generation: every plan is composed by the AI model. There is no
+    # deterministic fallback path — if the AI backend is down the request fails
+    # loudly instead of producing code-rule plans.
+    from services.ai_plan_builder import AIPlanError, generate_ai_plans
+    try:
+        plans = generate_ai_plans(parsed, db_data)
+    except AIPlanError as e:
+        return {
+            "selectedPlan": None,
+            "plans": [],
+            "aiExplanation": (
+                "The AI planner could not generate plans: %s. "
+                "Please check the AI provider configuration (GEMINI_API_KEY or "
+                "OPENROUTER_API_KEY) and try again." % e
+            ),
+            "parsedRequest": parsed,
+            "ml": {},
+            "source": "ai_unavailable",
+        }
 
-
-def _generate_db_plans(parsed, db_data):
-    from services.trip_optimizer import build_db_plan
-    plans = []
-    for pt in ("BUDGET", "BALANCED", "PREMIUM"):
-        plans.append(build_db_plan(parsed, db_data, pt))
-    plans.sort(key=lambda p: p["optimizationScore"], reverse=True)
-    selected = plans[0]
+    selected = plans[0] if plans else None
     ai = []
-    ai.append(f"Optimized a {parsed['durationDays']}-day itinerary for {parsed['destination']} "
-              f"using live catalogue data (transports, tourist spots, guides).")
+    ai.append(f"AI generated a {parsed['durationDays']}-day, {parsed['travelers']}-traveller "
+              f"itinerary for {parsed['destination']} from live catalogue data "
+              f"(transports, spots, guides, hotels).")
     budget_note = ("with an unlimited budget (premium eligible)."
                    if parsed.get('budgetUnlimited')
                    else f"within ₹{parsed['budget']:,.0f} budget.")

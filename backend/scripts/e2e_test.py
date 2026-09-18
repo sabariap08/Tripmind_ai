@@ -137,7 +137,8 @@ def main():
         "type": "BUS", "busNumber": "E2E-BUS-%s" % POSTFIX,
         "boardingPoint": "Coimbatore KPR", "boardingTime": "20:00",
         "droppingPoint": "Chennai CMBT", "droppingTime": "04:00",
-        "totalSeats": 30, "sleeperSeats": 20, "seaterSeats": 10})
+        "totalSeats": 30, "sleeperSeats": 20, "seaterSeats": 10,
+        "fare": {"price": 1200, "baseFare": 1200}})
     bus = jget(r)
     ok("register bus", r.status_code == 201, str(bus))
     transport_id = (bus.get("transport") or {}).get("transportId")
@@ -148,7 +149,7 @@ def main():
     r = c.post("/api/hotels", json={
         "name": "E2E Grand %s" % POSTFIX, "city": "Chennai", "category": "Mid-Range",
         "address": "T Nagar", "description": "E2E test hotel",
-        "amenities": ["Wi-Fi"], "roomTypes": [
+        "amenities": ["Wi-Fi"], "totalRooms": 4, "roomTypes": [
             {"name": "Deluxe", "ac": True, "bedType": "Double Bed", "totalRooms": 4,
              "roomNumbers": ["101", "102", "103", "104"],
              "pricePerNight": 2500, "maxOccupancy": 2}]})
@@ -176,13 +177,19 @@ def main():
         "image": TINY_PNG, "prepTimeMinutes": 10})
     food = jget(r)
     ok("add food item", r.status_code in (200, 201), str(food)[:160])
+    food_item_id = (food.get("food_item") or food.get("foodItem") or {}).get("id") or \
+                   (food.get("food") or {}).get("id") or \
+                   (food.get("foodItem") or {}).get("_id") if food else None
 
     # Tourist spot admin adds a spot in Chennai + a tour
     login(c, se, "Passw0rd@123")
     r = c.post("/api/spots", json={
         "name": "Marina E2E %s" % POSTFIX, "city": "Chennai", "location": "Marina Beach",
         "address": "Marina", "category": "Beach", "entryFee": 50, "openTime": "06:00",
-        "closeTime": "22:00", "images": [TINY_PNG] * 5, "lat": "13.05", "lng": "80.28"})
+        "closeTime": "22:00", "images": [TINY_PNG] * 5, "lat": "13.05", "lng": "80.28",
+        "recommendedTimes": [{"from": "09:00", "to": "11:00"}, {"from": "11:00", "to": "13:00"},
+                             {"from": "14:00", "to": "16:00"}, {"from": "16:00", "to": "18:00"},
+                             {"from": "18:00", "to": "20:00"}]})
     spot = jget(r)
     ok("register spot", r.status_code == 201, str(spot)[:180])
     spot_id = (spot.get("spot") or {}).get("id") or (spot.get("spot") or {}).get("_id")
@@ -208,6 +215,22 @@ def main():
                                 {"day": "Fri", "departure": "20:30", "arrival": "04:00"},
                                 {"day": "Sat", "departure": "20:30", "arrival": "04:00"},
                                 {"day": "Sun", "departure": "20:30", "arrival": "04:00"}]}})
+
+    # Second service on the same route so AI transport switching has an alternative.
+    r = c.post("/api/transport/register", json={
+        "type": "TRAIN", "trainNumber": "E2E-TRN-%s" % POSTFIX,
+        "trainName": "E2E Express", "boardingStation": "Coimbatore Jn", "departureTime": "19:00",
+        "destinationStation": "Chennai Central", "arrivalTime": "07:00",
+        "coaches": [{"coachType": "AC Sleeper", "coachCount": 3, "capacityPerCoach": 20,
+                     "baseFare": 800}],
+        "fare": {"price": 800, "baseFare": 800}})
+    train = jget(r)
+    ok("register train", r.status_code == 201, str(train)[:140])
+    train_id = (train.get("transport") or {}).get("transportId")
+    approve_doc("transports", train_id)
+    get_collection("transports").update_one(
+        {"_id": str(train_id)},
+        {"$set": {"status": "APPROVED", "approvalStatus": "APPROVED"}})
 
     # Guide sets pricing + availability on the approved spot location
     login(c, ge, "Passw0rd@123")
@@ -247,7 +270,7 @@ def main():
        st_book.get("paymentStatus") == "PENDING", str(st_book.get("paymentStatus")))
 
     # --------------------------------------------------- payment (standalone + trip)
-    c.post("/api/wallet/deposit", json={"amount": 5000})
+    c.post("/api/wallet/deposit", json={"amount": 20000})
     r = c.post("/api/bookings/%s/pay" % st_book.get("_id"))
     ok("pay standalone booking", r.status_code == 200, str(jget(r))[:120])
     b = jget(c.get("/api/bookings"))
@@ -296,6 +319,14 @@ def main():
     v = jget(r)
     ok("trip QR verifies", r.status_code == 200 and (v.get("trip") or v.get("status")), str(v)[:200])
 
+    # --------------------------------------------------- standalone restaurant booking
+    login(c, ue, "Passw0rd@123")
+    r = c.post("/api/bookings", json={
+        "type": "RESTAURANT", "restaurantId": restaurant_id, "foodItemId": food_item_id,
+        "qty": 2, "date": "2026-10-11"})
+    b = jget(r)
+    ok("standalone restaurant booking", r.status_code == 201, str(b)[:200])
+
     # --------------------------------------------------- admin propagation
     # Transport owner sees reservations
     login(c, te, "Passw0rd@123")
@@ -329,14 +360,27 @@ def main():
        str(trip_doc.get("delay", {}).get("status")))
 
     # --------------------------------------------------- AI assistant
+    # Pay flow needs an unpaid trip: book a fresh one (no wallet payment).
+    r = c.post("/api/trips", json={
+        "origin": "Coimbatore", "destination": "Chennai", "startDate": "2026-10-08",
+        "endDate": "2026-10-09", "budget": 40000, "travelers": 2,
+        "travelStyle": "BALANCED", "transportType": "BUS"})
+    b = jget(r)
+    pay_trip_id = b.get("tripId")
+    c.post("/api/trips/%s/generate" % pay_trip_id)
+    c.post("/api/trips/%s/book" % pay_trip_id)
+    c.post("/api/wallet/deposit", json={"amount": 20000})
     r = c.post("/api/assistant/chat", json={
-        "message": "I want to pay for my trip", "tripId": trip_id})
+        "message": "I want to pay for my trip", "tripId": pay_trip_id})
     b = jget(r)
     ok("assistant proposes pay action", b.get("action", {}).get("type") == "pay_trip", str(b)[:240])
     r = c.post("/api/assistant/action", json={
-        "type": "pay_trip", "params": {"trip_id": trip_id}})
+        "type": "pay_trip", "params": {"trip_id": pay_trip_id}})
     b = jget(r)
     ok("assistant pay executes", r.status_code == 200, str(b)[:200])
+    pay_doc = get_collection("trips").find_one({"_id": pay_trip_id})
+    ok("assistant-paid trip COMPLETED",
+       pay_doc.get("paymentStatus") == "COMPLETED", str(pay_doc.get("paymentStatus")))
 
     r = c.post("/api/assistant/chat", json={"message": "I want to switch my transport"})
     b = jget(r)
@@ -346,7 +390,7 @@ def main():
                                               "params": act.get("params")})
     b = jget(r)
     ok("assistant switch transport executes", r.status_code == 200, str(b)[:220])
-    trip_doc = get_collection("trips").find_one({"_id": trip_id})
+    trip_doc = get_collection("trips").find_one({"_id": pay_trip_id})
     switched = [x for x in trip_doc.get("bookings", [])
                 if x.get("switchedFrom") or x.get("switchedTo")]
     ok("switch recorded on trip", len(switched) >= 1, "switched=%d" % len(switched))

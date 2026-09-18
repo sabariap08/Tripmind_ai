@@ -12,6 +12,7 @@ Guide flow creates a REQUEST (pending) for the guide to accept/reject.
 """
 from datetime import datetime, timedelta
 from bson.objectid import ObjectId
+from pymongo.errors import DuplicateKeyError
 from services.mongodb import get_collection
 from services.transport_service import book_seats, release_seats
 from services.hotel_service import book_rooms, release_rooms
@@ -80,6 +81,10 @@ def _duplicate_guard(btype, user, resource_parts, date=""):
     date twice (cancelled/rejected bookings are ignored). Uses a deterministic
     uniqueness key, NOT a global "one booking per user" rule — a passenger can
     still book different services freely.
+
+    The key doubles as a concurrency safety net: `bookings.uniquenessKey` has
+    a unique index (services/mongodb) so two simultaneous identical requests
+    cannot both insert — the second insert fails and capacity is rolled back.
     """
     key = "|".join([str(user["id"]), btype, (date or "")] + [str(p) for p in resource_parts])
     exists = get_collection("bookings").find_one({
@@ -87,6 +92,60 @@ def _duplicate_guard(btype, user, resource_parts, date=""):
         "status": {"$nin": ("CANCELLED", "REJECTED")},
     })
     return key, exists
+
+
+def _overlap(a_start, a_end, b_start, b_end):
+    """True when two [start, end] minute intervals overlap (requirement 16:
+    new_start < existing_end AND new_end > existing_start)."""
+    try:
+        if a_start is None or a_end is None or b_start is None or b_end is None:
+            return False
+        a_start, a_end = int(a_start), int(a_end)
+        b_start, b_end = int(b_start), int(b_end)
+    except (TypeError, ValueError):
+        return False
+    return a_start < b_end and b_start < a_end
+
+
+def _time_overlap_conflict(user, btype, date, details=None, exclude=None):
+    """True when the requested date/time overlaps another ACTIVE booking of the
+    same type for the same traveller. Slots are drawn from
+    details.startTime / details.endTime (minutes-since-midnight values are
+    tolerated). Guards against "double-booking" a cab/auto for the same window
+    and similar time-boxed resources."""
+    details = details or {}
+    start = details.get("startTime")
+    end = details.get("endTime")
+    if start is None and end is None:
+        # Try alternative naming used by the plan flow.
+        start = details.get("pickupTime") or details.get("start")
+        end = details.get("dropTime") or details.get("end")
+    if start is None and end is None:
+        return False
+    if isinstance(start, str) and ":" in start:
+        start = _minutes(start)
+    if isinstance(end, str) and ":" in end:
+        end = _minutes(end)
+    if start is None or end is None:
+        return False
+    if start >= end:
+        return False  # malformed/inverted window — let other validators catch it
+    for b in get_collection("bookings").find({
+            "userId": user["id"], "type": btype,
+            "status": {"$in": ("CONFIRMED", "PENDING", "COMPLETED")},
+            "date": date or ""}):
+        if exclude and str(b["_id"]) == str(exclude):
+            continue
+        bd = b.get("details") or {}
+        bs = bd.get("startTime") or bd.get("pickupTime") or bd.get("start")
+        be = bd.get("endTime") or bd.get("dropTime") or bd.get("end")
+        if isinstance(bs, str) and ":" in bs:
+            bs = _minutes(bs)
+        if isinstance(be, str) and ":" in be:
+            be = _minutes(be)
+        if _overlap(start, end, bs, be):
+            return True
+    return False
 
 
 def create_booking(data, user):
@@ -104,6 +163,8 @@ def create_booking(data, user):
     spot = None
     hotel = None
     tour = None
+    restaurant = None
+    food_item = None
     ug_key = None
 
     if btype == "TRANSPORT":
@@ -118,6 +179,11 @@ def create_booking(data, user):
             # Charters: a single vehicle is booked for the whole trip, so no
             # per-seat capacity is consumed.
             qty = 1
+            # Requirement 16: a traveller can't hold overlapping time windows
+            # for a private/self-drive vehicle.
+            if _time_overlap_conflict(user, btype, data.get("date") or "", data.get("details")):
+                return None, ("You already have a %s booked in an overlapping time window "
+                              "on this date." % transport.get("type"))
         else:
             ok, err = book_seats(transport, data.get("seatType"), qty)
             if not ok:
@@ -176,9 +242,8 @@ def create_booking(data, user):
             {"_id": str(data.get("restaurantId") or ""), "status": "APPROVED"})
         if not restaurant:
             return None, "Restaurant not found or not available."
-        food_item = get_collection("food_items").find_one(
-            {"_id": str(data.get("foodItemId") or ""),
-             "restaurantId": str(restaurant["_id"]), "available": True})
+        food_item = _find_food_item(str(data.get("foodItemId") or ""),
+                                    str(restaurant["_id"]))
         if not food_item:
             return None, "Food item not available."
         ug_key, dup = _duplicate_guard(
@@ -242,22 +307,23 @@ def create_booking(data, user):
 
     wallet_txn_id = None
     if pay_wallet:
-        from services.wallet_service import debit as wallet_debit
-        wallet, err = wallet_debit(user["id"], total, f"Booking {reference}", ref=reference)
-        if not wallet:
-            # Roll back any capacity reserved above so nothing is held without a booking.
-            if btype == "TRANSPORT" and transport is not None and transport.get("type") not in ("CAB", "AUTO"):
-                release_seats(str(transport["_id"]), qty)
-            if btype == "HOTEL":
-                release_rooms(str(hotel["_id"]), str(data.get("roomTypeId") or ""), qty)
-            if btype == "TOUR":
-                get_collection("tours").update_one(
-                    {"_id": tour["_id"]}, {"$inc": {"bookedParticipants": -qty}})
-            return None, err
-        for t in reversed(wallet.get("transactions") or []):
-            if t.get("ref") == reference and t.get("type") == "DEBIT":
-                wallet_txn_id = t.get("id")
-                break
+        if total > 0:
+            from services.wallet_service import debit as wallet_debit
+            wallet, err = wallet_debit(user["id"], total, f"Booking {reference}", ref=reference)
+            if not wallet:
+                # Roll back any capacity reserved above so nothing is held without a booking.
+                if btype == "TRANSPORT" and transport is not None and transport.get("type") not in ("CAB", "AUTO"):
+                    release_seats(str(transport["_id"]), qty)
+                if btype == "HOTEL":
+                    release_rooms(str(hotel["_id"]), str(data.get("roomTypeId") or ""), qty)
+                if btype == "TOUR":
+                    get_collection("tours").update_one(
+                        {"_id": tour["_id"]}, {"$inc": {"bookedParticipants": -qty}})
+                return None, err
+            for t in reversed(wallet.get("transactions") or []):
+                if t.get("ref") == reference and t.get("type") == "DEBIT":
+                    wallet_txn_id = t.get("id")
+                    break
 
     booking = {
         "_id": _id(),
@@ -288,8 +354,42 @@ def create_booking(data, user):
         "tripId": data.get("tripId"),
         "createdAt": datetime.utcnow().isoformat(),
     }
-    get_collection("bookings").insert_one(booking)
+    try:
+        get_collection("bookings").insert_one(booking)
+    except DuplicateKeyError:
+        # Race condition: the same uniqueness key (user+type+date+resource)
+        # was inserted by a concurrent request. Roll back any capacity we
+        # reserved and reject politely instead of double-booking.
+        if btype == "TRANSPORT" and transport is not None and transport.get("type") not in ("CAB", "AUTO"):
+            release_seats(str(transport["_id"]), qty)
+        if btype == "HOTEL":
+            release_rooms(str(hotel["_id"]), str(data.get("roomTypeId") or ""), qty)
+        if btype == "TOUR":
+            get_collection("tours").update_one(
+                {"_id": tour["_id"]}, {"$inc": {"bookedParticipants": -qty}})
+        return None, "You already have a booking for this resource on this date."
     return booking, None
+
+
+def _find_food_item(fid, restaurant_id):
+    """Locate an available food item by id, accepting string and ObjectId ids."""
+    from bson.objectid import ObjectId
+    q = {"restaurantId": restaurant_id, "available": True}
+    for _id in (fid, None):
+        if _id is None:
+            continue
+        try:
+            q["_id"] = _id
+            row = get_collection("food_items").find_one(q)
+            if row:
+                return row
+            q["_id"] = ObjectId(_id)
+            row = get_collection("food_items").find_one(q)
+            if row:
+                return row
+        except Exception:
+            continue
+    return None
 
 
 def _book_tour_seats(tour, qty):
@@ -432,7 +532,16 @@ def pay_booking(booking, user):
         return booking, None
     amount = float(booking.get("total") or 0)
     if amount <= 0:
-        return None, "Booking total must be greater than zero."
+        # Free booking (e.g. free-entry tourist spot) — nothing to pay.
+        updated = dict(booking)
+        updated["paymentStatus"] = "COMPLETED"
+        updated["walletPaid"] = 0.0
+        updated["paidAt"] = datetime.utcnow().isoformat()
+        get_collection("bookings").update_one(
+            {"_id": booking["_id"]},
+            {"$set": {"paymentStatus": "COMPLETED", "walletPaid": 0.0,
+                      "paidAt": updated["paidAt"]}})
+        return updated, None
     from services.wallet_service import debit
     wallet, err = debit(user["id"], amount,
                         f"Payment for booking {booking.get('reference')}",

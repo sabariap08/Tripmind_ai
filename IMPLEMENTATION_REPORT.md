@@ -98,14 +98,15 @@ the wallet was never debited at book time. Fixed end-to-end:
 - `POST /api/trips/<id>/replan` recomputes the itinerary and sets
   `delay.status = 'RESOLVED'`; both transitions are asserted from the DB in the e2e suite.
 
-## 11. AI Travel Assistant (Groq, action-capable)
+## 11. AI Travel Assistant (action-capable)
 - New `services/assistant.py`: tool registry (`list_my_trips`, `get_trip`, `list_bookings`,
   `view_wallet`, `find_alternative_transports`, `change_transport`, `pay_trip`,
   `remove_place`) with an owner-ship re-validation layer in `execute_action`.
-- Groq (via the single `groq_service.py`) can **propose** actions; mutations execute only
-  through `POST /api/assistant/action` after the frontend Confirm button
-  (`execute_action` re-checks ownership/status server-side). Local keyword fallback keeps the
-  assistant functional with no Groq key.
+- The AI service chain (`services/ai_service.py`) uses Google Gemini (REST) as the primary
+  provider with an OpenRouter fallback and a deterministic local fallback. The assistant can
+  **propose** actions; mutations execute only through `POST /api/assistant/action` after the
+  frontend Confirm button (`execute_action` re-checks ownership/status server-side). Local
+  keyword fallback keeps the assistant functional with no Gemini key.
 - `change_transport` executes `booking_service.switch_transport`: net wallet credit/debit,
   seat release/reserve, single refund, same-trip rebooking with `switchedFrom`/`switchedTo`
   markers and duplicate guarding.
