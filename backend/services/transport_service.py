@@ -137,9 +137,13 @@ def _build(ttype, data, owner_id):
         base.update({
             "busNumber": data.get("busNumber"),
             "boardingPoint": data.get("boardingPoint"),
+            "boardingLat": float(data.get("boardingLat")) if data.get("boardingLat") not in (None, "") else None,
+            "boardingLng": float(data.get("boardingLng")) if data.get("boardingLng") not in (None, "") else None,
             "boardingDay": int(data.get("boardingDay") or 0),
             "boardingTime": data.get("boardingTime"),
             "droppingPoint": data.get("droppingPoint"),
+            "droppingLat": float(data.get("droppingLat")) if data.get("droppingLat") not in (None, "") else None,
+            "droppingLng": float(data.get("droppingLng")) if data.get("droppingLng") not in (None, "") else None,
             "droppingDay": int(data.get("droppingDay") or 0),
             "droppingTime": data.get("droppingTime"),
             "stops": stop_list(data.get("stops")),

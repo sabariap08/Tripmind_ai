@@ -42,7 +42,12 @@ def make_full_prompt(system_prompt, prompt):
 
 
 def generate_text(prompt, system_prompt="", max_tokens=1024, temperature=0.7):
-    """One-shot text generation. Returns raw model text or raises on failure."""
+    """One-shot text generation. Returns raw model text or raises on failure.
+
+    The free tier frequently returns transient HTTP 503 (high demand), so the
+    call is retried a few times with short backoff before giving up.
+    """
+    import time
     if not GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY is not configured.")
     url = "%s/models/%s:generateContent?key=%s" % (_BASE, GEMINI_MODEL, GEMINI_API_KEY)
@@ -56,20 +61,29 @@ def generate_text(prompt, system_prompt="", max_tokens=1024, temperature=0.7):
     }
     if payload["generationConfig"]["responseMimeType"] is None:
         del payload["generationConfig"]["responseMimeType"]
-    resp = requests.post(
-        url,
-        headers={"Content-Type": "application/json"},
-        json=payload,
-        timeout=90,
-    )
-    if resp.status_code != 200:
-        raise RuntimeError("Gemini API error %s: %s" % (resp.status_code, resp.text[:500]))
-    data = resp.json()
-    try:
-        text = data["candidates"][0]["content"]["parts"][0]["text"]
-    except (KeyError, IndexError, TypeError):
-        raise RuntimeError("Unexpected Gemini response: %s" % json.dumps(data)[:500])
-    return text.strip()
+    last = None
+    for attempt in range(1, 4):
+        try:
+            resp = requests.post(
+                url,
+                headers={"Content-Type": "application/json"},
+                json=payload,
+                timeout=90,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                try:
+                    return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                except (KeyError, IndexError, TypeError):
+                    raise RuntimeError("Unexpected Gemini response: %s" % json.dumps(data)[:500])
+            if resp.status_code not in (429, 500, 503):
+                raise RuntimeError("Gemini API error %s: %s" % (resp.status_code, resp.text[:500]))
+            last = "Gemini API transient %s: %s" % (resp.status_code, resp.text[:200])
+        except requests.exceptions.RequestException as e:
+            last = "Gemini network error: %s" % e
+        if attempt < 3:
+            time.sleep(3 * attempt)
+    raise RuntimeError(last or "Gemini request failed")
 
 
 def generate_json(prompt, system_prompt):

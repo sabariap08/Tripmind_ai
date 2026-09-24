@@ -218,7 +218,8 @@
                     html += `<div style="font-weight:600;">${item.title}</div>`;
                     if (item.provider) html += `<div class="text-xs text-muted">${item.provider}</div>`;
                     if (item.startTime) html += `<div class="text-xs text-muted">${formatTime(item.startTime)}${item.endTime ? ' - ' + formatTime(item.endTime) : ''}</div>`;
-                    html += `<div class="flex justify-between align-center"><div class="text-sm font-bold" style="color:var(--primary);">${formatCurrency(item.cost)}</div>`;
+                    if (item.distanceKm) html += `<div class="text-xs text-muted">${item.distanceKm} km road distance</div>`;
+                    html += `<div class="flex justify-between align-center"><div class="text-sm font-bold" style="color:${item.fareError ? 'var(--red,#dc2626)' : 'var(--primary)'};">${item.fareError ? 'Fare unavailable — ' + esc(item.fareError) : formatCurrency(item.cost)}</div>`;
                     if (item.status !== 'BOOKED') html += `<button class="btn btn-outline btn-sm" onclick="removeItineraryItem('${item._id}')">Remove</button></div>`;
                     if (item.status === 'DELAYED' || item.status === 'RESCHEDULED') html += `<span class="badge badge-warning" style="margin-top:0.25rem;">${item.status}</span>`;
                     html += `</div>`;

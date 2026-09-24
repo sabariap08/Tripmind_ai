@@ -1296,6 +1296,23 @@
                     ${field('Dropping day', 't6', `<select id="t6" class="form-select">${dayOptions(1)}</select>`)}
                     ${field('Dropping time (24h)', 't7', input('t7', 'placeholder="05:30"'))}
                 </div>
+                <div class="hr-label">Boarding point location (Google Maps)</div>
+                <p class="text-sm text-muted" style="margin:.35rem 0 .6rem;">Pick the exact boarding point on the map so the AI can bill your home→boarding transfer from the real road distance.</p>
+                <div style="display:grid;grid-template-columns:1fr auto;gap:.4rem;margin-bottom:.5rem;">
+                    <input id="tbpAddr" class="form-input" placeholder="Search boarding point…">
+                    <button class="btn btn-outline" type="button" onclick="TM.pickBusPoint('boarding')">Pick on map</button>
+                </div>
+                <input id="tbLat" type="hidden"><input id="tbLng" type="hidden">
+                <div id="tbpMap" style="height:180px;border:1px solid var(--slate-100);border-radius:.6rem;display:none;margin-bottom:.6rem;"></div>
+                <p class="text-sm text-muted" id="tbpNote" style="font-size:.75rem;">Optional — if you skip it, transfers fall back to the boarding point name/address.</p>
+                <div class="hr-label">Dropping point location (Google Maps)</div>
+                <div style="display:grid;grid-template-columns:1fr auto;gap:.4rem;margin-bottom:.5rem;">
+                    <input id="tdpAddr" class="form-input" placeholder="Search dropping point…">
+                    <button class="btn btn-outline" type="button" onclick="TM.pickBusPoint('dropping')">Pick on map</button>
+                </div>
+                <input id="tdLat" type="hidden"><input id="tdLng" type="hidden">
+                <div id="tdpMap" style="height:180px;border:1px solid var(--slate-100);border-radius:.6rem;display:none;margin-bottom:.6rem;"></div>
+                <p class="text-sm text-muted" style="font-size:.75rem;">Optional — used for arrival→stay and return-home transfer fares.</p>
                 <div class="hr-label">Seats</div>
                 <div class="form-row">
                     ${field('Total seats', 't8', num('t8', 'value="32"'))}
@@ -1415,6 +1432,8 @@
                 singleSeat: v('t13') === 'true', doubleSeat: v('t14') === 'true',
                 seatTypes: ['SLEEPER', 'SEATER'], fare: { sleeper: +v('t11'), seater: +v('t12') },
                 stops: collectRows($('tr_stops'), ['name', 'day', 'time']),
+                boardingLat: v('tbLat') || undefined, boardingLng: v('tbLng') || undefined,
+                droppingLat: v('tdLat') || undefined, droppingLng: v('tdLng') || undefined,
             });
             if (+v('t9') + +v('t10') !== +v('t8')) { e.innerHTML = 'Sleeper + Seater must equal Total Seats.'; return; }
         }
@@ -1451,6 +1470,34 @@
         if (window.__trDialog) { window.__trDialog.close(); window.__trDialog = null; }
         showPanel('register');
     });
+
+    /* Provider-side Google Maps picker for the bus boarding/dropping point.
+     * The traveller's home→boarding transfer is billed from the real road
+     * distance between these coordinates and their Google-picked start point,
+     * so the provider supplies the exact boarding location here. */
+    let __trBusPickers = {};
+    window.TM.pickBusPoint = async (which) => {
+        const isB = which === 'boarding';
+        const addrId = isB ? 'tbpAddr' : 'tdpAddr';
+        const latId = isB ? 'tbLat' : 'tdLat';
+        const lngId = isB ? 'tbLng' : 'tdLng';
+        const mapId = isB ? 'tbpMap' : 'tdpMap';
+        const noteId = isB ? 'tbpNote' : 'tdpNote';
+        const mapEl = document.getElementById(mapId);
+        if (!mapEl) return;
+        if (!window.TM_MAPS || !(await window.TM_MAPS.init())) {
+            showToast('Google Maps is not configured — the boarding point will be stored by name only.');
+            return;
+        }
+        mapEl.style.display = 'block';
+        const note = document.getElementById(noteId);
+        if (note) note.textContent = 'Search a place or click / drag the marker to set the exact location.';
+        if (!__trBusPickers[which]) {
+            __trBusPickers[which] = window.TM_MAPS.initLocationPicker({
+                addressId: addrId, latId, lngId, mapId,
+            });
+        }
+    };
 
     async function transportFleet() {
         const [res, bk] = await Promise.all([

@@ -307,6 +307,7 @@ def generate_plans(trip_id):
                     "metadata": None,
                     "bookableId": item.get("bookableId"),
                     "distanceKm": item.get("distanceKm"),
+                    "fareError": item.get("fareError"),
                 })
         itineraries.append({
             "_id": itin_id,
@@ -1221,6 +1222,23 @@ def _gather_db_data(trip):
         transports = available_transports(trip["origin"], trip["destination"], ttype)
         if transports:
             db_data["transports"] = transports
+    except Exception:
+        pass
+    try:
+        # Real CAB/AUTO fare cards (base fare + per-km + minimum) for the
+        # transfer legs (home->boarding point, arrival->stay, return home).
+        # Transfers are priced from the ACTUAL road distance, never a flat rate.
+        from services.transport_service import list_transports
+        cabs = []
+        for t in list_transports(approved_only=True) or []:
+            if t.get("type") not in ("CAB", "AUTO"):
+                continue
+            area = str(t.get("serviceArea") or "") + " " + str(t.get("baseLocation") or "")
+            area = area.lower()
+            if any(city in area for city in (str(trip["origin"]).lower(), str(trip["destination"]).lower())):
+                cabs.append(t)
+        if cabs:
+            db_data["cabs"] = cabs
     except Exception:
         pass
     try:

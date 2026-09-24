@@ -15,6 +15,10 @@ AI_MODEL = os.getenv("AI_MODEL", "llama-3.3-70b-versatile")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
 
+# Cerebras AI — fastest OpenAI-compatible backend (tried first).
+CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY", "")
+CEREBRAS_MODEL = os.getenv("CEREBRAS_MODEL", "gpt-oss-120b")
+
 APP_URL = os.getenv("APP_URL", "http://localhost:5000")
 
 SECRET_KEY = os.getenv("SECRET_KEY", "tripmind-dev-secret-key")

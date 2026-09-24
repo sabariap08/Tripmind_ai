@@ -60,6 +60,150 @@ def _vehicle_label(t):
 
 
 # ---------------------------------------------------------------------------
+# Real distance-based transfer fare (home -> boarding point, arrival -> stay,
+# return home).  Transfers are priced from the ACTUAL road distance returned
+# by the Google Maps integration, using a real registered CAB/AUTO fare card
+# (max(minimum, baseFare + distanceKm * pricePerKm)).  There is NO flat-rate /
+# "₹370" path: when the distance cannot be measured the item carries an
+# explicit error instead of a made-up fare.
+# ---------------------------------------------------------------------------
+
+def _pick_transfer_cab(cabs, city):
+    if not cabs:
+        return None
+    city = (city or "").lower()
+
+    def key(c):
+        area = " ".join([str(c.get("serviceArea") or ""), str(c.get("baseLocation") or "")]).lower()
+        per = _cost_f((c.get("fare") or {}).get("pricePerKm") or (c.get("fare") or {}).get("perKm") or 0)
+        return (0 if city and city in area else 1, per if per > 0 else float("inf"))
+    return min(cabs, key=key)
+
+
+def _cab_fare_for(cab, distance_km):
+    """Real cab/auto fare rule: max(minimum, baseFare + distanceKm*pricePerKm)."""
+    if not cab or not distance_km:
+        return None
+    f = cab.get("fare") or {}
+    per = _cost_f(f.get("pricePerKm") or f.get("perKm") or 0)
+    if per <= 0:
+        return None
+    base = _cost_f(f.get("baseFare") or 0)
+    minimum = _cost_f(f.get("minimum") or 0) or base
+    return max(minimum, base + per * distance_km)
+
+
+def _transfer_km(origin_obj, dest_obj, label):
+    """Measure road distance between two waypoints (coords preferred, else
+    address).  Returns km or None.  Every lookup prints the
+    ========== TRIPMIND DISTANCE DEBUG ========== block."""
+    try:
+        from services.maps_distance import route_distance_km
+        o_addr = origin_obj.get("address")
+        d_addr = dest_obj.get("address")
+        return route_distance_km(
+            o_addr, d_addr,
+            origin_obj.get("lat"), origin_obj.get("lng"),
+            dest_obj.get("lat"), dest_obj.get("lng"),
+            label=label)
+    except Exception as e:
+        print("[TripMind] DISTANCE-ERROR: transfer lookup '%s' failed: %s" % (label, e))
+        return None
+
+
+def _compute_transfers(parsed, leg, hotel, cabs):
+    """Compute the per-leg transfer distances and cab fares for a plan.
+
+    Returns a dict keyed by transfer leg name with {distanceKm, fare, error}:
+      - home_to_boarding: user start location -> bus boarding point
+      - arrival_to_stay:  bus dropping point -> hotel
+      - return_home:      hotel / dropping -> user start location
+    """
+    out = {}
+
+    start = parsed.get("startLocation") or {}
+    start_obj = {
+        "lat": start.get("lat"),
+        "lng": start.get("lng"),
+        "address": start.get("address") or start.get("origin") or parsed.get("origin") or "",
+    }
+    city = parsed.get("origin") or ""
+
+    # Bus boarding waypoint (provider-stored coords, else the point name).
+    boarding_obj = {"lat": None, "lng": None, "address": None}
+    dropping_obj = {"lat": None, "lng": None, "address": None}
+    if leg and leg.get("type") == "BUS":
+        boarding_obj = {
+            "lat": leg.get("boardingLat"), "lng": leg.get("boardingLng"),
+            "address": leg.get("boardingPoint") or "",
+        }
+        dropping_obj = {
+            "lat": leg.get("droppingLat"), "lng": leg.get("droppingLng"),
+            "address": leg.get("droppingPoint") or "",
+        }
+    elif leg:
+        # Train / flight: the "transfer" happens at the station / airport.
+        boarding_obj = {
+            "lat": None, "lng": None,
+            "address": leg.get("boardingStation") or leg.get("departureAirport") or "",
+        }
+        dropping_obj = {
+            "lat": None, "lng": None,
+            "address": leg.get("destinationStation") or leg.get("arrivalAirport") or "",
+        }
+
+    hotel_obj = {
+        "lat": hotel.get("lat") if hotel else None,
+        "lng": hotel.get("lng") if hotel else None,
+        "address": (hotel.get("name") if hotel else None) or "",
+    }
+
+    def price(label, origin_obj, dest_obj):
+        km = _transfer_km(origin_obj, dest_obj, label)
+        cab = _pick_transfer_cab(cabs, city)
+        fare = None
+        error = None
+        if km is None:
+            error = "Google Maps could not measure the road distance for '%s'; " \
+                    "no transfer fare was fabricated." % label
+            print("[TripMind] TRANSFER-FARE for '%s': DISTANCE UNKNOWN -> %s" % (label, error))
+        else:
+            fare = _cab_fare_for(cab, km)
+            if fare is None:
+                error = "No registered CAB/AUTO fare card found for '%s' to price the transfer." % city
+                print("[TripMind] TRANSFER-FARE for '%s': distance=%.2fkm but NO fare card -> %s"
+                      % (label, km, error))
+            else:
+                card = cab.get("fare") or {}
+                print("[TripMind] TRANSFER-FARE for '%s': distance=%.2fkm base=%.2f perKm=%.2f "
+                      "minimum=%.2f -> fare=₹%.2f"
+                      % (label, km,
+                         _cost_f(card.get("baseFare") or 0),
+                         _cost_f(card.get("pricePerKm") or card.get("perKm") or 0),
+                         _cost_f(card.get("minimum") or 0), fare))
+        return {"distanceKm": km, "fare": fare, "cab": cab, "error": error}
+
+    if leg:
+        out["home_to_boarding"] = price("home->boarding", start_obj, boarding_obj)
+        if hotel:
+            out["arrival_to_stay"] = price("arrival->stay", dropping_obj, hotel_obj)
+        out["return_home"] = price("return->home", hotel_obj or dropping_obj, start_obj)
+    return out
+
+
+def _transfer_cost(entry, travelers, capacity=4):
+    """Per-traveler transfer cost: the cab ride fare split across the party
+    (capped at one ride's capacity), so the plan total = the real whole-fare.
+    On a distance/fare failure the item cost is 0 and the explicit error is
+    carried in `fareError` instead of a made-up flat price."""
+    fare = entry.get("fare") if entry else None
+    if fare is None:
+        return 0, (entry or {}).get("error")
+    cap = max(1, min(int(capacity) or 4, int(travelers) or 1))
+    return round(fare / cap, 2), None
+
+
+# ---------------------------------------------------------------------------
 # Catalogue brief (ground-truth inventory handed to the AI)
 # ---------------------------------------------------------------------------
 
@@ -380,14 +524,18 @@ def _materialize(parsed, db_data, sel):
     if leg and leg.get("type") in ("CAB", "AUTO"):
         try:
             from services.maps_distance import route_distance_km
-            route_km = route_distance_km(parsed.get("origin"), parsed.get("destination"))
+            route_km = route_distance_km(parsed.get("origin"), parsed.get("destination"),
+                                         label="corridor")
         except Exception:
             route_km = None
+
+    transfers = _compute_transfers(parsed, leg, hotel, db_data.get("cabs") or [])
 
     decision = _arrive_decision(parsed, leg, hotel, activities)
     (daily_plan, total_cost, breakdown) = _ai_daily(parsed, leg, hotel, activities,
                                                     foods_sel, decision=decision,
-                                                    distance_km=route_km)
+                                                    distance_km=route_km,
+                                                    transfers=transfers)
 
     style = sel.get("style")
     style = str(style or "").upper()
@@ -470,9 +618,25 @@ def _arrival_time_ai(leg):
         return datetime.utcnow() + timedelta(hours=3)
 
 
-def _ai_daily(request, leg, hotel, activities, foods, decision=None, distance_km=None):
-    start = request["startDate"] if isinstance(request["startDate"], datetime) else datetime.utcnow()
-    days = request["durationDays"]
+def _ai_daily(request, leg, hotel, activities, foods, decision=None, distance_km=None,
+              transfers=None):
+    start = request.get("startDate")
+    try:
+        if isinstance(start, str):
+            start = parse_datetime(start.split("T")[0], "00:00")
+    except Exception:
+        start = None
+    if not isinstance(start, datetime):
+        start = datetime.utcnow()
+    days = request.get("durationDays")
+    if not days:
+        end = request.get("endDate")
+        try:
+            if isinstance(end, str):
+                end = parse_datetime(end.split("T")[0], "00:00")
+            days = max(1, (end - start).days + 1) if isinstance(end, datetime) else 1
+        except Exception:
+            days = 1
     travelers = request.get("travelers", 1)
     transfer_min = int(learned_duration_or_default("TRANSFER", 90))
     food_min = int(learned_duration_or_default("FOOD", 60))
@@ -484,6 +648,8 @@ def _ai_daily(request, leg, hotel, activities, foods, decision=None, distance_km
 
     act_list = [a for a in activities if not (a.get("title") or "").startswith("Guided")]
     guided = next((x for x in activities if (x.get("title") or "").startswith("Guided")), None)
+
+    transfers = transfers or {}
 
     daily = []
     total = 0.0
@@ -538,21 +704,34 @@ def _ai_daily(request, leg, hotel, activities, foods, decision=None, distance_km
             arr = dep + timedelta(minutes=ride)
             leg_fare = _cost(_fare(leg, distance_km))
             breakdown["transport"] += leg_fare * travelers
+            home_cost, home_err = _transfer_cost(transfers.get("home_to_boarding"), travelers)
+            stay_cost, stay_err = _transfer_cost(transfers.get("arrival_to_stay"), travelers)
+            breakdown["transport"] += (home_cost + stay_cost) * travelers
+            home_item = {"type": "TRANSFER", "title": "Home to boarding point",
+                         "provider": "Cab", "cost": home_cost,
+                         "startTime": (dep - timedelta(minutes=90)).isoformat(),
+                         "endTime": dep.isoformat()}
+            if transfers.get("home_to_boarding") and transfers["home_to_boarding"].get("distanceKm"):
+                home_item["distanceKm"] = round(transfers["home_to_boarding"]["distanceKm"], 2)
+            if home_err:
+                home_item["fareError"] = home_err
+            stay_item = {"type": "TRANSFER", "title": "Arrival to stay", "provider": "Cab",
+                         "cost": stay_cost,
+                         "startTime": (arr + timedelta(minutes=20)).isoformat(),
+                         "endTime": (arr + timedelta(minutes=20 + transfer_min)).isoformat()}
+            if transfers.get("arrival_to_stay") and transfers["arrival_to_stay"].get("distanceKm"):
+                stay_item["distanceKm"] = round(transfers["arrival_to_stay"]["distanceKm"], 2)
+            if stay_err:
+                stay_item["fareError"] = stay_err
             items = add([
-                {"type": "TRANSFER", "title": "Home to boarding point",
-                 "provider": "Cab", "cost": int(transfer_min * 4 * travelers),
-                 "startTime": (dep - timedelta(minutes=90)).isoformat(),
-                 "endTime": dep.isoformat()},
+                home_item,
                 {"type": leg.get("type", "TRANSPORT"),
                  "title": "%s · %s" % (leg.get("type"), leg.get("serviceName", "")),
                  "provider": leg.get("serviceName", ""),
                  "vehicle": _vehicle_label(leg), "cost": leg_fare,
                  "startTime": dep.isoformat(), "endTime": arr.isoformat(),
                  "distanceKm": distance_km, "bookableId": "transport:%s" % leg["_id"]},
-                {"type": "TRANSFER", "title": "Arrival to stay", "provider": "Cab",
-                 "cost": int(transfer_min * 3 * travelers),
-                 "startTime": (arr + timedelta(minutes=20)).isoformat(),
-                 "endTime": (arr + timedelta(minutes=20 + transfer_min)).isoformat()},
+                stay_item,
             ])
             slot = item_after(items)
 
@@ -605,12 +784,17 @@ def _ai_daily(request, leg, hotel, activities, foods, decision=None, distance_km
             slot = item_after(items)
 
         if day == days:
-            items.extend(add([
-                {"type": "TRANSFER", "title": "Return home transfer", "provider": "Cab",
-                 "cost": int(transfer_min * 4 * travelers),
-                 "startTime": slot.isoformat(),
-                 "endTime": (slot + timedelta(minutes=transfer_min)).isoformat()},
-            ]))
+            back_cost, back_err = _transfer_cost(transfers.get("return_home"), travelers)
+            breakdown["transport"] += back_cost * travelers
+            back_item = {"type": "TRANSFER", "title": "Return home transfer", "provider": "Cab",
+                         "cost": back_cost,
+                         "startTime": slot.isoformat(),
+                         "endTime": (slot + timedelta(minutes=transfer_min)).isoformat()}
+            if transfers.get("return_home") and transfers["return_home"].get("distanceKm"):
+                back_item["distanceKm"] = round(transfers["return_home"]["distanceKm"], 2)
+            if back_err:
+                back_item["fareError"] = back_err
+            items.extend(add([back_item]))
 
         daily.append({"day": day, "date": d.isoformat(), "items": items})
 
@@ -621,6 +805,30 @@ def _ai_daily(request, leg, hotel, activities, foods, decision=None, distance_km
 # Public API
 # ---------------------------------------------------------------------------
 
+def _normalize_request(parsed):
+    """Ensure the request dict always carries datetimes + durationDays, no
+    matter how the caller serialised the trip (JSON strings vs datetimes)."""
+    out = dict(parsed or {})
+    def _as_dt(v, default):
+        if isinstance(v, datetime):
+            return v
+        if isinstance(v, str):
+            try:
+                return parse_datetime(v.split("T")[0], "00:00")
+            except Exception:
+                return default
+        return default
+    start = _as_dt(out.get("startDate"), datetime.utcnow())
+    end = _as_dt(out.get("endDate"), start)
+    out["startDate"] = start
+    out["endDate"] = max(end, start)
+    if not out.get("durationDays"):
+        out["durationDays"] = max(1, (out["endDate"] - start).days + 1)
+    if not out.get("travelStyle"):
+        out["travelStyle"] = "BALANCED"
+    return out
+
+
 def generate_ai_plans(parsed, db_data, verbose=True):
     """Generate 3 AI plans (BUDGET/BALANCED/PREMIUM) exclusively via AI.
 
@@ -630,6 +838,8 @@ def generate_ai_plans(parsed, db_data, verbose=True):
     if not is_ai_available():
         raise AIPlanError("No AI provider is configured (missing "
                           "GEMINI_API_KEY / OPENROUTER_API_KEY).")
+
+    parsed = _normalize_request(parsed)
 
     brief = _catalogue_brief(db_data)
     if not brief["transports"] and not brief["spots"]:
