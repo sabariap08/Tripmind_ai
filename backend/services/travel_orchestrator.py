@@ -43,6 +43,12 @@ def parse_trip_request(request_data):
         "servicePreference": request_data.get("servicePreference"),
         "prioritizedSpotIds": request_data.get("prioritizedSpotIds") or [],
         "preferences": (request_data.get("preferences") or "").strip(),
+        # Round-trip toggle: when true the plan includes a real return leg
+        # (destination -> origin) priced from catalogue inventory.
+        "returnTrip": bool(request_data.get("returnTrip")),
+        # Premium services the traveller opted into (multi-select).
+        "premiumServices": [s for s in (request_data.get("premiumServices") or [])
+                            if s in ("TRANSPORT", "HOTELS", "ACTIVITIES", "GUIDE")],
     }
 
 
@@ -73,13 +79,17 @@ def generate_travel_plans(request_data, db_data=None):
     try:
         plans = generate_ai_plans(parsed, db_data)
     except AIPlanError as e:
+        # Surface the real LLM cause in the server console — never silent.
+        print("[TripMind AI] AI planner failed: %s" % e)
         return {
             "selectedPlan": None,
             "plans": [],
             "aiExplanation": (
-                "The AI planner could not generate plans: %s. "
-                "Please check the AI provider configuration (GEMINI_API_KEY or "
-                "OPENROUTER_API_KEY) and try again." % e
+                "The AI planner could not generate plans: %s "
+                "Check the [TripMind AI] LLM log lines above for the failing "
+                "provider, then verify OLLAMA_API_KEY (primary) or the "
+                "GEMINI/CEREBRAS/OPENROUTER fallback keys and try again."
+                % str(e).rstrip(".")
             ),
             "parsedRequest": parsed,
             "ml": {},

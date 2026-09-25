@@ -5,6 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Trip Details - TripMind AI</title>
     <link rel="stylesheet" href="../css/style.css">
+    <style>
+        .tl-row{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;}
+        .tl-title{font-weight:600;font-size:1rem;}
+        .tl-sub{font-size:.78rem;color:var(--slate-500);margin-top:.15rem;}
+        .tl-time{font-size:.78rem;color:var(--slate-500);margin-top:.2rem;}
+        .tl-cost{font-weight:700;color:var(--primary);white-space:nowrap;}
+        .tl-cost.err{color:var(--red,#dc2626);font-weight:600;font-size:.78rem;max-width:16rem;text-align:right;white-space:normal;}
+        .tl-remove{font-size:.72rem;padding:.2rem .55rem;}
+        .input-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;}
+        .input-cell{border:1px solid var(--slate-100);border-radius:.6rem;padding:.75rem .9rem;background:#fff;}
+        .input-cell .k{font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--slate-500);font-weight:700;}
+        .input-cell .v{font-size:.95rem;font-weight:600;margin-top:.25rem;word-break:break-word;white-space:pre-wrap;}
+        .book-bar{margin-top:2.5rem;padding-top:1.5rem;border-top:2px solid var(--slate-200);display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;}
+        .saving-line{display:flex;justify-content:space-between;padding:.5rem 0;font-size:.9rem;}
+        .not-est{color:var(--slate-500);font-style:italic;}
+    </style>
 </head>
 <body>
     <nav class="navbar">
@@ -16,7 +32,7 @@
                 TripMind AI
             </a>
             <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
             </button>
             <div class="navbar-links" id="navLinks">
                 <a href="/">Home</a>
@@ -34,30 +50,33 @@
         </div>
 
         <div id="tripContent" class="hidden">
-            <div class="flex justify-between items-center mb-4">
-                <div>
-                    <h1 id="tripTitle" style="font-size:1.5rem;font-weight:700;"></h1>
-                    <p id="tripMeta" class="text-sm text-muted mt-1"></p>
-                </div>
-                <div class="flex gap-2">
-                    <button class="btn btn-warning btn-sm" onclick="openDelayModal()">Simulate Delay</button>
-                    <button class="btn btn-success btn-sm" id="bookBtn" onclick="bookTrip()">Confirm & Book</button>
-                </div>
+            <div class="mb-4">
+                <h1 id="tripTitle" style="font-size:1.5rem;font-weight:700;"></h1>
+                <p id="tripMeta" class="text-sm text-muted mt-1"></p>
             </div>
 
             <div class="tabs">
-                <button class="tab active" onclick="switchTab('overview')">Overview</button>
-                <button class="tab" onclick="switchTab('timeline')">Timeline</button>
+                <button class="tab active" onclick="switchTab('timeline')">Itinerary Timeline</button>
                 <button class="tab" onclick="switchTab('cost')">Cost Breakdown</button>
                 <button class="tab" onclick="switchTab('compare')">Compare Plans</button>
+                <button class="tab" onclick="switchTab('inputs')">Your Inputs</button>
                 <button class="tab" onclick="switchTab('events')">Events</button>
             </div>
 
-            <div id="tab-overview" class="tab-content active"></div>
-            <div id="tab-timeline" class="tab-content"></div>
+            <div id="tab-timeline" class="tab-content active"></div>
             <div id="tab-cost" class="tab-content"></div>
             <div id="tab-compare" class="tab-content"></div>
+            <div id="tab-inputs" class="tab-content"></div>
             <div id="tab-events" class="tab-content"></div>
+
+            <!-- Book This Trip — at the end of the generated trip, never at the top -->
+            <div class="book-bar">
+                <div>
+                    <div class="text-sm text-muted">Estimated total for <span id="bookTravelers">1</span> traveler(s)</div>
+                    <div id="bookTotal" style="font-size:1.5rem;font-weight:700;color:var(--primary);">Not estimated</div>
+                </div>
+                <button class="btn btn-success btn-lg" id="bookBtn" onclick="bookTrip()">Book This Trip</button>
+            </div>
         </div>
     </div>
 
@@ -75,52 +94,14 @@
         </div>
     </div>
 
-    <!-- Delay Modal -->
-    <div id="delayModal" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header">
-                <div class="modal-title">Simulate Flight Delay</div>
-                <button class="modal-close" onclick="closeModal('delayModal')">&times;</button>
-            </div>
-            <div class="modal-body">
-                <p class="text-sm text-muted mb-4">Select delay duration to see how the AI replans your itinerary.</p>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
-                    <button class="btn btn-outline" onclick="simulateDelay(60)">1 Hour</button>
-                    <button class="btn btn-outline" onclick="simulateDelay(180)">3 Hours</button>
-                    <button class="btn btn-outline" onclick="simulateDelay(300)">5 Hours</button>
-                    <button class="btn btn-outline" onclick="simulateDelay(480)">8 Hours</button>
-                    <button class="btn btn-outline" onclick="simulateDelay(720)">12 Hours</button>
-                    <button class="btn btn-outline" onclick="simulateDelay(1440)">24 Hours</button>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-outline" onclick="closeModal('delayModal')">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Replan Result Modal -->
-    <div id="replanModal" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header">
-                <div class="modal-title">Replan Result</div>
-                <button class="modal-close" onclick="closeModal('replanModal')">&times;</button>
-            </div>
-            <div class="modal-body" id="replanModalBody"></div>
-            <div class="modal-footer">
-                <button class="btn btn-primary" onclick="closeModal('replanModal')">OK</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Chat Widget -->
+    <!-- Chat Widget (modification chatbot: propose -> confirm / keep) -->
     <div class="chat-widget">
         <div id="chatPanel" class="chat-panel">
             <div class="chat-header">AI Travel Assistant</div>
             <div id="chatMessages" class="chat-messages"></div>
             <div id="chatSuggestions" class="chat-suggestions"></div>
             <div class="chat-input-area">
-                <input id="chatInput" type="text" placeholder="Ask about your trip...">
+                <input id="chatInput" type="text" placeholder="Ask about your trip or describe a change...">
                 <button id="chatSend" class="chat-send">Send</button>
             </div>
         </div>
@@ -143,6 +124,7 @@
     <script>
         let tripData = null;
         let selectedPlanIndex = 0;
+        let genNotice = '';
         const tripId = new URLSearchParams(window.location.search).get('id');
 
         async function loadTrip() {
@@ -151,7 +133,10 @@
             try {
                 tripData = await api.getTrip(tripId);
                 if (!tripData.itineraries || !tripData.itineraries.length) {
-                    await api.generatePlans(tripId);
+                    document.getElementById('loading').innerHTML =
+                        '<div class="spinner"></div><p class="text-sm text-muted mt-2">The AI is generating your itinerary (usually 20–40 seconds)…</p>';
+                    const gen = await api.generatePlans(tripId).catch(() => null);
+                    genNotice = (gen && (gen.message || gen.aiExplanation)) || '';
                     tripData = await api.getTrip(tripId);
                 }
                 renderTrip();
@@ -165,12 +150,15 @@
 
         function renderTrip() {
             document.getElementById('tripTitle').innerHTML = `${tripData.origin} → ${tripData.destination} ${getStatusBadge(tripData.status)}`;
-            document.getElementById('tripMeta').textContent = `${formatDate(tripData.startDate)} - ${formatDate(tripData.endDate)} | ${tripData.travelers} travelers | ${tripData.travelStyle} | Budget: ${formatCurrency(tripData.budget)}`;
-            document.getElementById('bookBtn').disabled = tripData.status === 'BOOKED';
-            renderOverview();
+            document.getElementById('tripMeta').textContent = `${formatDate(tripData.startDate)} - ${formatDate(tripData.endDate)} | ${tripData.travelers} travelers | ${tripData.travelStyle} | Budget: ${tripData.budgetUnlimited ? 'Unlimited' : formatCurrency(tripData.budget)}${tripData.returnTrip ? ' | Round trip' : ''}`;
+            document.getElementById('bookTravelers').textContent = tripData.travelers || 1;
+            const bookBtn = document.getElementById('bookBtn');
+            bookBtn.disabled = tripData.status === 'BOOKED';
+            bookBtn.textContent = tripData.status === 'BOOKED' ? 'Trip Booked' : 'Book This Trip';
             renderTimeline();
             renderCost();
             renderCompare();
+            renderInputs();
             renderEvents();
         }
 
@@ -178,55 +166,55 @@
             return tripData.itineraries?.find(i => i.status === 'SELECTED');
         }
 
-        function renderOverview() {
-            const itin = getSelectedItinerary();
-            const rec = tripData.recommendations?.[0];
-            let html = '';
-            if (rec) {
-                html += `<div class="recommendation-box"><h3>AI Recommendation</h3><p>${rec.reasoning || rec.recommendation}</p></div>`;
-            }
-            if (itin) {
-                html += `<div class="card mb-4"><div class="card-header"><div class="card-title">Selected Plan — ${itin.planType}</div></div>`;
-                html += `<div class="card-content">`;
-                const flight = itin.items?.find(i => i.type === 'FLIGHT');
-                const hotel = itin.items?.find(i => i.type === 'HOTEL');
-                if (flight) html += `<div class="flex justify-between mb-2"><span><b class="cost-label">Flight</b> ${flight.title}</span><span class="font-bold">${formatCurrency(flight.cost)}</span></div>`;
-                if (hotel) html += `<div class="flex justify-between mb-2"><span><b class="cost-label">Stay</b> ${hotel.title}</span><span class="font-bold">${formatCurrency(hotel.cost)}</span></div>`;
-                html += `<div class="flex justify-between mb-2"><span>Estimated Total</span><span class="font-bold" style="color:var(--primary);">${formatCurrency(itin.totalCost)}</span></div>`;
-                if (itin.reasoning && itin.reasoning.length) {
-                    html += `<div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--slate-100);"><div class="text-xs font-bold text-muted mb-2">WHY THIS PLAN</div>`;
-                    itin.reasoning.forEach(r => { html += `<p class="text-sm" style="margin-bottom:0.25rem;">• ${r}</p>`; });
-                    html += `</div>`;
-                }
-                html += `</div></div>`;
-            }
-            document.getElementById('tab-overview').innerHTML = html;
+        function planTotal(itin) {
+            if (!itin) return null;
+            if (typeof itin.totalCost === 'number' && itin.totalCost > 0) return itin.totalCost;
+            const sum = (itin.items || []).reduce((s, it) => s + (Number(it.cost) || 0), 0);
+            return sum > 0 ? sum : null;
         }
 
         function renderTimeline() {
+            const box = document.getElementById('tab-timeline');
             const itin = getSelectedItinerary();
-            if (!itin || !itin.items) { document.getElementById('tab-timeline').innerHTML = '<p class="text-muted">No itinerary items.</p>'; return; }
+            let html = '';
+            const rec = tripData.recommendations?.[0];
+            if (rec) {
+                html += `<div class="recommendation-box" style="margin-bottom:1.5rem;"><h3>AI Recommendation</h3><p>${esc(rec.reasoning || rec.recommendation || '')}</p></div>`;
+            }
+            if (!itin || !itin.items || !itin.items.length) {
+                if (genNotice) {
+                    html += `<div class="recommendation-box" style="border-left:4px solid var(--red,#dc2626);"><h3>Plans not generated</h3><p>${esc(genNotice)}</p></div>`;
+                }
+                box.innerHTML = html + '<p class="text-muted">No itinerary items.</p>';
+                return;
+            }
             const days = {};
             itin.items.forEach(item => { const d = item.day || 1; if (!days[d]) days[d] = []; days[d].push(item); });
-            let html = '<div class="timeline">';
-            Object.keys(days).sort((a,b) => a - b).forEach(day => {
-                html += `<div class="timeline-day">Day ${day}</div>`;
-                days[day].forEach(item => {
+            html += '<div class="timeline">';
+            Object.keys(days).sort((a, b) => a - b).forEach(day => {
+                const items = days[day];
+                let dayDate = '';
+                for (const it of items) { if (it.startTime) { dayDate = formatDate(it.startTime); break; } }
+                html += `<div class="timeline-day">Day ${day}${dayDate ? ' · ' + dayDate : ''}</div>`;
+                items.forEach(item => {
                     const cls = getTypeColor(item.type);
                     html += `<div class="timeline-item ${cls} animate-fade-in">`;
-                    html += `<div class="timeline-type" style="color:var(--slate-500);">${item.type}</div>`;
-                    html += `<div style="font-weight:600;">${item.title}</div>`;
-                    if (item.provider) html += `<div class="text-xs text-muted">${item.provider}</div>`;
-                    if (item.startTime) html += `<div class="text-xs text-muted">${formatTime(item.startTime)}${item.endTime ? ' - ' + formatTime(item.endTime) : ''}</div>`;
-                    if (item.distanceKm) html += `<div class="text-xs text-muted">${item.distanceKm} km road distance</div>`;
-                    html += `<div class="flex justify-between align-center"><div class="text-sm font-bold" style="color:${item.fareError ? 'var(--red,#dc2626)' : 'var(--primary)'};">${item.fareError ? 'Fare unavailable — ' + esc(item.fareError) : formatCurrency(item.cost)}</div>`;
-                    if (item.status !== 'BOOKED') html += `<button class="btn btn-outline btn-sm" onclick="removeItineraryItem('${item._id}')">Remove</button></div>`;
-                    if (item.status === 'DELAYED' || item.status === 'RESCHEDULED') html += `<span class="badge badge-warning" style="margin-top:0.25rem;">${item.status}</span>`;
-                    html += `</div>`;
+                    html += `<div class="tl-row"><div style="min-width:0;">`;
+                    html += `<div class="timeline-type" style="color:var(--slate-500);">${esc(item.type)}</div>`;
+                    html += `<div class="tl-title">${esc(item.title)}</div>`;
+                    if (item.provider) html += `<div class="tl-sub">${esc(item.provider)}</div>`;
+                    if (item.startTime) html += `<div class="tl-time">${formatTime(item.startTime)}${item.endTime ? ' – ' + formatTime(item.endTime) : ''}</div>`;
+                    if (item.distanceKm) html += `<div class="tl-time">${item.distanceKm} km road distance</div>`;
+                    if (item.status === 'DELAYED' || item.status === 'RESCHEDULED') html += `<span class="badge badge-warning" style="margin-top:.3rem;display:inline-block;">${esc(item.status)}</span>`;
+                    html += `</div><div style="text-align:right;flex:none;">`;
+                    if (item.fareError) html += `<div class="tl-cost err">Fare unavailable — ${esc(item.fareError)}</div>`;
+                    else html += `<div class="tl-cost">${formatCurrency(item.cost)}</div>`;
+                    if (item.status !== 'BOOKED') html += `<button class="btn btn-outline tl-remove" style="margin-top:.4rem;" onclick="removeItineraryItem('${item._id}')">Remove</button>`;
+                    html += `</div></div></div>`;
                 });
             });
             html += '</div>';
-            document.getElementById('tab-timeline').innerHTML = html;
+            box.innerHTML = html;
         }
 
         async function removeItineraryItem(itemId) {
@@ -239,18 +227,24 @@
                 current.totalCost = (res.itinerary.items || []).reduce((s, it) => s + (it.cost || 0), 0);
                 tripData.totalEstimatedCost = current.totalCost;
             }
-            renderOverview();
             renderTimeline();
             renderCost();
+            updateBookBar();
             alert('Item removed.');
         }
 
+        function updateBookBar() {
+            const total = planTotal(getSelectedItinerary());
+            document.getElementById('bookTotal').textContent = total != null ? formatCurrency(total) : 'Not estimated';
+        }
+
         function renderCost() {
+            const box = document.getElementById('tab-cost');
             const itin = getSelectedItinerary();
-            if (!itin) { document.getElementById('tab-cost').innerHTML = '<p class="text-muted">No cost data.</p>'; return; }
+            if (!itin) { box.innerHTML = '<p class="text-muted">No cost data.</p>'; return; }
             const breakdown = itin.items?.reduce((acc, item) => {
-                const key = item.type === 'FLIGHT' || item.type === 'HOTEL' ? (item.type === 'FLIGHT' ? 'flights' : 'hotel') : (item.type === 'TRANSFER' || item.type === 'BUS' || item.type === 'TRAIN' || item.type === 'CAB' || item.type === 'AUTO') ? 'transport' : (item.type === 'ACTIVITY' ? 'activities' : 'food');
-                acc[key] = (acc[key] || 0) + item.cost;
+                const key = item.type === 'FLIGHT' || item.type === 'HOTEL' ? (item.type === 'FLIGHT' ? 'flights' : 'hotel') : (item.type === 'TRANSFER' || item.type === 'BUS' || item.type === 'TRAIN' || item.type === 'CAB' || item.type === 'AUTO' || item.type === 'TRANSPORT') ? 'transport' : (item.type === 'ACTIVITY' ? 'activities' : 'food');
+                acc[key] = (acc[key] || 0) + (Number(item.cost) || 0);
                 return acc;
             }, {}) || {};
             const total = Object.values(breakdown).reduce((a, b) => a + b, 0);
@@ -264,10 +258,37 @@
             });
             html += `</div>`;
             html += `<div class="flex justify-between mt-4" style="padding-top:1rem;border-top:1px solid var(--slate-100);"><span class="font-bold">Total</span><span class="font-bold" style="color:var(--primary);font-size:1.25rem;">${formatCurrency(total)}</span></div>`;
-            const remaining = tripData.budget - total;
-            if (remaining > 0) html += `<p class="text-sm text-muted mt-2">₹${remaining.toLocaleString('en-IN')} remaining from budget</p>`;
+
+            /* Savings — computed ONLY from real numbers; never fabricated. */
+            html += `<div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--slate-100);"><div class="text-xs font-bold text-muted mb-2">SAVINGS</div>`;
+            if (tripData.budgetUnlimited || !tripData.budget) {
+                html += `<div class="saving-line"><span>Against your budget</span><span class="not-est">Not estimated (unlimited budget)</span></div>`;
+            } else if (total > 0) {
+                const budgetTotal = tripData.budget * (tripData.travelers || 1);
+                const diff = budgetTotal - total;
+                html += `<div class="saving-line"><span>Against your budget (${formatCurrency(budgetTotal)} total)</span>` +
+                    (diff >= 0
+                        ? `<span style="color:var(--emerald,#059669);font-weight:700;">You save ${formatCurrency(diff)}</span>`
+                        : `<span style="color:var(--red,#dc2626);font-weight:700;">${formatCurrency(-diff)} over budget</span>`) +
+                    `</div>`;
+            } else {
+                html += `<div class="saving-line"><span>Against your budget</span><span class="not-est">Not estimated</span></div>`;
+            }
+            const others = (tripData.itineraries || []).filter(i => i.status !== 'SELECTED' && planTotal(i) != null);
+            const sel = planTotal(itin);
+            if (others.length && sel != null) {
+                const cheapest = Math.min(sel, ...others.map(planTotal));
+                const priciest = Math.max(sel, ...others.map(planTotal));
+                if (sel === cheapest && priciest > cheapest) {
+                    html += `<div class="saving-line"><span>Cheapest of ${others.length + 1} generated plans</span><span style="color:var(--emerald,#059669);font-weight:700;">You save ${formatCurrency(priciest - sel)} vs the priciest plan</span></div>`;
+                } else if (priciest > cheapest) {
+                    html += `<div class="saving-line"><span>vs the cheapest generated plan</span><span class="not-est">${formatCurrency(sel - cheapest)} more for this plan's comfort level</span></div>`;
+                }
+            }
+            html += `</div>`;
             html += `</div></div>`;
-            document.getElementById('tab-cost').innerHTML = html;
+            box.innerHTML = html;
+            updateBookBar();
         }
 
         function renderCompare() {
@@ -276,8 +297,9 @@
             let html = '<div class="plans-grid">';
             itins.forEach((itin, idx) => {
                 const sel = itin.status === 'SELECTED';
+                const total = planTotal(itin);
                 html += `<div class="plan-card ${sel ? 'selected' : ''}" onclick="selectPlan(${idx})">`;
-                html += `<div class="plan-header"><div class="plan-type">${itin.planType} ${sel ? '<span class="badge badge-success" style="font-size:0.65rem;">SELECTED</span>' : ''}</div><div class="plan-cost">${formatCurrency(itin.totalCost)}</div></div>`;
+                html += `<div class="plan-header"><div class="plan-type">${itin.planType} ${sel ? '<span class="badge badge-success" style="font-size:0.65rem;">SELECTED</span>' : ''}</div><div class="plan-cost">${total != null ? formatCurrency(total) : 'Not estimated'}</div></div>`;
                 html += `<div class="plan-details">`;
                 html += `<div class="plan-detail"><span>Comfort</span><span>${(itin.comfortScore * 100).toFixed(0)}%</span></div>`;
                 html += `<div class="plan-detail"><span>Optimization</span><span>${(itin.optimizationScore * 100).toFixed(0)}%</span></div>`;
@@ -289,12 +311,37 @@
             document.getElementById('tab-compare').innerHTML = html;
         }
 
+        function renderInputs() {
+            const cells = [];
+            const add = (k, v) => cells.push(`<div class="input-cell"><div class="k">${k}</div><div class="v">${v}</div></div>`);
+            add('Origin', esc(tripData.origin || 'Not set'));
+            add('Destination', esc(tripData.destination || 'Not set'));
+            add('Dates', `${formatDate(tripData.startDate)} → ${formatDate(tripData.endDate)}`);
+            add('Travelers', esc(String(tripData.travelers || 1)));
+            add('Budget per traveler', tripData.budgetUnlimited || !tripData.budget ? 'Unlimited' : formatCurrency(tripData.budget));
+            add('Travel style', esc(tripData.travelStyle || 'BALANCED'));
+            add('Return trip', tripData.returnTrip ? 'Yes — round trip' : 'No — one way');
+            const ps = tripData.premiumServices || [];
+            add('Premium services', ps.length ? esc(ps.join(', ')) : 'None');
+            add('Transport mode', esc(tripData.transportType || 'No preference'));
+            add('Starting point', esc((tripData.startLocation && tripData.startLocation.address) || tripData.startLocation || 'Not set'));
+            const spots = tripData.prioritizedSpotIds || [];
+            add('Spot preference', spots.length ? `${spots.length} spot(s) chosen by you` : 'No preference — AI picked');
+            add('Description for the AI', esc(tripData.preferences || 'Not provided'));
+
+            let html = '<div class="card mb-4"><div class="card-header"><div class="card-title">Your Inputs</div></div><div class="card-content">';
+            html += '<p class="text-sm text-muted" style="margin-bottom:1rem;">Everything below came from your plan form and was sent to the AI planner.</p>';
+            html += `<div class="input-grid">${cells.join('')}</div>`;
+            html += '</div></div>';
+            document.getElementById('tab-inputs').innerHTML = html;
+        }
+
         function renderEvents() {
             const events = tripData.events || [];
             if (!events.length) { document.getElementById('tab-events').innerHTML = '<div class="empty-state"><h3>No Events</h3><p>No flight delays or disruptions recorded.</p></div>'; return; }
             let html = '<div class="card"><div class="card-content">';
             events.forEach(ev => {
-                html += `<div class="event-item"><div class="event-severity">${getSeverityBadge(ev.severity)}</div><div><div class="font-bold">${ev.title}</div><div class="text-sm text-muted">${ev.description || ''}</div><div class="text-xs text-muted">${formatDate(ev.occurredAt)}</div></div></div>`;
+                html += `<div class="event-item"><div class="event-severity">${getSeverityBadge(ev.severity)}</div><div><div class="font-bold">${esc(ev.title)}</div><div class="text-sm text-muted">${esc(ev.description || '')}</div><div class="text-xs text-muted">${formatDate(ev.occurredAt)}</div></div></div>`;
             });
             html += '</div></div>';
             document.getElementById('tab-events').innerHTML = html;
@@ -323,7 +370,7 @@
                     : `<p class="mb-4">Trip booked${result.paymentStatus === 'COMPLETED' ? ' and payment completed from wallet' : ' — payment is pending'}!</p>`;
                 html += `<p class="mb-2 text-sm text-muted">${esc(result.message || '')}</p>`;
                 result.bookings.forEach(b => {
-                    html += `<div class="flex justify-between mb-2"><span>${b.provider} (${b.bookingReference})</span><span class="font-bold">${formatCurrency(b.price)}</span></div>`;
+                    html += `<div class="flex justify-between mb-2"><span>${esc(b.provider)} (${esc(b.bookingReference)})</span><span class="font-bold">${formatCurrency(b.price)}</span></div>`;
                 });
                 html += `<div class="flex justify-between mt-4" style="padding-top:1rem;border-top:1px solid var(--slate-100);"><span class="font-bold">Total</span><span class="font-bold" style="color:var(--emerald);">${formatCurrency(result.totalCost)}</span></div>`;
                 document.getElementById('bookingModalBody').innerHTML = html;
@@ -331,29 +378,6 @@
                 tripData = await api.getTrip(tripId);
                 renderTrip();
             } catch (e) { alert('Booking error: ' + e.message); }
-        }
-
-        function openDelayModal() { document.getElementById('delayModal').classList.add('active'); }
-
-        async function simulateDelay(minutes) {
-            closeModal('delayModal');
-            try {
-                await api.simulateDelay(tripId, minutes);
-                const result = await api.replan(tripId, minutes);
-                let html = `<p class="mb-4">${result.explanation}</p>`;
-                if (result.affectedItems.length) {
-                    html += `<div class="mb-4"><div class="font-bold text-sm mb-2">Affected Items:</div>`;
-                    result.affectedItems.forEach(i => { html += `<div class="text-sm">• ${i}</div>`; });
-                    html += `</div>`;
-                }
-                html += `<div class="flex justify-between"><span>Original Cost</span><span>${formatCurrency(result.originalPlan.totalCost)}</span></div>`;
-                html += `<div class="flex justify-between"><span>Revised Cost</span><span class="font-bold">${formatCurrency(result.revisedPlan.totalCost)}</span></div>`;
-                if (result.additionalCost > 0) html += `<div class="flex justify-between" style="color:var(--red);"><span>Additional Cost</span><span class="font-bold">${formatCurrency(result.additionalCost)}</span></div>`;
-                document.getElementById('replanModalBody').innerHTML = html;
-                document.getElementById('replanModal').classList.add('active');
-                tripData = await api.getTrip(tripId);
-                renderTrip();
-            } catch (e) { alert('Replan error: ' + e.message); }
         }
 
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }

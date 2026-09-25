@@ -24,6 +24,11 @@
         .rank-chip{font-size:.7rem;font-weight:700;letter-spacing:.04em;padding:.15rem .5rem;border-radius:999px;background:var(--slate-100,#e2e8f0);color:var(--slate-600,#475569);}
         .chip-p1{background:var(--amber,#eab308);color:#fff;}
         .chip-p0{background:#ecfdf5;color:#059669;}
+        .ps-menu{position:absolute;top:calc(100% + .3rem);left:0;right:0;background:#fff;border:1px solid var(--slate-200,#e2e8f0);border-radius:.6rem;box-shadow:0 12px 30px rgba(0,0,0,.14);z-index:30;padding:.4rem;display:none;}
+        .ps-menu.open{display:block;}
+        .ps-opt{display:flex;gap:.55rem;align-items:center;padding:.5rem .4rem;font-size:.85rem;cursor:pointer;border-radius:.4rem;}
+        .ps-opt:hover{background:var(--slate-50,#f8fafc);}
+        .ps-opt input{accent-color:var(--amber,#eab308);}
         .sel-bar{position:sticky;bottom:1rem;background:rgba(255,255,255,.96);border:1px solid var(--slate-200,#e2e8f0);border-radius:.9rem;padding:.8rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem;box-shadow:0 10px 30px rgba(0,0,0,.12);z-index:5;}
         .sel-bar .n{font-weight:700;color:var(--amber,#b45309);}
     </style>
@@ -52,7 +57,7 @@
         <!-- STEP 1 : Trip details -->
         <div id="stepDetails">
             <h1 style="font-size:1.75rem;font-weight:700;margin-bottom:.5rem;">Plan Your Trip</h1>
-            <p class="text-sm text-muted mb-6">Tell us where you start and how you want to travel — the AI plans the Coimbatore ↔ Chennai itinerary from your choices.</p>
+            <p class="text-sm text-muted mb-6">Tell us where you start, where you're going and how you want to travel — the AI builds the itinerary from your choices.</p>
 
             <div class="card mb-4">
                 <div class="card-header"><div class="card-title">Trip Details</div></div>
@@ -61,6 +66,10 @@
                         <div class="form-group">
                             <label class="form-label">Origin city</label>
                             <input id="origin" class="form-input" placeholder="e.g., Coimbatore">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Destination city <span style="color:#dc2626;">*</span></label>
+                            <input id="destination" class="form-input" placeholder="e.g., Chennai">
                         </div>
                         <div class="form-group">
                             <label class="form-label">Start Date</label>
@@ -91,15 +100,27 @@
                                 <option value="PREMIUM">Premium</option>
                             </select>
                         </div>
+                        <div class="form-group" style="position:relative;">
+                            <label class="form-label">Premium Services</label>
+                            <button type="button" id="psToggle" class="form-input"
+                                    style="text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;"
+                                    onclick="togglePremiumMenu()">
+                                <span id="psLabel" style="color:var(--slate-500,#64748b);">Select premium services…</span>
+                                <span style="color:var(--slate-400,#94a3b8);">&#9662;</span>
+                            </button>
+                            <div id="psMenu" class="ps-menu">
+                                <label class="ps-opt"><input type="checkbox" class="ps-cb" value="TRANSPORT"> Comfortable transport upgrade</label>
+                                <label class="ps-opt"><input type="checkbox" class="ps-cb" value="HOTELS"> Better hotels</label>
+                                <label class="ps-opt"><input type="checkbox" class="ps-cb" value="ACTIVITIES"> More activities &amp; tours</label>
+                                <label class="ps-opt"><input type="checkbox" class="ps-cb" value="GUIDE"> Local guide</label>
+                            </div>
+                        </div>
                         <div class="form-group">
-                            <label class="form-label">Service Preference</label>
-                            <select id="servicePreference" class="form-select">
-                                <option value="">No preference</option>
-                                <option value="TRANSPORT">Comfortable transport</option>
-                                <option value="HOTELS">Better hotels</option>
-                                <option value="ACTIVITIES">More activities & spots</option>
-                                <option value="GUIDE">Local guides</option>
-                            </select>
+                            <label class="form-label" style="display:flex;gap:.5rem;align-items:center;cursor:pointer;">
+                                <input type="checkbox" id="returnTrip" style="accent-color:var(--amber,#eab308);">
+                                Return trip (round trip back home)
+                            </label>
+                            <p class="text-sm text-muted" style="font-size:.75rem;margin:.2rem 0 0;">Adds the return journey on the last day, priced from real distance &amp; fares.</p>
                         </div>
                     </div>
                     <div class="hr-label">Tell the AI how you'd like to travel <span style="color:#dc2626;">*</span></div>
@@ -130,7 +151,7 @@
         <div id="stepSpots" class="hidden">
             <h1 style="font-size:1.75rem;font-weight:700;margin-bottom:.5rem;">Choose Your Tourist Spots</h1>
             <p class="text-sm text-muted mb-2">Spots are ranked by our recommendation engine. <b>Tap spots in the order you prefer</b> — your click order becomes the priority the optimizer must honor.</p>
-            <p class="text-sm text-muted" style="margin-bottom:1rem;">You can pick up to 4. If you don't care, just use <i>“I Have No Choice”</i>.</p>
+            <p class="text-sm text-muted" style="margin-bottom:1rem;">Tap as many as you like — your click order becomes the priority. If you don't care, just use <i>“I Have No Choice”</i>.</p>
             <div class="flex gap" style="margin-bottom:.5rem;">
                 <button class="btn btn-outline" onclick="pickNone()">I Have No Choice — AI picks</button>
                 <button class="btn btn-outline" onclick="resetPicks()">Reset choices</button>
@@ -158,6 +179,7 @@
                         <div class="processing-step" id="step4"><div class="step-dot"></div><span>Optimizing budget & comfort…</span></div>
                         <div class="processing-step" id="step5"><div class="step-dot"></div><span>Generating recommendations…</span></div>
                     </div>
+                    <p id="genStatus" class="text-sm text-muted text-center" style="margin-top:1.25rem;min-height:1.2rem;"></p>
                 </div>
             </div>
         </div>
@@ -179,14 +201,45 @@
 
         (async () => { await guardLogin(); })();
 
-        /* The corridor is Coimbatore <-> Chennai: the destination is inferred
-           from the chosen starting point, so no destination input exists here. */
+        /* Origin + destination are both user-entered; the starting point is
+           picked on the Google Maps picker for routing. */
         const budgetInput = document.getElementById('budget');
         const budgetUnlimited = document.getElementById('budgetUnlimited');
         budgetUnlimited.addEventListener('change', () => {
             budgetInput.disabled = budgetUnlimited.checked;
             if (budgetUnlimited.checked) { budgetInput.value = ''; }
             else if (!budgetInput.value) { budgetInput.value = '50000'; }
+        });
+
+        /* Premium Services: dropdown opened by the button, checkboxes inside. */
+        const psLabels = {
+            TRANSPORT: 'Comfortable transport',
+            HOTELS: 'Better hotels',
+            ACTIVITIES: 'More activities & tours',
+            GUIDE: 'Local guide',
+        };
+        function selectedPremiumServices() {
+            return Array.from(document.querySelectorAll('.ps-cb:checked')).map(c => c.value);
+        }
+        function updatePsLabel() {
+            const sel = selectedPremiumServices();
+            const label = document.getElementById('psLabel');
+            label.textContent = sel.length ? sel.map(s => psLabels[s] || s).join(', ')
+                                           : 'Select premium services…';
+            label.style.color = sel.length ? '' : 'var(--slate-500,#64748b)';
+        }
+        function togglePremiumMenu() {
+            document.getElementById('psMenu').classList.toggle('open');
+        }
+        document.querySelectorAll('.ps-cb').forEach(cb =>
+            cb.addEventListener('change', updatePsLabel));
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('psMenu');
+            if (!menu.classList.contains('open')) return;
+            if (!menu.contains(e.target) && e.target.id !== 'psToggle' &&
+                    !document.getElementById('psToggle').contains(e.target)) {
+                menu.classList.remove('open');
+            }
         });
 
         const originInput = document.getElementById('origin');
@@ -216,10 +269,12 @@
         }
 
         function goToSpots() {
-            const required = ['origin', 'startDate', 'endDate'];
+            const required = ['origin', 'destination', 'startDate', 'endDate'];
             for (const id of required) {
                 if (!document.getElementById(id).value.trim()) {
-                    alert('Please fill in all required fields.'); return;
+                    alert('Please fill in all required fields (origin, destination and dates).');
+                    document.getElementById(id).focus();
+                    return;
                 }
             }
             if (!document.getElementById('preferences').value.trim() ||
@@ -280,8 +335,7 @@
             const id = card.dataset.id;
             const idx = picked.indexOf(id);
             if (idx >= 0) { picked.splice(idx, 1); }
-            else if (picked.length < 4) { picked.push(id); }
-            else { alert('You can pick up to 4 spots. Clear one first if you want to swap.'); return; }
+            else { picked.push(id); }
             renderPicks();
         }
         function renderPicks() {
@@ -296,7 +350,7 @@
         }
         function updateSelBar() {
             document.getElementById('selBar').style.display = 'flex';
-            document.getElementById('selCount').textContent = picked.length + '/4';
+            document.getElementById('selCount').textContent = picked.length + (picked.length === 1 ? ' spot' : ' spots');
             const names = [];
             picked.forEach(id => {
                 const c = document.querySelector(`.spot-card[data-id="${id}"]`);
@@ -318,13 +372,15 @@
             if (!prefs) { alert('Please describe your travel preferences.'); return; }
             const data = {
                 origin: document.getElementById('origin').value || startLocation?.address || '',
+                destination: document.getElementById('destination').value.trim(),
                 startDate: document.getElementById('startDate').value,
                 endDate: document.getElementById('endDate').value,
                 travelers: parseInt(document.getElementById('travelers').value),
                 budget: unlimited ? 0 : (parseInt(document.getElementById('budget').value) || 0),
                 budgetUnlimited: unlimited,
                 travelStyle: document.getElementById('travelStyle').value,
-                servicePreference: document.getElementById('servicePreference').value || null,
+                returnTrip: document.getElementById('returnTrip').checked,
+                premiumServices: selectedPremiumServices(),
                 preferences: prefs,
                 prioritizedSpotIds: picked,
             };
@@ -342,10 +398,29 @@
                     document.getElementById(steps[i]).classList.remove('active');
                     document.getElementById(steps[i]).classList.add('done');
                 }
+                const status = document.getElementById('genStatus');
+                status.textContent = 'Saving your trip…';
                 const result = await api.createTrip(data);
-                await api.generatePlans(result.tripId);
+                let secs = 0;
+                status.textContent = 'The AI is generating your itinerary (usually 20–40 seconds)…';
+                const tick = setInterval(() => {
+                    secs += 5;
+                    status.textContent = `The AI is generating your itinerary — ${secs}s elapsed (usually 20–40 seconds).`;
+                }, 5000);
+                let gen;
+                try {
+                    gen = await api.generatePlans(result.tripId);
+                } finally {
+                    clearInterval(tick);
+                }
+                if (!gen || !gen.selectedPlan) {
+                    throw new Error((gen && (gen.message || gen.aiExplanation)) ||
+                        'The AI planner did not return a plan. Please try again.');
+                }
+                status.textContent = 'Done — opening your itinerary…';
                 window.location = `trip.html?id=${result.tripId}`;
             } catch (e) {
+                document.getElementById('genStatus').textContent = '';
                 alert('Error: ' + e.message);
                 document.getElementById('stepDetails').classList.remove('hidden');
                 document.getElementById('stepSpots').classList.remove('hidden');

@@ -407,7 +407,7 @@ a:hover { text-decoration: underline; }
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 
-/* Timeline */
+/* Timeline — flat, card-free entries on a vertical rail */
 .timeline { position: relative; padding-left: 2rem; }
 .timeline::before {
   content: '';
@@ -420,18 +420,20 @@ a:hover { text-decoration: underline; }
 }
 .timeline-item {
   position: relative;
-  margin-bottom: 1.5rem;
-  padding: 1rem;
-  background: white;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  border: 1px solid var(--slate-200);
+  margin-bottom: 0;
+  padding: 0.9rem 0;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  border: none;
+  border-bottom: 1px dashed var(--slate-200);
 }
+.timeline-item:last-child { border-bottom: none; }
 .timeline-item::before {
   content: '';
   position: absolute;
   left: -1.625rem;
-  top: 1.25rem;
+  top: 1.1rem;
   width: 12px;
   height: 12px;
   border-radius: 50%;
@@ -443,7 +445,18 @@ a:hover { text-decoration: underline; }
 .timeline-item.food::before { border-color: #f59e0b; background: #fef3c7; }
 .timeline-item.activity::before { border-color: #10b981; background: #d1fae5; }
 .timeline-item.transfer::before { border-color: #64748b; background: #e2e8f0; }
-.timeline-day { font-weight: 600; font-size: 0.875rem; color: var(--slate-500); margin-bottom: 0.5rem; }
+.timeline-item.transport::before { border-color: #2563eb; background: #dbeafe; }
+.timeline-day {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--slate-700);
+  margin: 1.75rem 0 0.5rem;
+  padding: 0.35rem 0.75rem;
+  background: var(--slate-50);
+  border-left: 3px solid var(--primary);
+  border-radius: 0 4px 4px 0;
+}
+.timeline-day:first-child { margin-top: 0.25rem; }
 .timeline-type {
   font-size: 0.7rem;
   text-transform: uppercase;

@@ -111,10 +111,21 @@ def _sys_prompt():
         "(no markdown, no surrounding text):\n"
         "{\"reply\":\"<short helpful reply to the traveller>\","
         "\"tool\":{\"name\":\"<one of the tool names or null>\",\"args\":{...}},"
+        "\"change\":{\"summary\":\"<1 sentence describing the change>\","
+        "\"updates\":{\"<field>\":<value>}},"
         "\"suggestions\":[\"<3 short follow-up prompts>\"]}\n"
-        "If no tool is needed, set tool to null. Never invent data; rely only on context provided. "
-        "For any action that changes facts (change_transport, pay_trip, remove_place) you still only "
-        "PROPOSE it; execution happens only after the traveller confirms."
+        "If no tool is needed, set tool to null. When the traveller asks to MODIFY their "
+        "current trip plan (change destination, travel style, transport mode, premium "
+        "services, round trip, or the free-text description), set 'change' with ONLY the "
+        "fields that change, using exactly these keys: destination (string), travelStyle "
+        "(BUDGET|BALANCED|PREMIUM), transportType (BUS|TRAIN|FLIGHT|CAB|AUTO), "
+        "premiumServices (array of TRANSPORT|HOTELS|ACTIVITIES|GUIDE), returnTrip (bool), "
+        "preferences (string - the full updated description). Set change to null when no "
+        "modification is requested. Never invent data; rely only on context provided. "
+        "The change is only a PROPOSAL - nothing is applied until the traveller presses "
+        "Confirm Change. For any action that changes facts (change_transport, pay_trip, "
+        "remove_place) you still only PROPOSE it; execution happens only after the "
+        "traveller confirms."
     )
 
 
@@ -180,6 +191,30 @@ def _local_intent(message, user, trip_id=None):
                 "tool": {"name": "remove_place", "args": {"trip_id": str(trip["_id"]), "place": place}},
                 "suggestions": ["Confirm", "Show my trips"]}
 
+    # Deterministic modification proposal (works even with no LLM): the change
+    # is appended to the trip description and the plan is regenerated only
+    # after the traveller presses Confirm Change.
+    modify_kw = ["modify", "change my trip", "change the trip", "change the plan",
+                 "update my trip", "update the plan", "regenerate", "revise",
+                 "edit my trip", "different plan", "change destination",
+                 "change the destination", "new destination", "make the trip"]
+    if trip and any(k in m for k in modify_kw):
+        base = (trip.get("preferences") or "").strip()
+        user_msg = (message or "").strip()
+        new_pref = (base + "\nAdditional request: " + user_msg) if base else user_msg
+        return {
+            "reply": ('I can apply this change to trip %s:\n"%s"\n'
+                      "Press Confirm Change to update your trip inputs and regenerate "
+                      "the plan, or Keep Current Plan to leave everything as it is."
+                      % (trip.get("reference") or trip.get("_id"), user_msg)),
+            "tool": None,
+            "change": {
+                "summary": ('Update the trip description with: "%s"' % user_msg[:120]),
+                "updates": {"preferences": new_pref[:2000]},
+            },
+            "suggestions": ["Confirm Change", "Keep Current Plan"],
+        }
+
     return None
 
 
@@ -239,6 +274,53 @@ def _build_context(user, trip_id=None):
     return ctx
 
 
+_CHANGE_KEYS = ("destination", "travelStyle", "transportType", "premiumServices",
+                "returnTrip", "preferences")
+_CHANGE_STYLES = ("BUDGET", "BALANCED", "PREMIUM")
+_CHANGE_MODES = ("BUS", "TRAIN", "FLIGHT", "CAB", "AUTO")
+_CHANGE_SERVICES = ("TRANSPORT", "HOTELS", "ACTIVITIES", "GUIDE")
+
+
+def _sanitize_change(raw):
+    """Validate an AI-proposed trip modification. Only structured, user-visible
+    inputs pass through; anything else is dropped (never executed blindly)."""
+    if not isinstance(raw, dict):
+        return None
+    updates = raw.get("updates")
+    if not isinstance(updates, dict) or not updates:
+        return None
+    allowed = {}
+
+    if "destination" in updates and str(updates.get("destination") or "").strip():
+        allowed["destination"] = str(updates["destination"]).strip()
+
+    if "travelStyle" in updates:
+        style = str(updates.get("travelStyle") or "").upper()
+        if style in _CHANGE_STYLES:
+            allowed["travelStyle"] = style
+
+    if "transportType" in updates:
+        mode = str(updates.get("transportType") or "").upper()
+        if mode in _CHANGE_MODES:
+            allowed["transportType"] = mode
+
+    if "premiumServices" in updates and isinstance(updates.get("premiumServices"), list):
+        allowed["premiumServices"] = [str(s).upper() for s in updates["premiumServices"]
+                                      if str(s).upper() in _CHANGE_SERVICES]
+
+    if "returnTrip" in updates:
+        allowed["returnTrip"] = bool(updates.get("returnTrip"))
+
+    if "preferences" in updates and str(updates.get("preferences") or "").strip():
+        allowed["preferences"] = str(updates["preferences"]).strip()[:2000]
+
+    if not allowed:
+        return None
+    summary = str(raw.get("summary") or "").strip() or \
+        ("Update " + ", ".join(sorted(allowed)))
+    return {"summary": summary[:300], "updates": allowed}
+
+
 def _parse_tool_json(raw):
     """Extract a usable tool call from the (possibly markdown-wrapped) LLM output."""
     clean = raw.strip()
@@ -267,7 +349,9 @@ def _parse_tool_json(raw):
         else:
             tool = {"name": name, "args": args}
     suggestions = data.get("suggestions") if isinstance(data.get("suggestions"), list) else []
-    return {"reply": reply, "tool": tool, "suggestions": [str(s) for s in suggestions[:3]]}
+    change = _sanitize_change(data.get("change"))
+    return {"reply": reply, "tool": tool, "change": change,
+            "suggestions": [str(s) for s in suggestions[:3]]}
 
 
 def handle_assistant_message(user, message, trip_id=None):
@@ -293,10 +377,14 @@ def handle_assistant_message(user, message, trip_id=None):
                         tool = local["tool"]
                     else:
                         tool = None
+                # The modification proposal: prefer the LLM's structured change,
+                # fall back to the deterministic local one.
+                change = parsed.get("change") or (local or {}).get("change")
                 return {
                     "response": parsed.get("reply") or "How can I help?",
                     "suggestions": parsed.get("suggestions") or _default_suggestions(),
                     "action": _action_descriptor(tool, user) if tool else None,
+                    "change": change,
                     "timestamp": datetime.utcnow().isoformat(),
                 }
         except Exception:
@@ -307,6 +395,7 @@ def handle_assistant_message(user, message, trip_id=None):
             "response": local["reply"],
             "suggestions": local.get("suggestions") or _default_suggestions(),
             "action": _action_descriptor(local.get("tool"), user) if local.get("tool") else None,
+            "change": local.get("change"),
             "timestamp": datetime.utcnow().isoformat(),
         }
 

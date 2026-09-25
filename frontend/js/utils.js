@@ -47,6 +47,7 @@ function getTypeColor(type) {
     const map = {
         'FLIGHT': 'flight', 'HOTEL': 'hotel', 'FOOD': 'food',
         'ACTIVITY': 'activity', 'TRANSFER': 'transfer', 'TRANSPORT': 'transfer',
+        'BUS': 'transport', 'TRAIN': 'transport', 'CAB': 'transport', 'AUTO': 'transport',
     };
     return map[type] || '';
 }

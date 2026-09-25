@@ -28,6 +28,12 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
 
 CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY", "")
 CEREBRAS_MODEL = os.getenv("CEREBRAS_MODEL", "gpt-oss-120b")
+CEREBRAS_BASE_URL = os.getenv("CEREBRAS_BASE_URL", "https://api.cerebras.ai/v1")
+# Models tried when the configured one 429s/503s or returns nothing.
+CEREBRAS_MODELS_TO_TRY = [
+    CEREBRAS_MODEL,
+    "llama-3.3-70b",
+]
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free")
@@ -51,35 +57,56 @@ def is_ai_available():
 def call_ai(prompt, system_prompt="", max_tokens=1024, temperature=0.7):
     """Route to the first available backend; return raw string content.
 
-    Returns None when no backend is available so callers can fall back to
-    deterministic logic.
+    Every provider failure is logged with its reason (never silently swallowed)
+    so an empty plan can always be traced to its LLM cause. Returns None when
+    no backend is available so callers can fall back to deterministic logic.
     """
+    import time as _time
+    started = _time.time()
     if OLLAMA_API_KEY:
         try:
-            return _call_ollama(prompt, system_prompt, max_tokens=max_tokens,
-                                temperature=temperature)
-        except Exception:
-            pass  # fall through to Gemini/Cerebras/OpenRouter
+            out = _call_ollama(prompt, system_prompt, max_tokens=max_tokens,
+                               temperature=temperature)
+            print("[TripMind AI] LLM ok · ollama/%s · %.1fs · %d chars"
+                  % (OLLAMA_MODEL, _time.time() - started, len(out or "")))
+            return out
+        except Exception as e:
+            print("[TripMind AI] LLM ollama failed after %.1fs: %s"
+                  % (_time.time() - started, e))
     if GEMINI_KEY:
         try:
             from services.gemini_service import generate_text
-            return generate_text(prompt, system_prompt, max_tokens=max_tokens,
-                                 temperature=temperature)
-        except Exception:
-            pass  # fall through to Cerebras/OpenRouter
+            out = generate_text(prompt, system_prompt, max_tokens=max_tokens,
+                                temperature=temperature)
+            print("[TripMind AI] LLM ok · gemini/%s · %.1fs · %d chars"
+                  % (GEMINI_MODEL, _time.time() - started, len(out or "")))
+            return out
+        except Exception as e:
+            print("[TripMind AI] LLM gemini failed after %.1fs: %s"
+                  % (_time.time() - started, e))
     if CEREBRAS_API_KEY:
         try:
-            return _call_openai_compatible(
+            out = _call_openai_compatible(
                 CEREBRAS_BASE_URL, CEREBRAS_API_KEY, CEREBRAS_MODELS_TO_TRY,
                 prompt, system_prompt, max_tokens=max_tokens, temperature=temperature)
-        except Exception:
-            pass  # fall through to OpenRouter
+            print("[TripMind AI] LLM ok · cerebras/%s · %.1fs · %d chars"
+                  % (CEREBRAS_MODEL, _time.time() - started, len(out or "")))
+            return out
+        except Exception as e:
+            print("[TripMind AI] LLM cerebras failed after %.1fs: %s"
+                  % (_time.time() - started, e))
     if OPENROUTER_API_KEY:
         try:
-            return _call_openrouter(prompt, system_prompt,
-                                    max_tokens=max_tokens, temperature=temperature)
-        except Exception:
-            pass
+            out = _call_openrouter(prompt, system_prompt,
+                                   max_tokens=max_tokens, temperature=temperature)
+            print("[TripMind AI] LLM ok · openrouter · %.1fs · %d chars"
+                  % (_time.time() - started, len(out or "")))
+            return out
+        except Exception as e:
+            print("[TripMind AI] LLM openrouter failed after %.1fs: %s"
+                  % (_time.time() - started, e))
+    print("[TripMind AI] LLM unavailable: every configured provider failed "
+          "(or no API key is set) after %.1fs." % (_time.time() - started))
     return None  # deterministic callers use None to trigger local fallback
 
 

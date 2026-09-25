@@ -17,6 +17,7 @@ So plans are generated ONLY by AI, but the AI can never invent inventory or
 prices — the database remains the single source of truth.
 """
 import json
+import time
 
 from services.ai_service import call_ai, is_ai_available
 from services.trip_optimizer import (STYLE_WEIGHTS, _build_daily, _cost,
@@ -111,13 +112,36 @@ def _transfer_km(origin_obj, dest_obj, label):
         return None
 
 
-def _compute_transfers(parsed, leg, hotel, cabs):
+def _leg_points(leg):
+    """Boarding + dropping waypoints of a transport leg (coords for buses,
+    station/airport names for train & flight)."""
+    empty = {"lat": None, "lng": None, "address": None}
+    if not leg:
+        return dict(empty), dict(empty)
+    if leg.get("type") == "BUS":
+        board = {"lat": leg.get("boardingLat"), "lng": leg.get("boardingLng"),
+                 "address": leg.get("boardingPoint") or ""}
+        drop = {"lat": leg.get("droppingLat"), "lng": leg.get("droppingLng"),
+                "address": leg.get("droppingPoint") or ""}
+    else:
+        # Train / flight: the "transfer" happens at the station / airport.
+        board = {"lat": None, "lng": None,
+                 "address": leg.get("boardingStation") or leg.get("departureAirport") or ""}
+        drop = {"lat": None, "lng": None,
+                "address": leg.get("destinationStation") or leg.get("arrivalAirport") or ""}
+    return board, drop
+
+
+def _compute_transfers(parsed, leg, hotel, cabs, return_leg=None):
     """Compute the per-leg transfer distances and cab fares for a plan.
 
     Returns a dict keyed by transfer leg name with {distanceKm, fare, error}:
       - home_to_boarding: user start location -> bus boarding point
       - arrival_to_stay:  bus dropping point -> hotel
       - return_home:      hotel / dropping -> user start location
+                           (one-way trips only)
+      - stay_to_return_boarding: hotel -> return boarding point (round trips)
+      - return_arrival_to_home:  return dropping point -> start (round trips)
     """
     out = {}
 
@@ -128,29 +152,10 @@ def _compute_transfers(parsed, leg, hotel, cabs):
         "address": start.get("address") or start.get("origin") or parsed.get("origin") or "",
     }
     city = parsed.get("origin") or ""
+    dest_city = parsed.get("destination") or ""
 
     # Bus boarding waypoint (provider-stored coords, else the point name).
-    boarding_obj = {"lat": None, "lng": None, "address": None}
-    dropping_obj = {"lat": None, "lng": None, "address": None}
-    if leg and leg.get("type") == "BUS":
-        boarding_obj = {
-            "lat": leg.get("boardingLat"), "lng": leg.get("boardingLng"),
-            "address": leg.get("boardingPoint") or "",
-        }
-        dropping_obj = {
-            "lat": leg.get("droppingLat"), "lng": leg.get("droppingLng"),
-            "address": leg.get("droppingPoint") or "",
-        }
-    elif leg:
-        # Train / flight: the "transfer" happens at the station / airport.
-        boarding_obj = {
-            "lat": None, "lng": None,
-            "address": leg.get("boardingStation") or leg.get("departureAirport") or "",
-        }
-        dropping_obj = {
-            "lat": None, "lng": None,
-            "address": leg.get("destinationStation") or leg.get("arrivalAirport") or "",
-        }
+    boarding_obj, dropping_obj = _leg_points(leg)
 
     hotel_obj = {
         "lat": hotel.get("lat") if hotel else None,
@@ -158,9 +163,9 @@ def _compute_transfers(parsed, leg, hotel, cabs):
         "address": (hotel.get("name") if hotel else None) or "",
     }
 
-    def price(label, origin_obj, dest_obj):
+    def price(label, origin_obj, dest_obj, cab_city=None):
         km = _transfer_km(origin_obj, dest_obj, label)
-        cab = _pick_transfer_cab(cabs, city)
+        cab = _pick_transfer_cab(cabs, cab_city or city)
         fare = None
         error = None
         if km is None:
@@ -170,7 +175,7 @@ def _compute_transfers(parsed, leg, hotel, cabs):
         else:
             fare = _cab_fare_for(cab, km)
             if fare is None:
-                error = "No registered CAB/AUTO fare card found for '%s' to price the transfer." % city
+                error = "No registered CAB/AUTO fare card found for '%s' to price the transfer." % (cab_city or city)
                 print("[TripMind] TRANSFER-FARE for '%s': distance=%.2fkm but NO fare card -> %s"
                       % (label, km, error))
             else:
@@ -187,7 +192,18 @@ def _compute_transfers(parsed, leg, hotel, cabs):
         out["home_to_boarding"] = price("home->boarding", start_obj, boarding_obj)
         if hotel:
             out["arrival_to_stay"] = price("arrival->stay", dropping_obj, hotel_obj)
-        out["return_home"] = price("return->home", hotel_obj or dropping_obj, start_obj)
+        if return_leg:
+            # Round trip: the traveller goes from the stay to the return
+            # boarding point, rides back, then transfers from the return
+            # arrival point home. The intercity return_home cab is NOT used.
+            r_board, r_drop = _leg_points(return_leg)
+            out["stay_to_return_boarding"] = price(
+                "stay->return-boarding", hotel_obj or dropping_obj, r_board,
+                cab_city=dest_city)
+            out["return_arrival_to_home"] = price(
+                "return-arrival->home", r_drop, start_obj, cab_city=dest_city)
+        else:
+            out["return_home"] = price("return->home", hotel_obj or dropping_obj, start_obj)
     return out
 
 
@@ -201,6 +217,48 @@ def _transfer_cost(entry, travelers, capacity=4):
         return 0, (entry or {}).get("error")
     cap = max(1, min(int(capacity) or 4, int(travelers) or 1))
     return round(fare / cap, 2), None
+
+
+def _pick_return_leg(parsed, db_data):
+    """Real return-direction transport (destination -> origin) from the
+    registered catalogue. Returns None when no return service is registered —
+    the plan then falls back to the distance-priced return-home transfer
+    instead of inventing a service."""
+    dest_city = parsed.get("destination") or ""
+    orig_city = parsed.get("origin") or ""
+    try:
+        from services.transport_service import available_transports, _corridor, _match
+        cands = available_transports(dest_city, orig_city, parsed.get("transportType")) or []
+        # Directional check: the corridor must run destination -> origin, so a
+        # destination-only fallback match (e.g. a local cab) never becomes the
+        # intercity return leg.
+        cands = [c for c in cands
+                 if _corridor(c) and _match(_corridor(c), dest_city, orig_city)]
+    except Exception:
+        cands = []
+    if not cands:
+        print("[TripMind] RETURN-LEG: no registered service for %s -> %s "
+              "(return transport omitted; transfers still priced by distance)."
+              % (dest_city, orig_city))
+        return None
+
+    mode = (parsed.get("transportType") or "").upper()
+
+    def fare_of(t):
+        f = t.get("fare")
+        if isinstance(f, dict):
+            return _cost_f(f.get("price") or f.get("baseFare") or f.get("pricePerKm") or 0)
+        return _cost_f(f)
+
+    # Prefer the traveller's requested mode, then the cheapest real fare.
+    cands.sort(key=lambda t: (0 if mode and str(t.get("type") or "").upper() == mode else 1,
+                              fare_of(t)))
+    picked = cands[0]
+    print("[TripMind] RETURN-LEG: picked %s · %s (%s) at Rs %s for %s -> %s"
+          % (picked.get("type"), picked.get("serviceName") or picked.get("name") or "",
+             picked.get("_id"), fare_of(picked), parsed.get("destination"),
+             parsed.get("origin")))
+    return picked
 
 
 # ---------------------------------------------------------------------------
@@ -310,6 +368,19 @@ def _build_prompt(parsed, brief):
     budget_line = ("an unlimited budget (premium eligible)"
                    if parsed.get("budgetUnlimited")
                    else "a budget of ₹%d per person" % parsed.get("budget", 0))
+    return_line = ("ROUND TRIP: YES — the traveller returns to the origin on the "
+                   "last day (the return transport is arranged separately); plan "
+                   "the final day around that departure."
+                   if parsed.get("returnTrip")
+                   else "ROUND TRIP: NO — one-way trip; the last day ends at the "
+                        "destination with the transfer home.")
+    premium_line = (", ".join(parsed.get("premiumServices") or [])
+                    or "none selected")
+    style_line = parsed.get("travelStyle") or "BALANCED"
+    mode_line = parsed.get("transportType") or "any mode"
+    food_line = parsed.get("foodPreference") or "no specific food preference"
+    spot_pref = ", ".join(str(s) for s in (parsed.get("prioritizedSpotIds") or [])
+                          ) or "none — choose the best-fitting spots"
     return (
         "Design the trip itinerary entirely from the available inventory below. "
         "Exactly 3 different plans must be returned — one for each style: "
@@ -317,10 +388,16 @@ def _build_prompt(parsed, brief):
         "PREMIUM (best comfort/experience regardless of price).\n\n"
         "Trip: %s -> %s | %d day(s), %d traveller(s) | %s.\n"
         "Starting point: %s.\n"
+        "Preferred travel style: %s | preferred transport mode: %s | "
+        "food preference: %s | premium services opted in: %s.\n"
+        "%s\n"
+        "Traveller-preferred spot ids (prioritise ALL of these in every plan): %s.\n"
         "Traveller preferences (IMPORTANT — follow them):\n\"%s\"\n\n"
         % (parsed.get("origin", ""), parsed.get("destination", ""),
            parsed.get("durationDays", 1), parsed.get("travelers", 1),
            budget_line, parsed.get("startLocation") or parsed.get("origin", ""),
+           style_line, mode_line, food_line, premium_line,
+           return_line, spot_pref,
            parsed.get("preferences", ""))
         + "Available inventory (only these ids are valid; use ONLY them):\n"
         + json.dumps(brief, indent=2, default=str)
@@ -333,21 +410,25 @@ def _build_prompt(parsed, brief):
            '"foodIds": ["<id>", ...], '
            '"reasoning": ["<1-2 sentence why this suits the traveller>"]}]}'
            "\nRules: pick ids exactly as listed; never invent ids, prices or names. "
-           "Use at most 3 spots per plan unless the trip is longer. Assign activities "
-           "across the trip days in a sensible order (arrival-day activities in the "
-           "afternoon, departures on the last day). Choose at most 2 food items."))
+           "Include EVERY traveller-preferred spot listed above, and fill the rest of "
+           "the itinerary with additional fitting spots from the inventory as the trip "
+           "length allows. Assign activities across the trip days in a sensible order "
+           "(arrival-day activities in the afternoon, departures on the last day). "
+           "Choose at most 2 food items."))
 
 
 _SYSTEM = (
     "You are TripMind's AI itinerary generator. You design complete travel plans "
-    "for Coimbatore <-> Chennai trips using ONLY the inventory and ids provided. "
-    "Rules: 1) never invent resources, ids, prices, timings or names; 2) every id "
-    "you return must appear in the inventory; 3) return exactly one JSON object, "
-    "no markdown, no commentary; 4) choose the transport that best fits the "
-    "traveller's preferences and the plan style (BUDGET prefers sleeper buses "
-    "and sleeper trains; PREMIUM prefers Air-conditioned flights/trains); "
-    "5) always include a sensible hotel (or none only if the trip is under 2 "
-    "days). Prefer tours that match the stated preferences.")
+    "for the requested origin -> destination route using ONLY the inventory and "
+    "ids provided. Rules: 1) never invent resources, ids, prices, timings or "
+    "names; 2) every id you return must appear in the inventory; 3) return exactly "
+    "one JSON object, no markdown, no commentary; 4) choose the transport that "
+    "best fits the traveller's preferences and the plan style (BUDGET prefers "
+    "sleeper buses and sleeper trains; PREMIUM prefers Air-conditioned "
+    "flights/trains); 5) always include a sensible hotel (or none only if the "
+    "trip is under 2 days); 6) honour the ROUND TRIP instruction by planning the "
+    "last day around the departure back home. Prefer tours that match the stated "
+    "preferences.")
 
 def _clean_json(raw):
     clean = (raw or "").strip()
@@ -520,8 +601,11 @@ def _materialize(parsed, db_data, sel):
         entry.setdefault("bookableId", None)
         foods_sel.append(entry)
 
+    return_leg = _pick_return_leg(parsed, db_data) if parsed.get("returnTrip") else None
+
     route_km = None
-    if leg and leg.get("type") in ("CAB", "AUTO"):
+    if (leg and leg.get("type") in ("CAB", "AUTO")) or \
+            (return_leg and return_leg.get("type") in ("CAB", "AUTO")):
         try:
             from services.maps_distance import route_distance_km
             route_km = route_distance_km(parsed.get("origin"), parsed.get("destination"),
@@ -529,13 +613,15 @@ def _materialize(parsed, db_data, sel):
         except Exception:
             route_km = None
 
-    transfers = _compute_transfers(parsed, leg, hotel, db_data.get("cabs") or [])
+    transfers = _compute_transfers(parsed, leg, hotel, db_data.get("cabs") or [],
+                                   return_leg=return_leg)
 
     decision = _arrive_decision(parsed, leg, hotel, activities)
     (daily_plan, total_cost, breakdown) = _ai_daily(parsed, leg, hotel, activities,
                                                     foods_sel, decision=decision,
                                                     distance_km=route_km,
-                                                    transfers=transfers)
+                                                    transfers=transfers,
+                                                    return_leg=return_leg)
 
     style = sel.get("style")
     style = str(style or "").upper()
@@ -574,9 +660,10 @@ def _materialize(parsed, db_data, sel):
         "bookableIds": [x.get("spotId") or x.get("guideId") for x in activities if x.get("bookable")],
         "dbSource": True,
         "transport": leg,
+        "returnTransport": return_leg,
         "hotel": hotel,
         "arrivalDecision": decision.get("mode"),
-        "transports": [leg] if leg else [],
+        "transports": [x for x in (leg, return_leg) if x],
         "activities": activities,
         "foods": foods_sel,
         "dailyPlan": daily_plan,
@@ -619,7 +706,7 @@ def _arrival_time_ai(leg):
 
 
 def _ai_daily(request, leg, hotel, activities, foods, decision=None, distance_km=None,
-              transfers=None):
+              transfers=None, return_leg=None):
     start = request.get("startDate")
     try:
         if isinstance(start, str):
@@ -783,7 +870,54 @@ def _ai_daily(request, leg, hotel, activities, foods, decision=None, distance_km
             ]))
             slot = item_after(items)
 
-        if day == days:
+        if day == days and return_leg:
+            # Round trip: stay -> return boarding -> transport home -> arrival
+            # -> home. Every fare comes from real distance/inventory data.
+            r_time = str(return_leg.get("boardingTime") or "18:00")
+            try:
+                hh, mm = (r_time.split("T")[-1])[:5].split(":")
+                rdep = d.replace(hour=int(hh), minute=int(mm))
+            except Exception:
+                rdep = d.replace(hour=18, minute=0)
+            rride = int(learned_duration_or_default(return_leg.get("type"), transfer_min))
+            rarr = rdep + timedelta(minutes=rride)
+            r_fare = _cost(_fare(return_leg, distance_km))
+            breakdown["transport"] += r_fare * travelers
+            s2b_cost, s2b_err = _transfer_cost(transfers.get("stay_to_return_boarding"),
+                                               travelers)
+            a2h_cost, a2h_err = _transfer_cost(transfers.get("return_arrival_to_home"),
+                                               travelers)
+            breakdown["transport"] += (s2b_cost + a2h_cost) * travelers
+            to_board = {"type": "TRANSFER", "title": "Stay to return boarding point",
+                        "provider": "Cab", "cost": s2b_cost,
+                        "startTime": (rdep - timedelta(minutes=90)).isoformat(),
+                        "endTime": rdep.isoformat()}
+            if transfers.get("stay_to_return_boarding") and \
+                    transfers["stay_to_return_boarding"].get("distanceKm"):
+                to_board["distanceKm"] = round(
+                    transfers["stay_to_return_boarding"]["distanceKm"], 2)
+            if s2b_err:
+                to_board["fareError"] = s2b_err
+            back_item = {"type": return_leg.get("type", "TRANSPORT"),
+                         "title": "Return %s · %s" % (return_leg.get("type"),
+                                                      return_leg.get("serviceName", "")),
+                         "provider": return_leg.get("serviceName", ""),
+                         "vehicle": _vehicle_label(return_leg), "cost": r_fare,
+                         "startTime": rdep.isoformat(), "endTime": rarr.isoformat(),
+                         "distanceKm": distance_km,
+                         "bookableId": "transport:%s" % return_leg["_id"]}
+            home_item = {"type": "TRANSFER", "title": "Return arrival to home",
+                         "provider": "Cab", "cost": a2h_cost,
+                         "startTime": (rarr + timedelta(minutes=20)).isoformat(),
+                         "endTime": (rarr + timedelta(minutes=20 + transfer_min)).isoformat()}
+            if transfers.get("return_arrival_to_home") and \
+                    transfers["return_arrival_to_home"].get("distanceKm"):
+                home_item["distanceKm"] = round(
+                    transfers["return_arrival_to_home"]["distanceKm"], 2)
+            if a2h_err:
+                home_item["fareError"] = a2h_err
+            items.extend(add([to_board, back_item, home_item]))
+        elif day == days:
             back_cost, back_err = _transfer_cost(transfers.get("return_home"), travelers)
             breakdown["transport"] += back_cost * travelers
             back_item = {"type": "TRANSFER", "title": "Return home transfer", "provider": "Cab",
@@ -826,6 +960,10 @@ def _normalize_request(parsed):
         out["durationDays"] = max(1, (out["endDate"] - start).days + 1)
     if not out.get("travelStyle"):
         out["travelStyle"] = "BALANCED"
+    if "returnTrip" not in out:
+        out["returnTrip"] = False
+    if not isinstance(out.get("premiumServices"), list):
+        out["premiumServices"] = []
     return out
 
 
@@ -836,8 +974,9 @@ def generate_ai_plans(parsed, db_data, verbose=True):
     unusable response, so the caller NEVER falls back to code-rule plans.
     """
     if not is_ai_available():
-        raise AIPlanError("No AI provider is configured (missing "
-                          "GEMINI_API_KEY / OPENROUTER_API_KEY).")
+        raise AIPlanError("No AI provider is configured (set OLLAMA_API_KEY — "
+                          "primary — or GEMINI_API_KEY / CEREBRAS_API_KEY / "
+                          "OPENROUTER_API_KEY as fallbacks).")
 
     parsed = _normalize_request(parsed)
 
@@ -846,9 +985,16 @@ def generate_ai_plans(parsed, db_data, verbose=True):
         raise AIPlanError("No registered inventory available for this route.")
 
     prompt = _build_prompt(parsed, brief)
+    print("[TripMind AI] LLM request: %d chars prompt, waiting for provider ..."
+          % len(prompt))
+    t0 = time.time()
     raw = call_ai(prompt, _SYSTEM, max_tokens=2200, temperature=0.3)
     if not raw:
-        raise AIPlanError("AI provider returned no content.")
+        raise AIPlanError("AI provider returned no content (see the "
+                          "[TripMind AI] LLM lines above for the failing "
+                          "provider and reason).")
+    print("[TripMind AI] LLM response: %d chars in %.1fs: %s"
+          % (len(raw), time.time() - t0, raw[:200].replace("\n", " ")))
 
     selections = _parse_response(raw)
     plans = []

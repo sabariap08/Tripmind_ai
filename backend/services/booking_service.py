@@ -246,8 +246,15 @@ def create_booking(data, user):
                                     str(restaurant["_id"]))
         if not food_item:
             return None, "Food item not available."
+        # Meal sittings are part of the identity when provided: a plan can
+        # legitimately serve the same dish at breakfast and after midnight on
+        # one calendar day, while an exact same sitting stays a duplicate.
+        guard_parts = [str(restaurant["_id"]), str(food_item["_id"])]
+        slot = str((data.get("details") or {}).get("startTime") or "")
+        if slot:
+            guard_parts.append("@" + slot)
         ug_key, dup = _duplicate_guard(
-            btype, user, [str(restaurant["_id"]), str(food_item["_id"])],
+            btype, user, guard_parts,
             data.get("date") or "")
         if dup:
             return None, "You already have a booking for this item on this date."

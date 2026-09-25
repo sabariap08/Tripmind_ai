@@ -47,6 +47,7 @@ const api = {
     feedbackAnalysis: () => apiRequest('/api/ai/feedback-analysis', { method: 'POST' }),
     assistantChat: (message, tripId) => apiRequest('/api/assistant/chat', { method: 'POST', body: { message, tripId } }),
     assistantAction: (type, params) => apiRequest('/api/assistant/action', { method: 'POST', body: { type, params } }),
+    modifyTrip: (id, updates) => apiRequest(`/api/trips/${id}/modify`, { method: 'POST', body: { updates } }),
 
     // Auth
     me: () => apiRequest('/api/auth/me'),
