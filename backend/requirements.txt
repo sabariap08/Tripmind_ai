@@ -6,3 +6,4 @@ reportlab==5.0.0
 qrcode
 Pillow
 gunicorn==23.0.0
+requests==2.34.2
