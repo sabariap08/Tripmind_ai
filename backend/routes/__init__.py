@@ -166,6 +166,11 @@ def create_trip():
     premium_services = [s for s in (data.get("premiumServices") or [])
                         if s in ("TRANSPORT", "HOTELS", "ACTIVITIES", "GUIDE")]
 
+    # Optional voice input metadata: the mic transcript + detected language.
+    # The English-normalised text already lives in `preferences`.
+    voice_language = str(data.get("voiceLanguage") or "").strip()[:60]
+    voice_original = str(data.get("voiceOriginal") or "").strip()[:500]
+
     budget_unlimited = bool(data.get("budgetUnlimited")) or data.get("budget") in (None, 0)
     if budget_unlimited:
         budget_value = 0
@@ -220,6 +225,8 @@ def create_trip():
         "prioritizedSpotIds": [str(s) for s in (data.get("prioritizedSpotIds") or []) if str(s)],
         "returnTrip": return_trip,
         "premiumServices": premium_services,
+        "voice": {"language": voice_language, "original": voice_original}
+                 if voice_original else None,
         "status": "DRAFT",
         "totalEstimatedCost": None,
         "createdAt": now,
@@ -288,6 +295,11 @@ def generate_plans(trip_id):
     print("[TripMind AI] Origin: %s" % (trip.get("origin") or "(not set)"))
     print("[TripMind AI] Destination: %s" % (trip.get("destination") or "(not set)"))
     print("[TripMind AI] Description: %s" % (trip.get("preferences") or "(none)"))
+    _voice = trip.get("voice") or {}
+    print("[TripMind AI] Voice Input: %s" % ("YES" if _voice.get("original") else "NO"))
+    if _voice.get("original"):
+        print("[TripMind AI] Detected Language: %s" % (_voice.get("language") or "unknown"))
+        print("[TripMind AI] English Text: %s" % (trip.get("preferences") or ""))
     print("[TripMind AI] Return Trip: %s" % ("YES" if trip.get("returnTrip") else "NO"))
     print("[TripMind AI] Premium Services: %s" % (
         ", ".join(trip.get("premiumServices") or []) or "(none)"))
@@ -458,6 +470,40 @@ def modify_trip(trip_id):
                    % ", ".join(sorted(k for k in allowed if k != "updatedAt")),
         "applied": sorted(k for k in allowed if k != "updatedAt"),
     })
+
+
+def _salvage_packing_items(raw):
+    """Recover the complete item objects from a truncated packing JSON reply.
+
+    The reply is genuine AI output; when it is cut off mid-string (usually the
+    model spent its token budget on reasoning) we keep every fully formed item
+    instead of throwing the whole list away.
+    """
+    import json as _sj
+    found, stack, in_str, esc = [], [], False, False
+    for i, ch in enumerate(raw or ""):
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            stack.append(i)
+        elif ch == "}" and stack:
+            chunk = raw[stack.pop():i + 1]
+            if '"name"' in chunk:
+                try:
+                    obj = _sj.loads(chunk)
+                except Exception:
+                    obj = None
+                if isinstance(obj, dict) and obj.get("name"):
+                    found.append(obj)
+    return found
 
 
 def _item_date(item, trip):
@@ -1433,6 +1479,331 @@ def _extract_daily_plan(itinerary):
             days[day] = {"day": day, "items": []}
         days[day]["items"].append(item)
     return [days[k] for k in sorted(days.keys())]
+
+
+@trips_bp.route("/api/trips/<trip_id>/packing", methods=["POST"])
+def smart_packing(trip_id):
+    """SMART PACKING OPTIMIZER.
+
+    Generates a packing list from the REAL trip (destination, duration,
+    travellers, itinerary, transport, description) plus REAL weather. Cached
+    on the trip document; `force: true` regenerates. If the AI or the weather
+    service fails, an honest error/unavailable flag is returned - never a
+    fabricated list.
+    """
+    import json as _json
+    import time as _time
+    from services.ai_service import call_ai, is_ai_available
+    from services.weather_service import fetch_weather
+
+    user_id = _resolve_user()
+    if not user_id:
+        return jsonify({"error": "Authentication required. Please log in."}), 401
+    trip = _owned_trip(trip_id, user_id)
+    if not trip:
+        return jsonify({"error": "Trip not found"}), 404
+    body = request.get_json(silent=True) or {}
+    force = bool(body.get("force"))
+
+    itin = next((i for i in (trip.get("itineraries") or [])
+                 if i.get("status") == "SELECTED"), None)
+    itin_items = (itin or {}).get("items") or []
+    basis = {
+        "items": len(itin_items),
+        "totalCost": round(float((itin or {}).get("totalCost") or 0), 2),
+    }
+    cached = trip.get("packing")
+    if cached and not force and cached.get("basis") == basis:
+        return jsonify(cached)
+
+    if not is_ai_available():
+        return jsonify({"error": "AI provider is not configured, so the packing optimizer cannot run."}), 403
+
+    try:
+        s = datetime.strptime((trip.get("startDate") or "")[:10], "%Y-%m-%d").date()
+        e = datetime.strptime((trip.get("endDate") or "")[:10], "%Y-%m-%d").date()
+        days = max(1, (e - s).days + 1)
+    except Exception:
+        days = max(1, len({i.get("day") for i in itin_items}) or 1)
+
+    activity_types = sorted({str(i.get("type")) for i in itin_items if i.get("type")})
+    transport_modes = sorted({str(i.get("type")) for i in itin_items
+                              if i.get("type") in ("BUS", "TRAIN", "FLIGHT", "CAB", "AUTO", "TRANSPORT")})
+    itinerary_titles = [str(i.get("title")) for i in itin_items if i.get("title")][:14]
+    spot_names = []
+    try:
+        for s_obj in (list_spots(city=trip.get("destination")) or []):
+            if str(s_obj.get("_id")) in {str(x) for x in (trip.get("prioritizedSpotIds") or [])}:
+                spot_names.append(str(s_obj.get("name") or s_obj.get("title") or ""))
+        spot_names = [n for n in spot_names if n and n != "None"][:10]
+    except Exception:
+        spot_names = []
+
+    weather = fetch_weather(trip.get("destination"),
+                            trip.get("startDate"), trip.get("endDate"))
+
+    context = {
+        "origin": trip.get("origin"),
+        "destination": trip.get("destination"),
+        "startDate": trip.get("startDate"),
+        "endDate": trip.get("endDate"),
+        "days": days,
+        "travelers": int(trip.get("travelers") or 1),
+        "travelStyle": trip.get("travelStyle"),
+        "returnTrip": bool(trip.get("returnTrip")),
+        "premiumServices": trip.get("premiumServices") or [],
+        "description": (trip.get("preferences") or "")[:500],
+        "selectedSpotNames": spot_names,
+        "itineraryActivityTypes": activity_types,
+        "transportModes": transport_modes,
+        "itineraryTitles": itinerary_titles,
+        "weather": (
+            {"summary": weather.get("summary"),
+             "current": weather.get("current"),
+             "tripForecast": weather.get("tripForecast")}
+            if weather.get("available")
+            else {"available": False, "reason": weather.get("reason")}),
+    }
+
+    system = (
+        "You are TripMind AI Packing Optimizer. You receive a JSON trip "
+        "context and must return ONLY a JSON object (no markdown, no "
+        "explanation) with this schema: "
+        '{"items":[{"name":"...","qty":<int>,'
+        '"category":"clothing|essential|weather|activity|documents|tech|health|optional",'
+        '"weightG":<int>,"reason":"..."}],"optimization":["..."],"notes":"<1-2 sentences>"} '
+        "Rules: quantities scale with trip days and travellers; tailor items "
+        "to the destination climate, transport modes and planned activities; "
+        "weather-specific items only when the context provides real weather "
+        "data (if weather is unavailable, do not invent conditions - note it "
+        "in notes); weightG is a realistic integer grams per single unit; "
+        "include documents, tech and health essentials. Return at most 18 items "
+        "and keep every reason under 8 words."
+    )
+    print("[TripMind AI] PACKING request: %s -> %s, %d day(s), %s traveller(s), "
+          "weather=%s, %d itinerary items"
+          % (context["origin"], context["destination"], days,
+             context["travelers"],
+             "available" if weather.get("available") else "unavailable",
+             len(itin_items)))
+    t0 = _time.time()
+    raw = call_ai("Trip context JSON:\n" + _json.dumps(context), system,
+                  max_tokens=4000, temperature=0.3)
+    elapsed = _time.time() - t0
+    if not raw:
+        return jsonify({"error": "Packing optimizer failed: the AI provider "
+                                 "returned no content (see [TripMind AI] LLM "
+                                 "log lines). No packing list was generated."}), 502
+    truncated = False
+    try:
+        parsed = _json.loads(raw)
+        raw_items = parsed.get("items") or []
+    except Exception as exc:
+        raw_items = _salvage_packing_items(raw)
+        if not raw_items:
+            return jsonify({"error": "Packing optimizer returned unusable output "
+                                     "(%s). No packing list was generated." % exc}), 502
+        truncated = True
+        parsed = {"items": raw_items, "optimization": [], "notes": ""}
+        print("[TripMind AI] PACKING reply was cut off (%s); kept %d complete items"
+              % (exc, len(raw_items)))
+
+    allowed = ("clothing", "essential", "weather", "activity", "documents",
+               "tech", "health", "optional")
+    pack_items = []
+    for it in raw_items[:40]:
+        if not isinstance(it, dict):
+            continue
+        name = str(it.get("name") or "").strip()[:80]
+        if not name:
+            continue
+        try:
+            qty = max(1, int(it.get("qty") or 1))
+        except (TypeError, ValueError):
+            qty = 1
+        try:
+            weight_g = max(0, int(it.get("weightG") or 0))
+        except (TypeError, ValueError):
+            weight_g = 0
+        category = str(it.get("category") or "essential").lower()
+        if category not in allowed:
+            category = "essential"
+        pack_items.append({
+            "name": name, "qty": qty, "category": category,
+            "weightG": weight_g,
+            "reason": str(it.get("reason") or "")[:140],
+        })
+    if not pack_items:
+        return jsonify({"error": "Packing optimizer returned an empty list. "
+                                 "No packing list was generated."}), 502
+
+    notes = str(parsed.get("notes") or "")[:400]
+    if truncated:
+        notes = ("%s List was cut off by the AI response length after %d "
+                 "items; press Refresh to complete it." % (notes, len(pack_items))
+                 ).strip()[:500]
+
+    packing = {
+        "items": pack_items,
+        "itemCount": len(pack_items),
+        "totalWeightG": sum(i["qty"] * i["weightG"] for i in pack_items),
+        "optimization": [str(o)[:40] for o in (parsed.get("optimization") or [])][:6],
+        "notes": notes,
+        "truncated": truncated,
+        "weather": weather,
+        "basis": basis,
+        "context": {"destination": trip.get("destination"), "days": days,
+                    "travelers": int(trip.get("travelers") or 1),
+                    "activities": activity_types,
+                    "transportModes": transport_modes},
+        "generatedAt": datetime.utcnow().isoformat(),
+    }
+    get_collection("trips").update_one(
+        {"_id": trip_id},
+        {"$set": {"packing": packing,
+                  "updatedAt": datetime.utcnow().isoformat()}})
+    print("[TripMind AI] PACKING ok: %d items, %.1f kg in %.1fs"
+          % (len(pack_items), packing["totalWeightG"] / 1000.0, elapsed))
+    return jsonify(packing)
+
+
+@trips_bp.route("/api/trips/<trip_id>/twin", methods=["GET"])
+def trip_twin(trip_id):
+    """DIGITAL TRIP TWIN.
+
+    A structured representation of the current planned journey built ONLY from
+    real trip state: itinerary legs, bookings, budget actually committed,
+    recorded disruptions and real weather. Luggage tracking is reported as
+    explicitly not connected unless a real source exists - it is never faked.
+    """
+    from services.weather_service import fetch_weather
+
+    user_id = _resolve_user()
+    if not user_id:
+        return jsonify({"error": "Authentication required. Please log in."}), 401
+    trip = _owned_trip(trip_id, user_id)
+    if not trip:
+        return jsonify({"error": "Trip not found"}), 404
+
+    start = (trip.get("startDate") or "")[:10]
+    end = (trip.get("endDate") or "")[:10]
+    today = datetime.utcnow().date()
+    state = "UPCOMING"
+    current_day = None
+    days_total = None
+    try:
+        s_date = datetime.strptime(start, "%Y-%m-%d").date()
+        e_date = datetime.strptime(end, "%Y-%m-%d").date()
+        days_total = max(1, (e_date - s_date).days + 1)
+        if today < s_date:
+            state = "UPCOMING"
+        elif today > e_date:
+            state = "COMPLETED"
+        else:
+            state = "IN_PROGRESS"
+            current_day = (today - s_date).days + 1
+    except Exception:
+        pass
+
+    itin = next((i for i in (trip.get("itineraries") or [])
+                 if i.get("status") == "SELECTED"), None)
+    itin_items = (itin or {}).get("items") or []
+    domain_of = {
+        "BUS": "Bus", "TRAIN": "Train", "FLIGHT": "Flight", "CAB": "Cab",
+        "AUTO": "Local transport", "TRANSPORT": "Transport",
+        "TRANSFER": "Local transport", "HOTEL": "Hotel", "FOOD": "Meal",
+        "SPOT": "Activity", "ACTIVITY": "Activity", "GUIDE": "Guide",
+    }
+    booked_titles = {str(b.get("itemTitle")) for b in (trip.get("bookings") or [])
+                     if b.get("status") not in ("CANCELLED", "REJECTED")}
+    legs = []
+    for i in itin_items:
+        t = str(i.get("type") or "OTHER")
+        legs.append({
+            "domain": domain_of.get(t, t.title()),
+            "title": str(i.get("title") or t),
+            "type": t,
+            "startTime": i.get("startTime"),
+            "day": i.get("day"),
+            "status": i.get("status") or
+                      ("CONFIRMED" if str(i.get("title")) in booked_titles else "PLANNED"),
+            "cost": i.get("cost"),
+            "delayed": str(i.get("status") or "") in ("DELAYED", "RESCHEDULED"),
+        })
+
+    bookings = [{
+        "reference": b.get("reference"),
+        "type": b.get("type"),
+        "provider": b.get("provider"),
+        "itemTitle": b.get("itemTitle"),
+        "status": b.get("status"),
+        "paymentStatus": b.get("paymentStatus"),
+        "price": b.get("total"),
+        "bookedAt": b.get("createdAt"),
+    } for b in (trip.get("bookings") or [])]
+
+    estimated = (itin or {}).get("totalCost")
+    if estimated is None:
+        estimated = trip.get("totalEstimatedCost")
+    committed = sum(float(b.get("total") or 0) for b in (trip.get("bookings") or [])
+                    if b.get("status") not in ("CANCELLED", "REJECTED"))
+    paid = sum(float(b.get("total") or 0) for b in (trip.get("bookings") or [])
+               if b.get("paymentStatus") in ("COMPLETED", "WALLET"))
+
+    weather = fetch_weather(trip.get("destination"), start, end)
+
+    disruptions = [{
+        "title": ev.get("title"),
+        "description": ev.get("description"),
+        "severity": ev.get("severity"),
+        "occurredAt": ev.get("occurredAt"),
+    } for ev in (trip.get("events") or [])]
+
+    luggage_source = trip.get("luggageSource")  # only set if a real source exists
+    luggage = (
+        {"connected": True, "status": luggage_source.get("status"),
+         "location": luggage_source.get("location"),
+         "lastUpdated": luggage_source.get("lastUpdated"),
+         "source": luggage_source.get("source")}
+        if isinstance(luggage_source, dict) and luggage_source.get("status")
+        else {"connected": False, "status": "Not connected", "source": None,
+              "location": None, "lastUpdated": None,
+              "message": "No luggage tracking source is connected. This slot "
+                         "is architecture-ready and will show real status the "
+                         "moment a tracking source is integrated."}
+    )
+
+    return jsonify({
+        "tripId": str(trip.get("_id")),
+        "generatedAt": datetime.utcnow().isoformat(),
+        "journey": {
+            "state": state,
+            "currentDay": current_day,
+            "daysTotal": days_total,
+            "origin": trip.get("origin"),
+            "destination": trip.get("destination"),
+            "startDate": start,
+            "endDate": end,
+            "returnTrip": bool(trip.get("returnTrip")),
+            "tripStatus": trip.get("status"),
+        },
+        "traveller": {
+            "travelers": int(trip.get("travelers") or 1),
+            "travelStyle": trip.get("travelStyle"),
+            "premiumServices": trip.get("premiumServices") or [],
+        },
+        "legs": legs,
+        "bookings": bookings,
+        "budget": {
+            "estimated": round(float(estimated), 2) if isinstance(estimated, (int, float)) else None,
+            "committed": round(committed, 2),
+            "paid": round(paid, 2),
+            "currency": trip.get("currency", "INR"),
+        },
+        "weather": weather,
+        "disruptions": disruptions,
+        "luggage": luggage,
+    })
 ''',
     'ai': r'''from flask import Blueprint, request, jsonify
 from services.ai_chat import handle_ai_chat
@@ -1574,6 +1945,69 @@ def feedback_analysis():
             "suggestions": [],
             "rawReviewCount": len(reviews),
         })
+
+
+@ai_bp.route("/api/ai/voice-normalize", methods=["POST"])
+@require_login
+def voice_normalize():
+    """VOICE -> ENGLISH handoff for the existing planning flow.
+
+    The browser performs speech-to-text (Web Speech API); this endpoint
+    detects the spoken language and translates the transcript to English
+    through the same Ollama chain the planner uses, so voice simply feeds the
+    normal text pipeline. Nothing is fabricated: if the model returns no
+    usable translation the original transcript is passed through unchanged
+    and `translated` is false.
+    """
+    import time as _time
+    data = request.get_json(silent=True) or {}
+    text = str(data.get("text") or "").strip()
+    if len(text) < 2:
+        return jsonify({"error": "Voice transcript is too short."}), 400
+    if len(text) > 2000:
+        text = text[:2000]
+    if not is_ai_available():
+        return jsonify({"error": "AI provider is not configured, so the voice "
+                                 "text cannot be translated to English."}), 403
+
+    system = (
+        "You are TripMind AI language normalisation. Detect the language of "
+        "the user text and translate it to natural English, preserving the "
+        "original meaning exactly (place names, times, preferences, family "
+        "details). Return ONLY a JSON object of the form "
+        '{"language":"<common language name>","english":"<English translation>"} '
+        "If the text is already English, set language to English and copy the "
+        "text into english."
+    )
+    t0 = _time.time()
+    raw = call_ai(text, system, max_tokens=600, temperature=0.1)
+    elapsed = _time.time() - t0
+    if not raw:
+        return jsonify({"error": "Voice translation failed: the AI provider "
+                                 "returned no content (see [TripMind AI] LLM "
+                                 "log lines)."}), 502
+
+    parsed = None
+    try:
+        import json as _json
+        parsed = _json.loads(raw)
+    except Exception:
+        parsed = None
+    language = str((parsed or {}).get("language") or "").strip()[:60]
+    english = str((parsed or {}).get("english") or "").strip()
+    translated = bool(parsed) and bool(english)
+    if not english:
+        language = language or "unknown"
+        english = text
+
+    print("[TripMind AI] Voice Input: YES")
+    print("[TripMind AI] Detected Language: %s" % language)
+    print("[TripMind AI] English Text: %s" % english)
+    print("[TripMind AI] Voice normalize: %.1fs (translated=%s)"
+          % (elapsed, "yes" if translated else "no"))
+    return jsonify({"language": language, "english": english,
+                    "original": text, "translated": translated,
+                    "responseSeconds": round(elapsed, 1)})
 ''',
     'auth': r'''from flask import Blueprint, request, jsonify, session
 from config import ROLES, PROVIDER_ROLES, APPROVAL_STATUSES, DEV_MODE

@@ -49,6 +49,11 @@ const api = {
     assistantAction: (type, params) => apiRequest('/api/assistant/action', { method: 'POST', body: { type, params } }),
     modifyTrip: (id, updates) => apiRequest(`/api/trips/${id}/modify`, { method: 'POST', body: { updates } }),
 
+    // Smart Packing / Digital Twin / Voice
+    voiceNormalize: (text) => apiRequest('/api/ai/voice-normalize', { method: 'POST', body: { text } }),
+    tripPacking: (id, force) => apiRequest(`/api/trips/${id}/packing`, { method: 'POST', body: { force: !!force } }),
+    tripTwin: (id) => apiRequest(`/api/trips/${id}/twin`),
+
     // Auth
     me: () => apiRequest('/api/auth/me'),
     login: (data) => apiRequest('/api/auth/login', { method: 'POST', body: data }),

@@ -21,6 +21,14 @@
         .saving-line{display:flex;justify-content:space-between;padding:.5rem 0;font-size:.9rem;}
         .not-est{color:var(--slate-500);font-style:italic;}
     </style>
+    <meta name="theme-color" content="#f59e0b">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+    <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="TripMind AI">
 </head>
 <body>
     <nav class="navbar">
@@ -53,12 +61,15 @@
             <div class="mb-4">
                 <h1 id="tripTitle" style="font-size:1.5rem;font-weight:700;"></h1>
                 <p id="tripMeta" class="text-sm text-muted mt-1"></p>
+                <div id="tripHeaderGrid" class="input-grid" style="margin-top:.9rem;"></div>
             </div>
 
             <div class="tabs">
                 <button class="tab active" onclick="switchTab('timeline')">Itinerary Timeline</button>
                 <button class="tab" onclick="switchTab('cost')">Cost Breakdown</button>
                 <button class="tab" onclick="switchTab('compare')">Compare Plans</button>
+                <button class="tab" onclick="switchTab('packing')">Smart Packing</button>
+                <button class="tab" onclick="switchTab('twin')">Digital Twin</button>
                 <button class="tab" onclick="switchTab('inputs')">Your Inputs</button>
                 <button class="tab" onclick="switchTab('events')">Events</button>
             </div>
@@ -66,6 +77,8 @@
             <div id="tab-timeline" class="tab-content active"></div>
             <div id="tab-cost" class="tab-content"></div>
             <div id="tab-compare" class="tab-content"></div>
+            <div id="tab-packing" class="tab-content"></div>
+            <div id="tab-twin" class="tab-content"></div>
             <div id="tab-inputs" class="tab-content"></div>
             <div id="tab-events" class="tab-content"></div>
 
@@ -155,11 +168,31 @@
             const bookBtn = document.getElementById('bookBtn');
             bookBtn.disabled = tripData.status === 'BOOKED';
             bookBtn.textContent = tripData.status === 'BOOKED' ? 'Trip Booked' : 'Book This Trip';
+            renderHeaderGrid();
             renderTimeline();
             renderCost();
             renderCompare();
             renderInputs();
             renderEvents();
+        }
+
+        function inputCell(k, v) {
+            return `<div class="input-cell"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+        }
+
+        /* Trip header — FROM / TO / DATES / TRAVELLERS / RETURN / PREMIUM /
+           PREFERENCES, shown before any tab (Part 8 result structure). */
+        function renderHeaderGrid() {
+            const ps = tripData.premiumServices || [];
+            document.getElementById('tripHeaderGrid').innerHTML = [
+                inputCell('From', esc(tripData.origin || 'Not set')),
+                inputCell('To', esc(tripData.destination || 'Not set')),
+                inputCell('Dates', `${formatDate(tripData.startDate)} → ${formatDate(tripData.endDate)}`),
+                inputCell('Travellers', esc(String(tripData.travelers || 1))),
+                inputCell('Return', tripData.returnTrip ? 'Yes — round trip' : 'No — one way'),
+                inputCell('Premium services', ps.length ? esc(ps.join(', ')) : 'None'),
+                inputCell('Your preferences', esc(tripData.preferences || 'Not provided')),
+            ].join('');
         }
 
         function getSelectedItinerary() {
@@ -179,7 +212,7 @@
             let html = '';
             const rec = tripData.recommendations?.[0];
             if (rec) {
-                html += `<div class="recommendation-box" style="margin-bottom:1.5rem;"><h3>AI Recommendation</h3><p>${esc(rec.reasoning || rec.recommendation || '')}</p></div>`;
+                html += `<div class="recommendation-box" style="margin-bottom:1.5rem;"><h3>AI Trip Summary</h3><p>${esc(rec.reasoning || rec.recommendation || '')}</p></div>`;
             }
             if (!itin || !itin.items || !itin.items.length) {
                 if (genNotice) {
@@ -347,11 +380,133 @@
             document.getElementById('tab-events').innerHTML = html;
         }
 
+        /* SMART PACKING — generated server-side from the real trip + real
+           weather; lazy-loaded when the tab opens (Part 14/15). */
+        let packingLoaded = false;
+        async function renderPacking(force) {
+            const box = document.getElementById('tab-packing');
+            if (!force && packingLoaded && box.innerHTML) return;
+            box.innerHTML = `<div style="padding:2.5rem 0;text-align:center;"><div class="spinner"></div><p class="text-sm text-muted mt-2">Building your packing optimizer from this trip and real weather…</p></div>`;
+            try {
+                const p = await api.tripPacking(tripId, force);
+                packingLoaded = true;
+                drawPacking(p, box);
+            } catch (e) {
+                box.innerHTML = `<div class="recommendation-box" style="border-left:4px solid var(--red,#dc2626);"><h3>Packing optimizer unavailable</h3><p>${esc(e.message)}</p></div>`;
+            }
+        }
+
+        function drawPacking(p, box) {
+            const w = p.weather || {};
+            const ctx = p.context || {};
+            const cats = { clothing: 'Clothing', essential: 'Essentials', weather: 'Weather-specific', activity: 'Activity-specific', documents: 'Documents', tech: 'Tech', health: 'Health', optional: 'Optional' };
+            const groups = {};
+            (p.items || []).forEach(i => { (groups[i.category] = groups[i.category] || []).push(i); });
+            let html = `<div style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;">` +
+                `<div class="text-xs font-bold text-muted">SMART PACKING OPTIMIZER</div>` +
+                `<button class="btn btn-outline tl-remove" onclick="renderPacking(true)">↻ Regenerate</button></div>`;
+            html += `<div class="input-grid" style="margin-top:.75rem;">`;
+            html += inputCell('Weather', w.available ? esc(w.summary || '') : `Not available — ${esc(w.reason || 'weather service unavailable')}`);
+            html += inputCell('Trip duration', `${ctx.days || '?'} day(s)`);
+            html += inputCell('Travellers', `${ctx.travelers || tripData.travelers || 1}`);
+            html += inputCell('Activities', (ctx.activities && ctx.activities.length) ? esc(ctx.activities.join(' · ')) : 'General sightseeing');
+            html += inputCell('Bag estimate', `${(p.totalWeightG / 1000).toFixed(1)} kg · ${p.itemCount} items`);
+            html += inputCell('Optimization', (p.optimization || []).length ? esc(p.optimization.join(' · ')) : 'Trip-fitted list');
+            html += `</div>`;
+            if (w.available && w.tripForecastNote) html += `<p class="text-sm text-muted" style="margin-top:.5rem;">${esc(w.tripForecastNote)}</p>`;
+            if (!w.available) html += `<p class="text-sm text-muted" style="margin-top:.5rem;">Weather was unavailable, so no weather-specific items were invented.</p>`;
+            if (p.notes) html += `<p class="text-sm" style="margin-top:.75rem;">${esc(p.notes)}</p>`;
+            Object.keys(groups).forEach(cat => {
+                html += `<div class="text-xs font-bold text-muted" style="margin-top:1.1rem;padding-bottom:.35rem;border-bottom:1px solid var(--slate-100);">${cats[cat] || esc(cat)}</div>`;
+                groups[cat].forEach(i => {
+                    html += `<div style="display:flex;gap:.6rem;align-items:baseline;padding:.45rem 0;border-bottom:1px solid var(--slate-50,#f8fafc);flex-wrap:wrap;">` +
+                        `<span style="color:var(--emerald,#059669);font-weight:700;">✓</span>` +
+                        `<span style="font-weight:600;">${i.qty} × ${esc(i.name)}</span>` +
+                        `<span class="text-sm text-muted" style="flex:1;min-width:10rem;">${esc(i.reason || '')}</span>` +
+                        `<span class="text-sm text-muted" style="white-space:nowrap;">${i.weightG ? ((i.weightG * i.qty) / 1000).toFixed(2) + ' kg' : ''}</span></div>`;
+                });
+            });
+            html += `<p class="text-xs text-muted" style="margin-top:1rem;">Generated from your actual itinerary · weather: ${w.available ? 'real data (' + esc(w.source || 'weatherapi.com') + ')' : 'unavailable (not fabricated)'} · ${esc((p.generatedAt || '').slice(0, 16).replace('T', ' '))}</p>`;
+            box.innerHTML = html;
+        }
+
+        /* DIGITAL TRIP TWIN — a live structured view of the planned journey
+           built only from real trip state (Part 16-19). */
+        let twinLoaded = false;
+        async function renderTwin(force) {
+            const box = document.getElementById('tab-twin');
+            if (!force && twinLoaded && box.innerHTML) return;
+            box.innerHTML = `<div style="padding:2.5rem 0;text-align:center;"><div class="spinner"></div><p class="text-sm text-muted mt-2">Reading live trip state…</p></div>`;
+            try {
+                const t = await api.tripTwin(tripId);
+                twinLoaded = true;
+                drawTwin(t, box);
+            } catch (e) {
+                box.innerHTML = `<div class="recommendation-box" style="border-left:4px solid var(--red,#dc2626);"><h3>Digital Twin unavailable</h3><p>${esc(e.message)}</p></div>`;
+            }
+        }
+
+        function drawTwin(t, box) {
+            const j = t.journey || {};
+            const b = t.budget || {};
+            const w = t.weather || {};
+            const stateLabel = { UPCOMING: 'Upcoming', IN_PROGRESS: 'In progress', COMPLETED: 'Completed' }[j.state] || j.state;
+            const statePos = j.currentDay ? ` · Day ${j.currentDay} of ${j.daysTotal}` : (j.daysTotal ? ` · ${j.daysTotal} days` : '');
+            const money = v => (v == null ? 'Not estimated' : formatCurrency(v));
+            const statusOf = l => `${l.status}${l.delayed ? ' ⚠ Delayed' : ''}`;
+
+            let html = `<div class="text-xs font-bold text-muted">DIGITAL TRIP TWIN — structured live state of your planned journey</div>`;
+            html += `<div class="input-grid" style="margin-top:.75rem;">`;
+            html += inputCell('Journey status', esc(stateLabel + statePos));
+            html += inputCell('Route', `${esc(j.origin || '')} → ${esc(j.destination || '')}${j.returnTrip ? ' · round trip' : ''}`);
+            html += inputCell('Travellers', `${t.traveller?.travelers || 1} · ${esc(t.traveller?.travelStyle || '')}`);
+            html += inputCell('Weather', w.available ? esc(w.summary || '') : `Not available — ${esc(w.reason || 'weather service unavailable')}`);
+            html += `</div>`;
+
+            html += `<div class="text-xs font-bold text-muted" style="margin-top:1.25rem;padding-bottom:.35rem;border-bottom:1px solid var(--slate-100);">REAL WORLD &nbsp;→&nbsp; DIGITAL TWIN</div>`;
+            const rows = [];
+            rows.push({ l: 'Traveller', r: `${t.traveller?.travelers || 1} traveller(s) · ${t.traveller?.travelStyle || '-'}` });
+            (t.legs || []).forEach(l => rows.push({ l: `${l.domain} — ${l.title}`, r: statusOf(l) }));
+            rows.push({ l: 'Weather', r: w.available ? (w.summary || '') : 'Not connected — unavailable' });
+            rows.push({ l: 'Budget', r: `${money(b.paid)} paid / ${money(b.estimated)} estimated` });
+            rows.push({ l: 'Delay / disruption', r: (t.disruptions || []).length ? `${t.disruptions.length} recorded — see Events` : 'None recorded' });
+            rows.push({ l: 'Location', r: `${j.origin || '?'} → ${j.destination || '?'}${statePos}` });
+            const lug = t.luggage || {};
+            rows.push({ l: 'Luggage', r: lug.connected
+                ? `${lug.status || 'Unknown'}${lug.location ? ' · ' + lug.location : ''}`
+                : 'Not connected — architecture-ready (no tracking source)' });
+            rows.forEach(row => {
+                const muted = row.r.indexOf('Not connected') === 0;
+                html += `<div style="display:flex;justify-content:space-between;gap:1rem;padding:.55rem 0;border-bottom:1px solid var(--slate-50,#f8fafc);">` +
+                    `<span style="flex:1;min-width:0;">${esc(row.l)}</span>` +
+                    `<span style="text-align:right;font-weight:600;font-size:.88rem;white-space:normal;${muted ? 'font-style:italic;color:var(--slate-500);' : ''}">${esc(row.r)}</span></div>`;
+            });
+
+            if ((t.bookings || []).length) {
+                html += `<div class="text-xs font-bold text-muted" style="margin-top:1.25rem;padding-bottom:.35rem;border-bottom:1px solid var(--slate-100);">BOOKINGS</div>`;
+                t.bookings.forEach(bk => {
+                    html += `<div style="display:flex;justify-content:space-between;gap:1rem;padding:.5rem 0;border-bottom:1px solid var(--slate-50,#f8fafc);flex-wrap:wrap;">` +
+                        `<span>${esc(bk.itemTitle || bk.type || 'Booking')} <span class="text-sm text-muted">(${esc(bk.reference || '')} · ${esc(bk.status || '')} · ${esc(bk.paymentStatus || 'PENDING')})</span></span>` +
+                        `<span style="font-weight:700;">${money(bk.price)}</span></div>`;
+                });
+            }
+            if ((t.disruptions || []).length) {
+                html += `<div class="text-xs font-bold text-muted" style="margin-top:1.25rem;padding-bottom:.35rem;border-bottom:1px solid var(--slate-100);">DISRUPTIONS</div>`;
+                t.disruptions.forEach(dv => {
+                    html += `<div class="event-item"><div class="event-severity">${getSeverityBadge(dv.severity)}</div><div><div class="font-bold">${esc(dv.title || '')}</div><div class="text-sm text-muted">${esc(dv.description || '')}</div></div></div>`;
+                });
+            }
+            html += `<p class="text-xs text-muted" style="margin-top:1rem;">Built from real trip state (itinerary, bookings, budget, events${w.available ? ', weather' : ''}) — no simulated data · refreshed ${esc((t.generatedAt || '').slice(0, 16).replace('T', ' '))} · <a href="javascript:void(0)" onclick="renderTwin(true)">refresh</a></p>`;
+            box.innerHTML = html;
+        }
+
         function switchTab(name) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
             event.target.classList.add('active');
             document.getElementById('tab-' + name).classList.add('active');
+            if (name === 'packing') renderPacking();
+            if (name === 'twin') renderTwin();
         }
 
         function selectPlan(idx) {
@@ -388,5 +543,6 @@
 
         loadTrip();
     </script>
+    <script src="/js/pwa.js" defer></script>
 </body>
 </html>

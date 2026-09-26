@@ -26,6 +26,10 @@ SECRET_KEY = os.getenv("SECRET_KEY", "tripmind-dev-secret-key")
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
 MAPS_ENABLED = bool(GOOGLE_MAPS_API_KEY)
 
+# WeatherAPI.com key for Smart Packing / Digital Twin weather. Empty = weather
+# is reported as unavailable (never fabricated).
+WEATHER_API_KEY = os.getenv("WEATHER_API_KEY", "")
+
 DEV_MODE = os.getenv("DEV_MODE", "true").lower() in ("1", "true", "yes")
 
 # Role constants (single source of truth)

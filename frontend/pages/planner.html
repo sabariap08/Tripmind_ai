@@ -32,6 +32,14 @@
         .sel-bar{position:sticky;bottom:1rem;background:rgba(255,255,255,.96);border:1px solid var(--slate-200,#e2e8f0);border-radius:.9rem;padding:.8rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem;box-shadow:0 10px 30px rgba(0,0,0,.12);z-index:5;}
         .sel-bar .n{font-weight:700;color:var(--amber,#b45309);}
     </style>
+    <meta name="theme-color" content="#f59e0b">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+    <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="TripMind AI">
 </head>
 <body>
     <nav class="navbar">
@@ -62,7 +70,7 @@
             <div class="card mb-4">
                 <div class="card-header"><div class="card-title">Trip Details</div></div>
                 <div class="card-content">
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+                    <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
                         <div class="form-group">
                             <label class="form-label">Origin city</label>
                             <input id="origin" class="form-input" placeholder="e.g., Coimbatore">
@@ -129,9 +137,24 @@
                         <textarea id="preferences" class="form-input" rows="5"
                                   placeholder="e.g. I want a relaxed trip with a direct AC train in the morning, a good vegetarian restaurant near the hotel, a guide for the cultural spots, and a rooftop cafe to end the day…"></textarea>
                     </div>
+                    <!-- VOICE: speak any language -> STT -> detect+translate to
+                         English -> the English text fills this same box, so
+                         voice feeds the existing text planning flow. -->
+                    <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-top:.5rem;">
+                        <button type="button" class="btn btn-outline" id="voiceBtn" onclick="toggleVoice()">🎤 Speak your trip</button>
+                        <select id="voiceLang" class="form-select" style="max-width:210px;">
+                            <option value="en-IN">English (India)</option>
+                            <option value="ta-IN">தமிழ் (Tamil)</option>
+                            <option value="hi-IN">हिन्दी (Hindi)</option>
+                            <option value="ml-IN">മലയാളം (Malayalam)</option>
+                            <option value="te-IN">తెలుగు (Telugu)</option>
+                            <option value="kn-IN">ಕನ್ನಡ (Kannada)</option>
+                        </select>
+                        <span id="voiceStatus" class="text-sm text-muted" style="font-size:.8rem;"></span>
+                    </div>
                     <div class="hr-label" style="margin-top:1rem;">Starting point (Google Maps) <span style="color:#dc2626;">*</span></div>
                     <p class="text-sm text-muted" style="margin:.35rem 0 .75rem;">Pick exactly where the trip starts — this is <b>mandatory</b> and the AI uses it for routing.</p>
-                    <div style="display:grid;grid-template-columns:1fr auto;gap:.5rem;">
+                    <div class="grid-side" style="display:grid;grid-template-columns:1fr auto;gap:.5rem;">
                         <div class="form-group">
                             <input id="startAddr" class="form-input" placeholder="Search your starting location…">
                         </div>
@@ -151,7 +174,7 @@
         <div id="stepSpots" class="hidden">
             <h1 style="font-size:1.75rem;font-weight:700;margin-bottom:.5rem;">Choose Your Tourist Spots</h1>
             <p class="text-sm text-muted mb-2">Spots are ranked by our recommendation engine. <b>Tap spots in the order you prefer</b> — your click order becomes the priority the optimizer must honor.</p>
-            <p class="text-sm text-muted" style="margin-bottom:1rem;">Tap as many as you like — your click order becomes the priority. If you don't care, just use <i>“I Have No Choice”</i>.</p>
+            <p class="text-sm text-muted" style="margin-bottom:1rem;">Tap as many as you like — every approved spot can be selected, and your click order becomes the priority. If you don't care, just use <i>“I Have No Choice”</i>.</p>
             <div class="flex gap" style="margin-bottom:.5rem;">
                 <button class="btn btn-outline" onclick="pickNone()">I Have No Choice — AI picks</button>
                 <button class="btn btn-outline" onclick="resetPicks()">Reset choices</button>
@@ -247,6 +270,57 @@
             originInput.value = (params.get('origin') || params.get('from') || '').trim();
         }
 
+        /* VOICE INPUT — browser speech-to-text, then the backend detects the
+           language and translates to English. The English text fills the
+           description box, so voice feeds the existing text -> Ollama flow
+           (no separate planning system). */
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let rec = null;
+        let voiceMeta = null;
+        function voiceStatus(msg) {
+            const el = document.getElementById('voiceStatus');
+            if (el) el.textContent = msg || '';
+        }
+        function toggleVoice() {
+            if (!SR) {
+                alert('Voice input is not supported in this browser — please use Chrome or Edge, or type your description instead.');
+                return;
+            }
+            if (rec) { rec.stop(); return; }
+            rec = new SR();
+            rec.lang = document.getElementById('voiceLang').value;
+            rec.interimResults = false;
+            rec.maxAlternatives = 1;
+            document.getElementById('voiceBtn').textContent = '⏹ Stop listening';
+            voiceStatus('Listening… speak now…');
+            rec.onresult = async (e) => {
+                const transcript = (e.results[0][0].transcript || '').trim();
+                voiceStatus('Heard "' + transcript + '" — detecting language…');
+                try {
+                    const res = await api.voiceNormalize(transcript);
+                    document.getElementById('preferences').value = res.english;
+                    voiceMeta = { language: res.language, original: res.original };
+                    voiceStatus('✓ ' + res.language + ' → English inserted into your description.');
+                } catch (err) {
+                    voiceMeta = null;
+                    voiceStatus('');
+                    alert('Voice translation failed: ' + err.message);
+                }
+            };
+            rec.onerror = (e) => {
+                voiceStatus('');
+                if (e.error !== 'aborted' && e.error !== 'no-speech') {
+                    alert('Voice input error: ' + e.error +
+                        (e.error === 'not-allowed' ? ' (microphone permission denied)' : ''));
+                }
+            };
+            rec.onend = () => {
+                rec = null;
+                document.getElementById('voiceBtn').textContent = '🎤 Speak your trip';
+            };
+            try { rec.start(); } catch (err) { rec = null; voiceStatus(''); }
+        }
+
         let TM_start = null;
         async function openStartMap() {
             const mapDiv = document.getElementById('startMap');
@@ -298,7 +372,7 @@
             grid.innerHTML = '<div class="text-muted">Querying recommendation engine…</div>';
             let resp;
             try {
-                resp = await api.mlRecommendSpots({ limit: 12 });
+                resp = await api.mlRecommendSpots({ limit: 100 });
             } catch (e) {
                 grid.innerHTML = `<div class="text-muted">${esc(e.message)}</div>`;
                 return;
@@ -383,6 +457,8 @@
                 premiumServices: selectedPremiumServices(),
                 preferences: prefs,
                 prioritizedSpotIds: picked,
+                voiceLanguage: voiceMeta ? voiceMeta.language : '',
+                voiceOriginal: voiceMeta ? voiceMeta.original : '',
             };
             if (startLocation) data.startLocation = startLocation;
 
@@ -428,5 +504,6 @@
             }
         }
     </script>
+    <script src="/js/pwa.js" defer></script>
 </body>
 </html>
