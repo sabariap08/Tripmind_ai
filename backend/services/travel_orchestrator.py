@@ -52,6 +52,25 @@ def parse_trip_request(request_data):
     }
 
 
+def _ai_failure_hint(err):
+    """An accurate next step for the traveller — never a misleading guess.
+
+    A cut-off model reply is an output-length problem, not a credentials one, so
+    it must not send the user off to check API keys that were never the cause."""
+    text = str(err).lower()
+    if "malformed" in text or "non-json" in text or "no usable plans" in text:
+        return ("The model's reply was incomplete, so no complete plan could be "
+                "read from it. This is a reply-length issue rather than a key "
+                "problem - press Generate again; the planner already retries once "
+                "with a stricter JSON-only prompt.")
+    if "no ai provider" in text or "not configured" in text:
+        return ("The AI provider is not configured on the server. Check the "
+                "[TripMind AI] log lines above, then set OLLAMA_API_KEY in the "
+                "server environment and try again.")
+    return ("Check the [TripMind AI] log lines above for the failing provider and "
+            "the exact reason, then try again.")
+
+
 def generate_travel_plans(request_data, db_data=None):
     parsed = parse_trip_request(request_data)
     request_data = parsed
@@ -85,11 +104,8 @@ def generate_travel_plans(request_data, db_data=None):
             "selectedPlan": None,
             "plans": [],
             "aiExplanation": (
-                "The AI planner could not generate plans: %s "
-                "Check the [TripMind AI] LLM log lines above for the failing "
-                "provider, then verify OLLAMA_API_KEY (primary) or the "
-                "GEMINI/CEREBRAS/OPENROUTER fallback keys and try again."
-                % str(e).rstrip(".")
+                "The AI planner could not generate plans: %s %s"
+                % (str(e).rstrip("."), _ai_failure_hint(e))
             ),
             "parsedRequest": parsed,
             "ml": {},

@@ -443,6 +443,40 @@ def _clean_json(raw):
     return clean[start:end + 1]
 
 
+def _salvage_plans(raw):
+    """Recover the complete plan objects from a truncated LLM reply.
+
+    Reasoning models can spend their whole token budget before the JSON even
+    starts, which cuts the reply mid-object. Every fully written plan is still
+    real model output, so we keep those and ignore the half-written one instead
+    of failing the whole request.
+    """
+    found, stack, in_str, esc = [], [], False, False
+    for i, ch in enumerate(raw or ""):
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            stack.append(i)
+        elif ch == "}" and stack:
+            chunk = raw[stack.pop():i + 1]
+            if '"style"' in chunk and '"transportId"' in chunk:
+                try:
+                    obj = json.loads(chunk)
+                except Exception:
+                    obj = None
+                if isinstance(obj, dict) and obj.get("style") and obj.get("transportId"):
+                    found.append(obj)
+    return found
+
+
 def _parse_response(raw):
     clean = _clean_json(raw)
     if not clean:
@@ -450,6 +484,11 @@ def _parse_response(raw):
     try:
         data = json.loads(clean)
     except (ValueError, TypeError) as e:
+        salvaged = _salvage_plans(clean)
+        if salvaged:
+            print("[TripMind AI] LLM reply was cut off (%s); recovered %d complete "
+                  "plan(s) and ignored the partial one." % (e, len(salvaged)))
+            return salvaged
         raise AIPlanError("AI returned malformed JSON (%s)." % e)
     if not isinstance(data, dict):
         raise AIPlanError("AI returned non-object JSON.")
@@ -988,7 +1027,7 @@ def generate_ai_plans(parsed, db_data, verbose=True):
     print("[TripMind AI] LLM request: %d chars prompt, waiting for provider ..."
           % len(prompt))
     t0 = time.time()
-    raw = call_ai(prompt, _SYSTEM, max_tokens=2200, temperature=0.3)
+    raw = call_ai(prompt, _SYSTEM, max_tokens=6000, temperature=0.3)
     if not raw:
         raise AIPlanError("AI provider returned no content (see the "
                           "[TripMind AI] LLM lines above for the failing "
@@ -996,7 +1035,26 @@ def generate_ai_plans(parsed, db_data, verbose=True):
     print("[TripMind AI] LLM response: %d chars in %.1fs: %s"
           % (len(raw), time.time() - t0, raw[:200].replace("\n", " ")))
 
-    selections = _parse_response(raw)
+    try:
+        selections = _parse_response(raw)
+    except AIPlanError as e:
+        # A truncated reply is worth one strict retry; every other failure
+        # (no inventory, unusable plan) stays a hard, honest error.
+        if "malformed" not in str(e) and "non-JSON" not in str(e):
+            raise
+        print("[TripMind AI] Retrying once with a stricter JSON-only prompt (%s)" % e)
+        t1 = time.time()
+        raw2 = call_ai(
+            prompt + "\n\nIMPORTANT: reply with the JSON object only. No prose, "
+                      "no commentary, and keep activityOrder to the listed spot "
+                      "ids only.", _SYSTEM, max_tokens=6000, temperature=0.1)
+        if not raw2:
+            raise AIPlanError("AI provider returned no content on the retry (see "
+                              "the [TripMind AI] LLM lines above for the failing "
+                              "provider and reason).")
+        print("[TripMind AI] LLM retry response: %d chars in %.1fs"
+              % (len(raw2), time.time() - t1))
+        selections = _parse_response(raw2)
     plans = []
     for sel in selections:
         try:

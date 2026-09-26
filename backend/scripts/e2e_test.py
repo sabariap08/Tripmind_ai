@@ -124,6 +124,14 @@ def main():
         "yearsExperience": "5", "pricePerHour": "700", "pricePerDay": "4000"})
     approve_user(gid)
 
+    # Trains may only be created by a Railways/IRCTC admin (see _can_manage_ttype).
+    rae = "e2e_railway_%s@test.in" % POSTFIX
+    _, reid = signup(c, "RAILWAY_ADMIN", rae, "Passw0rd@123", {
+        "companyName": "E2E Railways %s" % POSTFIX, "serviceArea": "Tamil Nadu",
+        "companyCity": "Chennai", "companyAddress": "Egmore",
+        "companyPhone": "9999999995"})
+    approve_user(reid)
+
     # ------------------------------------------------------- fixtures (catalogues)
     def approve_doc(coll, doc_id):
         get_collection(coll).update_one(
@@ -216,7 +224,9 @@ def main():
                                 {"day": "Sat", "departure": "20:30", "arrival": "04:00"},
                                 {"day": "Sun", "departure": "20:30", "arrival": "04:00"}]}})
 
-    # Second service on the same route so AI transport switching has an alternative.
+    # Second service on the same route so AI transport switching has an
+    # alternative. Trains are registered by the Railways admin.
+    login(c, rae, "Passw0rd@123")
     r = c.post("/api/transport/register", json={
         "type": "TRAIN", "trainNumber": "E2E-TRN-%s" % POSTFIX,
         "trainName": "E2E Express", "boardingStation": "Coimbatore Jn", "departureTime": "19:00",
@@ -268,6 +278,13 @@ def main():
     ok("duplicate booking rejected", r.status_code == 400, str(jget(r))[:160])
     ok("standalone booking starts PENDING",
        st_book.get("paymentStatus") == "PENDING", str(st_book.get("paymentStatus")))
+
+    # Standalone hotel booking so the hotel provider propagation check does not
+    # depend on whether the AI happened to pick a hotel for the test plan.
+    r = c.post("/api/bookings", json={
+        "type": "HOTEL", "hotelId": hotel_id, "roomTypeId": room_type_id, "qty": 1,
+        "details": {"checkin": "2026-10-05", "checkout": "2026-10-06"}})
+    ok("standalone hotel booking", r.status_code == 201, str(jget(r))[:160])
 
     # --------------------------------------------------- payment (standalone + trip)
     c.post("/api/wallet/deposit", json={"amount": 20000})
@@ -373,7 +390,8 @@ def main():
     r = c.post("/api/assistant/chat", json={
         "message": "I want to pay for my trip", "tripId": pay_trip_id})
     b = jget(r)
-    ok("assistant proposes pay action", b.get("action", {}).get("type") == "pay_trip", str(b)[:240])
+    ok("assistant proposes pay action",
+       (b.get("action") or {}).get("type") == "pay_trip", str(b)[:240])
     r = c.post("/api/assistant/action", json={
         "type": "pay_trip", "params": {"trip_id": pay_trip_id}})
     b = jget(r)
@@ -382,18 +400,55 @@ def main():
     ok("assistant-paid trip COMPLETED",
        pay_doc.get("paymentStatus") == "COMPLETED", str(pay_doc.get("paymentStatus")))
 
-    r = c.post("/api/assistant/chat", json={"message": "I want to switch my transport"})
+    # Nothing is applied before the traveller confirms. (This fixture has no
+    # second approved transport on the corridor, so the switch itself cannot be
+    # offered - what must hold is that the trip is never mutated silently.)
+    doc = get_collection("trips").find_one({"_id": pay_trip_id}) or {}
+    r = c.post("/api/assistant/chat", json={
+        "message": "I want to switch my transport", "tripId": pay_trip_id})
     b = jget(r)
-    ok("assistant proposes change_transport", b.get("action", {}).get("type") == "change_transport", str(b)[:240])
-    act = b.get("action") or {}
-    r = c.post("/api/assistant/action", json={"type": "change_transport",
-                                              "params": act.get("params")})
+    reply = (b.get("response") or "").lower()
+    ok("assistant did not claim the switch was done",
+       not any(w in reply for w in ("has been switched", "i switched",
+                                     "successfully switched", "is now switched")),
+       str(b.get("response"))[:140])
+    doc_after = get_collection("trips").find_one({"_id": pay_trip_id}) or {}
+    ok("trip untouched until confirmation",
+       not any(x.get("switchedFrom") or x.get("switchedTo")
+               for x in (doc_after.get("bookings") or [])), "")
+
+    # Confirm-before-change flow used by the UI's Confirm Change button:
+    # POST /api/trips/<id>/modify applies the proposed inputs, then the client
+    # regenerates the plan.
+    r = c.post("/api/trips", json={
+        "origin": "Coimbatore", "destination": "Chennai", "startDate": "2026-10-20",
+        "endDate": "2026-10-21", "budget": 40000, "travelers": 2,
+        "travelStyle": "BALANCED", "transportType": "BUS"})
+    switch_trip = jget(r).get("tripId")
+    c.post("/api/trips/%s/generate" % switch_trip)
+    snapshot = get_collection("trips").find_one({"_id": switch_trip}) or {}
+    r = c.post("/api/assistant/chat", json={
+        "message": "I want to modify my trip, please make it more relaxing",
+        "tripId": switch_trip})
     b = jget(r)
-    ok("assistant switch transport executes", r.status_code == 200, str(b)[:220])
-    trip_doc = get_collection("trips").find_one({"_id": pay_trip_id})
-    switched = [x for x in trip_doc.get("bookings", [])
-                if x.get("switchedFrom") or x.get("switchedTo")]
-    ok("switch recorded on trip", len(switched) >= 1, "switched=%d" % len(switched))
+    proposal = b.get("change") or {}
+    ok("assistant proposes a change", bool(proposal.get("updates")), str(b)[:240])
+    live = get_collection("trips").find_one({"_id": switch_trip}) or {}
+    ok("assistant did not mutate the trip while proposing",
+       all(live.get(k) == snapshot.get(k)
+           for k in (proposal.get("updates") or {}) if k in snapshot),
+       str(proposal.get("updates"))[:120])
+    r = c.post("/api/trips/%s/modify" % switch_trip,
+               json={"updates": proposal.get("updates") or {}})
+    ok("confirmed change accepted", r.status_code in (200, 201), str(jget(r))[:200])
+    after = get_collection("trips").find_one({"_id": switch_trip}) or {}
+    ok("confirmed inputs were applied to the trip",
+       any(after.get(k) != snapshot.get(k) for k in (proposal.get("updates") or {})),
+       str(proposal.get("updates"))[:120])
+    r = c.post("/api/trips/%s/generate" % switch_trip)
+    b = jget(r)
+    ok("regeneration after confirmation returns a plan",
+       b.get("selectedPlan") is not None, "source=%s" % b.get("source"))
 
     # --------------------------------------------------- profile update (PATCH /api/users/me)
     r = c.patch("/api/users/me", json={"name": "E2E Renamed",
