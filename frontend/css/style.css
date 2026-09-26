@@ -1391,3 +1391,172 @@ a:hover { text-decoration: underline; }
   .dest-grid { grid-template-columns: 1fr 1fr; gap: .7rem; }
   .dest-cap strong { font-size: 1.1rem; }
 }
+
+/* ==========================================================================
+   Mobile + install support
+   Appended last so these rules win over the desktop defaults above without
+   rewriting them. Desktop layout is untouched; every rule here is inside a
+   width/coarse-pointer query, and the install banner styles are the only
+   always-on additions.
+   ========================================================================== */
+
+/* --- never let a page scroll sideways ------------------------------------ */
+html, body { max-width: 100%; overflow-x: hidden; }
+img, video, canvas, svg { max-width: 100%; }
+img, video, canvas { height: auto; }
+/* long ids / URLs / provider messages must wrap instead of stretching a card */
+p, li, td, th, span, div { overflow-wrap: anywhere; word-break: break-word; }
+
+/* --- iOS/Android text inflation ----------------------------------------- */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+/* --- safe areas (notches, home indicator) -------------------------------- */
+.navbar { padding-top: calc(1rem + env(safe-area-inset-top)); }
+body { padding-bottom: env(safe-area-inset-bottom); }
+
+/* --- touch behaviour + finger-sized targets ------------------------------ */
+a, button, .btn, .tab, input, select, textarea, .mm-chip, .nav-toggle {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(245, 158, 11, 0.18);
+}
+@media (pointer: coarse) {
+  .btn, .btn-sm, button, .tab, .nav-toggle {
+    min-height: 44px;                 /* WCAG 2.5.5 finger target */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .tab { padding: 0.7rem 1.1rem; }
+  select, input, textarea { min-height: 44px; }
+}
+
+/* --- small screens ------------------------------------------------------- */
+@media (max-width: 768px) {
+  .container { padding-left: 1rem; padding-right: 1rem; }
+
+  /* iOS zooms any focused field whose font is under 16px, which then leaves
+     the user zoomed-in on the rest of the form. */
+  input, select, textarea, .form-input, .form-select, .form-textarea {
+    font-size: 16px;
+    max-width: 100%;
+  }
+
+  /* wide tables become horizontally scrollable blocks instead of overflowing */
+  table, .cin-trip-table, .data-table, .table {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+  th, td { white-space: nowrap; }
+
+  /* sticky action bars wrap rather than push the page wide */
+  .book-bar, .saving-line, .card-header, .modal-header {
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+  .book-bar .btn { width: 100%; }
+
+  /* full-width stacked actions */
+  .btn-block-mobile { width: 100%; }
+}
+
+/* --- phones: chat becomes a bottom sheet -------------------------------- */
+@media (max-width: 640px) {
+  .chat-panel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 100%;
+    max-height: 78vh;
+    border-radius: 1rem 1rem 0 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    z-index: 90;
+  }
+  .chat-panel .chat-header { border-radius: 1rem 1rem 0 0; }
+  .chat-toggle {
+    bottom: calc(1rem + env(safe-area-inset-bottom));
+    right: calc(1rem + env(safe-area-inset-right));
+  }
+  .chat-messages { max-height: 46vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+}
+
+/* --- itinerary rows stack instead of cramming ---------------------------- */
+@media (max-width: 560px) {
+  .tl-row { flex-direction: column; gap: 0.3rem; }
+  .tl-cost, .tl-cost.err { text-align: left; max-width: 100%; }
+  .input-grid { grid-template-columns: 1fr; }
+  .grid-2 { grid-template-columns: 1fr !important; }
+  .grid-side { grid-template-columns: 1fr !important; }
+}
+
+/* --- narrow phones: every multi-column grid becomes one column ------------
+   auto-fit/minmax() tracks wider than the viewport (minmax(320px,...) on a
+   320px phone) would otherwise overflow the page. */
+@media (max-width: 480px) {
+  .input-grid, .overview-grid, .details-grid, .role-grid, .detail-list,
+  .image-grid, .vehicle-grid, .room-grid, .dest-grid, .cin-trip-grid,
+  .mm-options-grid, .mm-branch-grid, .mm-reach-grid, .mm-spots-grid,
+  .plans-grid, .trips-grid, .planner-grid, .grid-2, .grid-side {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* --- very narrow phones -------------------------------------------------- */
+@media (max-width: 400px) {
+  .container { padding-left: 0.75rem; padding-right: 0.75rem; }
+  .navbar { padding: 0.6rem 0; }
+  .navbar-brand { font-size: 1.15rem; }
+  .dest-grid { grid-template-columns: 1fr; }
+  .cin-stats { gap: 1rem; }
+  .cin-stats > * { min-width: 0; }
+}
+
+/* ==========================================================================
+   Install / download app banner (added by js/pwa.js)
+   ========================================================================== */
+.pwa-install {
+  position: fixed;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  z-index: 9999;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 0.8rem;
+  background: #ffffff;
+  border: 1px solid var(--slate-200, #e2e8f0);
+  border-radius: 0.9rem;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.22);
+  font-size: 0.85rem;
+  animation: pwa-install-in 0.25s ease-out;
+}
+.pwa-install-body { display: flex; align-items: center; gap: 0.6rem; flex: 1 1 190px; min-width: 0; }
+.pwa-install-icon { flex: none; display: inline-flex; }
+.pwa-install-icon img { border-radius: 0.45rem; display: block; }
+.pwa-install-text { display: flex; flex-direction: column; min-width: 0; }
+.pwa-install-text strong { font-size: 0.88rem; }
+.pwa-install-text span { color: var(--slate-500, #64748b); font-size: 0.78rem; }
+.pwa-install-actions { display: flex; gap: 0.4rem; flex: none; }
+.pwa-install-actions .btn { min-height: 40px; }
+.pwa-install .pwa-install-no { color: var(--slate-500, #64748b); }
+@keyframes pwa-install-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pwa-install { animation: none; }
+}
+
+/* Standalone (installed) mode: keep the app clear of the notch. */
+@media (display-mode: standalone) {
+  .navbar { padding-top: calc(0.6rem + env(safe-area-inset-top)); }
+}
