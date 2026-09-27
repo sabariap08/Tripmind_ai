@@ -2013,7 +2013,7 @@ def voice_normalize():
 from config import ROLES, PROVIDER_ROLES, APPROVAL_STATUSES, DEV_MODE
 from services.auth import (
     register_user, register_provider, login_user, logout_user, current_user,
-    require_login, require_admin, is_admin,
+    require_login, require_admin, is_admin, _public_user,
 )
 from services import duplicate
 from services.mongodb import get_collection
@@ -2040,9 +2040,14 @@ def register():
         return jsonify({"error": "Invalid role."}), 400
     if err:
         return jsonify({"error": err}), 400
-    msg = ("Account created. Your provider account is pending Admin approval."
-           if user["role"] in PROVIDER_ROLES else "Account created. Please log in.")
-    return jsonify({"user": user, "message": msg}), 201
+    is_provider = user["role"] in PROVIDER_ROLES
+    msg = ("Account created. Your partner account is pending Main Admin approval."
+           if is_provider else "Account created. Please log in.")
+    # Return the public session shape (masked identity, no password hash) plus
+    # the raw _id for backwards compatibility with existing clients.
+    public = _public_user(user)
+    public["_id"] = user["_id"]
+    return jsonify({"user": public, "message": msg}), 201
 
 
 @auth_bp.route("/api/auth/check-availability", methods=["GET"])
@@ -2251,7 +2256,7 @@ def admin_set_approval(user_id):
     return jsonify({"message": "Account updated successfully.", "user": pub})''',
     'transport': r'''from flask import Blueprint, request, jsonify
 from config import ROLES, TRANSPORT_TYPES
-from services.auth import require_roles, require_login, is_admin, require_approved_provider
+from services.auth import require_roles, require_login, is_admin, require_approved_provider, is_irctc_admin
 from services.transport_service import (create_transport, update_transport,
                                         get_transport, list_transports,
                                         set_status, set_service_profile,
@@ -2292,12 +2297,18 @@ def _summary(t):
 
 
 def _can_manage_ttype(user, ttype):
-    """Authorization matrix: only Railways/IRCTC can create/manage trains."""
+    """Authorization matrix.
+
+    Train inventory is operated solely by Indian Railways / IRCTC, so TRAIN is
+    restricted to the single authorised IRCTC account. The check is on the
+    account email, not just the role, so a railway account created any other way
+    cannot add trains. Buses, flights, cabs and autos belong to Transport Admins.
+    """
     if is_admin(user):
         return True
     role = user.get("role")
     if ttype == "TRAIN":
-        return role == ROLES["RAILWAY_ADMIN"]
+        return is_irctc_admin(user)
     return role == ROLES["TRANSPORT_ADMIN"]
 
 
@@ -2394,8 +2405,10 @@ lounge_bp = Blueprint("lounge", __name__)
 
 
 def _is_railway(user):
-    from config import ROLES
-    return user.get("role") == ROLES["RAILWAY_ADMIN"]
+    """Railway lounge management is restricted to the authorised IRCTC account
+    (or Main Admin), matched on email as well as role."""
+    from services.auth import is_irctc_admin
+    return is_irctc_admin(user)
 
 
 @lounge_bp.route("/api/lounge", methods=["GET"])
@@ -2463,7 +2476,7 @@ from config import ROLES
 from services.auth import (require_roles, require_login, is_admin,
                            require_approved_provider)
 from services.tourist_service import (create_spot, update_spot, get_spot,
-                                      list_spots, set_status,
+                                      list_spots, set_status, list_my_spots,
                                       add_guide_location, list_guide_locations,
                                       create_tour, list_tours, get_tour,
                                       set_tour_status)
@@ -2477,6 +2490,14 @@ tourist_bp = Blueprint("tourist", __name__)
 def spots():
     city = request.args.get("city")
     return jsonify({"spots": list_spots(city=city)})
+
+
+@tourist_bp.route("/api/spots/mine", methods=["GET"])
+@require_approved_provider
+def my_spots():
+    if request.current_user["role"] != ROLES["TOURIST_SPOT_ADMIN"]:
+        return jsonify({"error": "You do not have access to this resource."}), 403
+    return jsonify({"spots": list_my_spots(request.current_user["id"])})
 
 
 @tourist_bp.route("/api/spots", methods=["POST"])
@@ -3657,6 +3678,444 @@ def verify_ticket(token):
         "type": booking.get("type"),
         "date": booking.get("date"),
     })''',
+    'partner': r'''"""Partner Hub API: shared role metadata, passenger profiles, pre-trip
+checklists, in-app notifications and the Main Admin partner approval queue.
+
+Everything role-specific about registration is served from
+``services.partner_schema`` so the frontend never hardcodes districts, fields
+or verification requirements.
+"""
+from flask import Blueprint, request, jsonify
+from datetime import datetime
+
+from config import ROLES, PARTNER_ROLES, PARTNER_ROLE_MAP, TAMIL_NADU_DISTRICTS
+from services.auth import (require_login, require_admin, is_partner,
+                           is_irctc_admin, provider_is_approved)
+from services import partner_schema, passenger_service, checklist_service
+from services import notification_service
+from services.mongodb import get_collection
+
+partner_bp = Blueprint("partner", __name__)
+
+
+def _now():
+    return datetime.utcnow().isoformat()
+
+
+# ---------------------------------------------------------------------------
+# Public metadata
+# ---------------------------------------------------------------------------
+@partner_bp.route("/api/partner/meta", methods=["GET"])
+def meta():
+    """Everything the Partner Hub registration wizard needs: role list, role
+    schemas, weekly days, the 38 Tamil Nadu districts and upload limits.
+    Public on purpose so the sign-up form can render before sign-in."""
+    return jsonify(partner_schema.partner_meta())
+
+
+@partner_bp.route("/api/partner/roles", methods=["GET"])
+def roles():
+    return jsonify({
+        "roles": [
+            {"role": role, "slug": spec["slug"], "label": spec["label"],
+             "blurb": spec["blurb"]}
+            for role, spec in PARTNER_ROLE_MAP.items()
+        ],
+    })
+
+
+@partner_bp.route("/api/partner/districts", methods=["GET"])
+def districts():
+    return jsonify({"districts": list(TAMIL_NADU_DISTRICTS),
+                    "count": len(TAMIL_NADU_DISTRICTS)})
+
+
+@partner_bp.route("/api/partner/schema/<role>", methods=["GET"])
+def schema(role):
+    role = (role or "").strip().upper()
+    if role not in PARTNER_ROLE_MAP:
+        return jsonify({"error": "Unknown partner role."}), 404
+    return jsonify(partner_schema.role_meta(role))
+
+
+@partner_bp.route("/api/partner/validate", methods=["POST"])
+def validate_registration():
+    """Dry-run the registration rules so the wizard can show problems before
+    the account is created. Returns the full error list, never creates an
+    account."""
+    data = request.get_json() or {}
+    role = (data.get("role") or "").strip().upper()
+    if role not in PARTNER_ROLE_MAP:
+        return jsonify({"error": "Unknown partner role."}), 400
+    errors = partner_schema.validate_registration(role, data)
+    return jsonify({"valid": not errors, "errors": errors,
+                    "verification": partner_schema.verification_summary(role)})
+
+
+# ---------------------------------------------------------------------------
+# Partner hub home
+# ---------------------------------------------------------------------------
+@partner_bp.route("/api/partner/me", methods=["GET"])
+@require_login
+def me():
+    user = request.current_user
+    role = user.get("role")
+    payload = {
+        "user": user,
+        "isPartner": is_partner(user),
+        "isMainAdmin": user.get("role") == ROLES["ADMIN"],
+        "isIrctc": is_irctc_admin(user),
+        "isApproved": provider_is_approved(user),
+        "canPublish": is_partner(user) and provider_is_approved(user),
+    }
+    if is_partner(user):
+        payload["schema"] = partner_schema.role_meta(role)
+        payload["verification"] = partner_schema.verification_summary(role)
+    return jsonify(payload)
+
+
+# ---------------------------------------------------------------------------
+# Passenger profiles (owner only - never visible to partners)
+# ---------------------------------------------------------------------------
+@partner_bp.route("/api/passengers", methods=["GET", "POST"])
+@require_login
+def passengers():
+    user = request.current_user
+    owner_id = user["id"]
+    if is_partner(user):
+        return jsonify({"error": "Partner accounts cannot manage traveller profiles."}), 403
+    if request.method == "GET":
+        return jsonify({"passengers": passenger_service.list_passengers(owner_id)})
+    data = request.get_json() or {}
+
+    passenger, err = passenger_service.create_passenger(owner_id, data, user=user)
+    if err:
+        return jsonify({"error": err}), 400
+    return jsonify({"passenger": passenger}), 201
+
+
+@partner_bp.route("/api/passengers/<pid>", methods=["GET", "PUT", "DELETE"])
+@require_login
+def passenger_detail(pid):
+    user = request.current_user
+    owner_id = user["id"]
+    if is_partner(user):
+        return jsonify({"error": "Partner accounts cannot manage traveller profiles."}), 403
+    if request.method == "GET":
+        passenger = passenger_service.get_passenger(pid, owner_id)
+        if not passenger:
+            return jsonify({"error": "Traveller not found."}), 404
+        return jsonify({"passenger": passenger})
+    if request.method == "PUT":
+        passenger, err = passenger_service.update_passenger(pid, owner_id,
+                                                            request.get_json() or {})
+        if err:
+            return jsonify({"error": err}), (404 if "not found" in err.lower() else 400)
+        return jsonify({"passenger": passenger})
+    ok, err = passenger_service.delete_passenger(pid, owner_id)
+    if err:
+        return jsonify({"error": err}), 400
+    return jsonify({"deleted": True})
+
+
+@partner_bp.route("/api/passengers/<pid>/default", methods=["POST"])
+@require_login
+def passenger_default(pid):
+    user = request.current_user
+    if is_partner(user):
+        return jsonify({"error": "Partner accounts cannot manage traveller profiles."}), 403
+    passenger, err = passenger_service.set_default(pid, user["id"])
+    if err:
+        return jsonify({"error": err}), 404
+    return jsonify({"passenger": passenger})
+
+
+@partner_bp.route("/api/passengers/party", methods=["POST"])
+@require_login
+def party_preview():
+    """Preview the non-identifying party summary exactly as a partner booking
+    partner will see it. Useful for the passenger to confirm consent choices."""
+    user = request.current_user
+    data = request.get_json() or {}
+    snapshot, err = passenger_service.party_snapshot(
+        user["id"], data.get("passengerIds") or [], data.get("travellers") or 1)
+    if err:
+        return jsonify({"error": err}), 400
+    return jsonify({"party": snapshot,
+                    "privacyNote": ("Partners see only a headcount and coarse "
+                                    "requirements - never names, ages in years, "
+                                    "contact details or ID proof.")})
+
+
+# ---------------------------------------------------------------------------
+# Pre-trip checklists
+# ---------------------------------------------------------------------------
+@partner_bp.route("/api/checklists", methods=["GET"])
+@require_login
+def checklist_list():
+    user = request.current_user
+    if is_partner(user):
+        return jsonify({"error": "Checklists are a passenger feature."}), 403
+    rows = checklist_service.list_checklists(user["id"])
+    return jsonify({"checklists": rows,
+                    "progress": [checklist_service.progress(r) for r in rows]})
+
+
+@partner_bp.route("/api/checklists/<booking_id>", methods=["GET", "POST", "DELETE"])
+@require_login
+def checklist_detail(booking_id):
+    user = request.current_user
+    if is_partner(user):
+        return jsonify({"error": "Checklists are a passenger feature."}), 403
+
+    if request.method == "DELETE":
+        get_collection("checklists").delete_one(
+            {"_id": checklist_service._checklist_id(user["id"], booking_id),
+             "ownerId": user["id"]})
+        return jsonify({"deleted": True})
+
+    if request.method == "POST":
+        booking = get_collection("bookings").find_one(
+            {"_id": booking_id, "userId": user["id"]})
+        if not booking:
+            # Fall back to any booking the passenger owns (legacy owner field).
+            booking = get_collection("bookings").find_one(
+                {"_id": booking_id, "ownerId": user["id"]})
+        if not booking:
+            return jsonify({"error": "Booking not found."}), 404
+        regenerate = bool((request.get_json() or {}).get("regenerate"))
+        doc, err = checklist_service.generate_checklist(
+            user["id"], booking, passenger_ids=booking.get("passengerIds"),
+            regenerate=regenerate)
+        if err:
+            return jsonify({"error": err}), 400
+        return jsonify({"checklist": doc,
+                        "progress": checklist_service.progress(doc)})
+
+    doc = checklist_service.get_checklist(user["id"], booking_id)
+    if not doc:
+        return jsonify({"error": "No checklist yet for this booking."}), 404
+    return jsonify({"checklist": doc, "progress": checklist_service.progress(doc)})
+
+
+@partner_bp.route("/api/checklists/<booking_id>/items", methods=["POST"])
+@require_login
+def checklist_add_item(booking_id):
+    user = request.current_user
+    if is_partner(user):
+        return jsonify({"error": "Checklists are a passenger feature."}), 403
+    data = request.get_json() or {}
+    doc, err = checklist_service.add_custom_item(
+        user["id"], checklist_service._checklist_id(user["id"], booking_id),
+        data.get("text"), data.get("category") or "OTHER",
+        data.get("dueOffsetDays", 1))
+    if err:
+        return jsonify({"error": err}), 400
+    return jsonify({"checklist": doc, "progress": checklist_service.progress(doc)})
+
+
+@partner_bp.route("/api/checklists/<booking_id>/items/<item_id>", methods=["PATCH", "DELETE"])
+@require_login
+def checklist_item(booking_id, item_id):
+    user = request.current_user
+    if is_partner(user):
+        return jsonify({"error": "Checklists are a passenger feature."}), 403
+    checklist_id = checklist_service._checklist_id(user["id"], booking_id)
+    if request.method == "DELETE":
+        doc, err = checklist_service.remove_item(user["id"], checklist_id, item_id)
+    else:
+        data = request.get_json() or {}
+        doc, err = checklist_service.set_item_state(
+            user["id"], checklist_id, item_id, bool(data.get("done")))
+    if err:
+        return jsonify({"error": err}), (404 if "not found" in err.lower() else 400)
+    return jsonify({"checklist": doc, "progress": checklist_service.progress(doc)})
+
+
+# ---------------------------------------------------------------------------
+# Notifications
+# ---------------------------------------------------------------------------
+@partner_bp.route("/api/notifications", methods=["GET"])
+@require_login
+def notifications():
+    user = request.current_user
+    limit = request.args.get("limit", 30)
+    unread = request.args.get("unread") in ("1", "true", "yes")
+    return jsonify({"notifications": notification_service.list_notifications(
+        user["id"], limit=limit, unread_only=unread),
+        "unread": notification_service.unread_count(user["id"]),
+        "emailEnabled": notification_service.notifications_configured()})
+
+
+@partner_bp.route("/api/notifications/<nid>/read", methods=["POST"])
+@require_login
+def notification_read(nid):
+    user = request.current_user
+    if not notification_service.mark_read(user["id"], nid):
+        return jsonify({"error": "Notification not found."}), 404
+    return jsonify({"read": True, "unread": notification_service.unread_count(user["id"])})
+
+
+@partner_bp.route("/api/notifications/read-all", methods=["POST"])
+@require_login
+def notification_read_all():
+    user = request.current_user
+    count = notification_service.mark_all_read(user["id"])
+    return jsonify({"updated": count, "unread": 0})
+
+
+# ---------------------------------------------------------------------------
+# Main Admin partner approval queue
+# ---------------------------------------------------------------------------
+def _approval_view(doc):
+    """Approval queue row.
+
+    The Main Admin sees raw identity/proof references because they are the
+    reviewer. Everyone else only ever sees the masked public payload.
+    """
+    role = doc.get("role")
+    return {
+        "id": str(doc["_id"]),
+        "name": doc.get("name"),
+        "email": doc.get("email"),
+        "mobile": doc.get("mobile", ""),
+        "role": role,
+        "partnerLabel": (PARTNER_ROLE_MAP.get(role) or {}).get("label", role),
+        "partnerSlug": (PARTNER_ROLE_MAP.get(role) or {}).get("slug", ""),
+        "approvalStatus": doc.get("approvalStatus"),
+        "approvalReason": doc.get("approvalReason", ""),
+        "createdAt": doc.get("createdAt"),
+        "approvedAt": doc.get("approvedAt"),
+        "approvedBy": doc.get("approvedBy"),
+        "rejectedAt": doc.get("rejectedAt"),
+        "rejectedBy": doc.get("rejectedBy"),
+        "registration": doc.get("registration", {}),
+        "documents": doc.get("documents", []),
+        "imageCount": len(doc.get("images") or []),
+        "identityType": doc.get("identityType", ""),
+        "identityNumber": doc.get("identityNumber", ""),
+        "gst": doc.get("gst", ""),
+        "verification": partner_schema.verification_summary(role) if role in PARTNER_ROLE_MAP else {},
+        "requirements": (partner_schema.ROLE_DOCUMENTS.get(role, [])
+                         if role in PARTNER_ROLE_MAP else []),
+    }
+
+
+@partner_bp.route("/api/admin/partners", methods=["GET"])
+@require_admin
+def admin_partners():
+    status = (request.args.get("status") or "PENDING").strip().upper()
+    role = (request.args.get("role") or "").strip().upper()
+    query = {}
+    if status and status != "ALL":
+        query["approvalStatus"] = status
+    if role and role != "ALL":
+        query["role"] = role
+    rows = list(get_collection("users").find(query).sort("createdAt", -1).limit(200))
+    return jsonify({"partners": [_approval_view(r) for r in rows],
+                    "count": len(rows),
+                    "roles": sorted(PARTNER_ROLE_MAP.keys())})
+
+
+@partner_bp.route("/api/admin/partners/<pid>/decision", methods=["POST"])
+@require_admin
+def admin_partner_decision(pid):
+    """Approve or reject a partner registration.
+
+    Every provider role requires Main Admin approval, including roles that
+    previously auto-approved."""
+    admin = request.current_user
+    data = request.get_json() or {}
+    action = (data.get("action") or "").strip().lower()
+    if action not in ("approve", "reject"):
+        return jsonify({"error": "Action must be 'approve' or 'reject'."}), 400
+    target = get_collection("users").find_one({"_id": str(pid)})
+    if not target:
+        return jsonify({"error": "Partner account not found."}), 404
+    if target.get("role") not in PARTNER_ROLES:
+        return jsonify({"error": "That account is not a Partner Hub account."}), 400
+    if target.get("role") == ROLES["ADMIN"]:
+        return jsonify({"error": "Invalid role."}), 400
+
+    reason = (data.get("reason") or "").strip()[:500]
+    if action == "reject" and not reason:
+        return jsonify({"error": "A reason is required when rejecting a partner."}), 400
+
+    now = _now()
+    if action == "approve":
+        update = {
+            "approvalStatus": "APPROVED",
+            "approved": True,
+            "approvedAt": now,
+            "approvedBy": admin.get("email", ""),
+            "approvalReason": "",
+            "reviewedAt": now,
+        }
+        status = "APPROVED"
+    else:
+        update = {
+            "approvalStatus": "REJECTED",
+            "approved": False,
+            "rejectedAt": now,
+            "rejectedBy": admin.get("email", ""),
+            "approvalReason": reason,
+            "reviewedAt": now,
+        }
+        status = "REJECTED"
+    get_collection("users").update_one({"_id": target["_id"]}, {"$set": update})
+
+    # Publish the matching entity the moment the account is approved, so the
+    # partner's existing listing becomes visible without a second manual step.
+    entity_note = None
+    if action == "approve":
+        entity_note = _publish_on_approval(target)
+    elif action == "reject":
+        _unpublish_on_rejection(target)
+
+    # Tell the partner (in-app; see notification_service.approval_decision).
+    public_user = {k: target.get(k) for k in ("id", "email", "name", "role")}
+    public_user["id"] = str(target["_id"])
+    public_user["partner"] = (PARTNER_ROLE_MAP.get(target["role"]) or {})
+    notification_service.approval_decision(public_user, action == "approve", reason)
+
+    return jsonify({"id": str(target["_id"]), "approvalStatus": status,
+                    "entity": entity_note, "notified": True})
+
+
+def _publish_on_approval(user):
+    """Flip the partner's own listing from PENDING to APPROVED."""
+    owner_id = user["_id"]
+    role = user.get("role")
+    now = _now()
+    mapping = {
+        ROLES["TRANSPORT_ADMIN"]: "transports",
+        ROLES["HOTEL_ADMIN"]: "hotels",
+        ROLES["RESTAURANT_ADMIN"]: "restaurants",
+        ROLES["TOURIST_SPOT_ADMIN"]: "tourist_spots",
+    }
+    collection = mapping.get(role)
+    if not collection:
+        return None
+    result = get_collection(collection).update_many(
+        {"ownerId": owner_id, "status": {"$ne": "APPROVED"}},
+        {"$set": {"status": "APPROVED", "updatedAt": now}})
+    return {"collection": collection, "published": result.modified_count}
+
+
+def _unpublish_on_rejection(user):
+    mapping = {
+        ROLES["TRANSPORT_ADMIN"]: "transports",
+        ROLES["HOTEL_ADMIN"]: "hotels",
+        ROLES["RESTAURANT_ADMIN"]: "restaurants",
+        ROLES["TOURIST_SPOT_ADMIN"]: "tourist_spots",
+    }
+    collection = mapping.get(user.get("role"))
+    if not collection:
+        return None
+    get_collection(collection).update_many(
+        {"ownerId": user["_id"]}, {"$set": {"status": "REJECTED", "updatedAt": _now()}})
+    return collection
+''',
 }
 
 

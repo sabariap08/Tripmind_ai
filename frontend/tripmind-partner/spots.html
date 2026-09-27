@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>My spots — TripMind Partner Hub</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#06202b">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="../css/theme.css">
+    <link rel="stylesheet" href="css/partner.css">
+</head>
+<body>
+    <a class="ph-skip" href="#phMain">Skip to content</a>
+
+    <header class="ph-topbar">
+        <div class="ph-topbar__inner">
+            <button class="ph-burger" type="button" data-ph-burger aria-expanded="false" aria-controls="phDrawer" aria-label="Open menu"><span></span></button>
+            <a class="ph-wordmark" href="/tripmind-partner/dashboard">
+                <span class="ph-wordmark__mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="#06202b"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                <span class="ph-wordmark__text">
+                    <span class="ph-wordmark__name" data-ph-role-note>TripMind AI</span>
+                    <span class="ph-wordmark__hub">Partner Hub</span>
+                </span>
+            </a>
+            <div class="ph-topbar__spacer"></div>
+            <span class="ph-user">
+                <span class="ph-user__avatar" data-ph-user-avatar aria-hidden="true">P</span>
+                <span class="ph-user__name" data-ph-user-name>Partner</span>
+            </span>
+            <button class="tm-btn tm-btn--on-dark-ghost tm-btn--sm" type="button" data-ph-signout>Sign out</button>
+        </div>
+    </header>
+
+    <div class="ph-drawer" data-ph-drawer id="phDrawer" hidden>
+        <div class="ph-drawer__scrim" data-ph-drawer-scrim></div>
+        <div class="ph-drawer__panel" role="dialog" aria-modal="true" aria-label="Partner Hub menu">
+            <div class="ph-drawer__head">
+                <span class="ph-wordmark" style="color:var(--tm-ink)">
+                    <span class="ph-wordmark__mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="#06202b"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                    <span class="ph-wordmark__text">
+                        <span class="ph-wordmark__name">TripMind AI</span>
+                        <span class="ph-wordmark__hub" style="color:var(--tm-clay)">Partner Hub</span>
+                    </span>
+                </span>
+                <button class="ph-drawer__close" type="button" data-ph-drawer-close aria-label="Close menu">&times;</button>
+            </div>
+            <p class="ph-drawer__group">Operating</p>
+            <ul class="ph-drawer__links" data-ph-nav></ul>
+            <div class="ph-drawer__foot">
+                <span class="tm-2xs tm-muted">Signed in as <b data-ph-partner-type>tourist spot partner</b></span>
+                <a href="/portal.html">Open the provider console</a>
+                <a href="/">Traveller site</a>
+                <button class="tm-btn tm-btn--ghost tm-btn--sm" type="button" data-ph-signout style="margin-top:.5rem">Sign out</button>
+            </div>
+        </div>
+    </div>
+
+    <main class="ph-main" id="phMain">
+        <div class="ph-head">
+            <div>
+                <p class="tm-eyebrow">Places</p>
+                <h1>My spots</h1>
+                <p>Every attraction you have listed with TripMind, with its review status, entry fee and best times to
+                    visit.</p>
+            </div>
+            <div class="ph-head__actions">
+                <a class="tm-btn tm-btn--ghost" href="/tripmind-partner/bookings">Bookings</a>
+                <a class="tm-btn tm-btn--primary" href="#add">Add a spot</a>
+            </div>
+        </div>
+
+        <div class="ph-stats" id="phStats" aria-live="polite">
+            <div class="ph-stat"><b>—</b><span>Loading</span></div>
+        </div>
+
+        <div class="ph-note ph-note--wait" id="phPendingNote" hidden style="margin-bottom:1.5rem">
+            <div><b>Some spots are still under review.</b> The TripMind team checks every new spot before travellers can
+                see it, so these do not appear in the planner yet.</div>
+        </div>
+
+        <section class="ph-panel" id="phListPanel" style="margin-bottom:1.5rem">
+            <div class="ph-panel__head">
+                <div>
+                    <h2>Your spots</h2>
+                    <p>Approved spots are live for travellers.</p>
+                </div>
+            </div>
+            <div class="ph-panel__body ph-panel__body--flush" id="phList"></div>
+        </section>
+
+        <section class="ph-panel" id="add">
+            <div class="ph-panel__head">
+                <div>
+                    <h2 id="phFormTitle">Add a spot</h2>
+                    <p id="phFormSub">Travellers plan around visiting hours and crowds, so enter the opening hours and at
+                        least five recommended visiting slots.</p>
+                </div>
+            </div>
+            <div class="ph-panel__body">
+                <form id="phSpotForm" novalidate class="ph-form">
+                    <p class="ph-form__legend">Spot</p>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="sName">Spot name <span class="req">*</span></label>
+                            <input class="tm-input" type="text" id="sName" name="name" placeholder="e.g. Shore Temple" maxlength="120" required>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="sCategory">Category <span class="req">*</span></label>
+                            <select class="tm-select" id="sCategory" name="category" required>
+                                <option value="">Select a category</option>
+                                <option value="HISTORICAL">Historical</option>
+                                <option value="BEACH">Beach</option>
+                                <option value="HILL">Hill</option>
+                                <option value="WATERFALL">Waterfall</option>
+                                <option value="WILDLIFE">Wildlife</option>
+                                <option value="RELIGIOUS">Religious</option>
+                                <option value="MUSEUM">Museum</option>
+                                <option value="GARDEN">Garden</option>
+                                <option value="ADVENTURE">Adventure</option>
+                                <option value="OTHER">Other</option>
+                            </select>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                    </div>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="sCity">City <span class="req">*</span></label>
+                            <input class="tm-input" type="text" id="sCity" name="city" placeholder="e.g. Mahabalipuram" maxlength="80" required>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="sAddress">Address <span class="req">*</span></label>
+                            <input class="tm-input" type="text" id="sAddress" name="address" placeholder="Where travellers should go" maxlength="200" required>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                    </div>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="sEntry">Entry fee (₹)</label>
+                            <input class="tm-input" type="number" id="sEntry" name="entryFee" min="0" step="1" value="0" inputmode="numeric">
+                            <span class="tm-hint">Enter 0 if the spot is free to enter.</span>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="sOpen">Opens</label>
+                            <input class="tm-input" type="time" id="sOpen" name="openingTime" value="09:00">
+                        </div>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="sClose">Closes</label>
+                            <input class="tm-input" type="time" id="sClose" name="closingTime" value="18:00">
+                        </div>
+                    </div>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="sSlots">Recommended visiting slots <span class="req">*</span></label>
+                            <input class="tm-input" type="text" id="sSlots" name="recommendedTimes"
+                                placeholder="06:00-08:00, 08:00-10:00, 10:00-12:00" maxlength="300">
+                            <span class="tm-hint">Comma separated time ranges. At least five are needed so the planner can
+                                suggest the quietest time.</span>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                    </div>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="sDays">Working days (comma separated)</label>
+                            <input class="tm-input" type="text" id="sDays" name="workingDays" placeholder="Monday, Tuesday, Wednesday" maxlength="200">
+                        </div>
+                    </div>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="sImages">Image URLs (one per line) <span class="req">*</span></label>
+                            <textarea class="tm-textarea" id="sImages" name="images" rows="5"
+                                placeholder="https://…/1.jpg&#10;https://…/2.jpg&#10;https://…/3.jpg&#10;https://…/4.jpg&#10;https://…/5.jpg"></textarea>
+                            <span class="tm-hint">At least five images are required before a spot can be submitted.</span>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                    </div>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="sDescription">Description</label>
+                            <textarea class="tm-textarea" id="sDescription" name="description" rows="3"
+                                placeholder="What travellers will find here."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="ph-form__actions">
+                        <button class="tm-btn tm-btn--primary" type="submit" id="phSubmit">Submit for review</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+    </main>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/ui.js"></script>
+    <script src="js/partner.js"></script>
+    <script src="js/catalogue.js"></script>
+    <script>
+        (function () {
+            var P = TM_PARTNER;
+
+            P.boot({
+                view: function (state) {
+                    if (state.role !== 'TOURIST_SPOT_ADMIN') {
+                        P.go('dashboard');
+                        return;
+                    }
+                    TM_CATALOGUE.mount({
+                        form: '#phSpotForm',
+                        list: '#phList',
+                        stats: '#phStats',
+                        pendingNote: '#phPendingNote',
+                        title: '#phFormTitle',
+                        sub: '#phFormSub',
+                        submit: '#phSubmit',
+                        entity: 'spot',
+                        addTitle: 'Add a spot',
+                        editTitle: 'Edit this spot',
+                        addSub: 'Travellers plan around visiting hours and crowds, so enter the opening hours and at least five recommended visiting slots.',
+                        editSub: 'A spot must always keep at least five images and five recommended visiting slots.',
+                        load: function () { return api.getMySpots().then(function (r) { return r.spots || []; }); },
+                        create: function (data) { return api.createSpot(data); },
+                        /* The spot update route keys off spotId in the body, so it
+                         * is merged in here rather than in the URL. */
+                        update: function (id, data) {
+                            data.spotId = id;
+                            return apiRequest('/api/spots', { method: 'PUT', body: data });
+                        },
+                        fields: TM_CATALOGUE.spotFields,
+                        row: function (v) {
+                            return {
+                                title: v.name || 'Spot',
+                                status: v.status,
+                                meta: [v.category, v.city, v.address].filter(Boolean).join(' · '),
+                                side: v.entryFee ? P.money(v.entryFee) + ' entry' : 'Free entry',
+                                detail: 'Open ' + (v.openingTime || '09:00') + '–' + (v.closingTime || '18:00') +
+                                    ((v.recommendedTimes || []).length
+                                        ? '  ·  quietest: ' + v.recommendedTimes.slice(0, 2).map(function (s) {
+                                            return s && s.from ? s.from : s;
+                                        }).join(', ')
+                                        : '')
+                            };
+                        }
+                    });
+                }
+            });
+        })();
+    </script>
+    <script src="/js/pwa.js" defer></script>
+</body>
+</html>

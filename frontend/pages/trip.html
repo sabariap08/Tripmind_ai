@@ -15,6 +15,9 @@
         .jr-rail__link:hover { background: var(--tm-white); color: var(--tm-ink); }
         .jr-rail__link[aria-current="true"] { background: var(--tm-ink); color: var(--tm-white); }
         .jr-wrap { max-width: 60rem; margin-inline: auto; }
+        /* The rail is sticky, so a naive scrollIntoView would park the section
+           heading underneath it. Reserve the rail's height for every jump. */
+        .jr-sec, [id^="sec"] { scroll-margin-top: calc(var(--jr-rail-h, 3.25rem) + .75rem); }
         .jr-sec { padding-block: clamp(2.25rem, 5vw, 3.5rem); border-top: 1px solid var(--tm-line); }
         .jr-sec:first-of-type { border-top: 0; }
         .jr-sec__head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--tm-s4); flex-wrap: wrap; margin-bottom: var(--tm-s5); }
@@ -790,15 +793,52 @@
         /* Kept for anything that still asks for a "tab": now a smooth jump. */
         function switchTab(name) {
             const target = document.getElementById('sec' + name.charAt(0).toUpperCase() + name.slice(1));
-            if (target) target.scrollIntoView({ behavior: TM.reducedMotion() ? 'auto' : 'smooth', block: 'start' });
+            if (!target) return;
+            target.scrollIntoView({ behavior: TM.reducedMotion() ? 'auto' : 'smooth', block: 'start' });
+            // A hidden rail still eats scroll-margin-top, so a manual jump has
+            // to clear the value it is about to compute.
+            target.focus({ preventScroll: true });
         }
 
         function initRailSpy() {
+            const rail = document.querySelector('.jr-rail');
             const links = Array.from(document.querySelectorAll('.jr-rail__link'));
             if (!links.length || !('IntersectionObserver' in window)) return;
+
+            // Publish the live rail height so scroll-margin-top always matches,
+            // whatever the wrap point, font size or zoom ends up being.
+            const syncRailHeight = () => {
+                if (rail) {
+                    document.documentElement.style.setProperty(
+                        '--jr-rail-h', rail.offsetHeight + 'px');
+                }
+            };
+            syncRailHeight();
+            if ('ResizeObserver' in window && rail) {
+                new ResizeObserver(syncRailHeight).observe(rail);
+            } else {
+                window.addEventListener('resize', syncRailHeight);
+            }
+
+            // Manual jumps must also beat smooth scrolling to the section,
+            // otherwise the observer can re-highlight the previous link while
+            // the page is still animating.
+            let locked = 0;
+            const lock = () => {
+                locked = Date.now() + 900;
+            };
+            document.addEventListener('click', e => {
+                const link = e.target.closest ? e.target.closest('.jr-rail__link') : null;
+                if (link) lock();
+            }, true);
+            document.addEventListener('keydown', e => {
+                if (e.key === 'Enter' || e.key === ' ' || e.key.startsWith('Arrow')) lock();
+            }, true);
+
             const byId = {};
             links.forEach(l => { byId[l.dataset.rail] = l; });
             const io = new IntersectionObserver(entries => {
+                if (Date.now() < locked) return;
                 entries.forEach(e => {
                     if (!e.isIntersecting) return;
                     links.forEach(l => l.removeAttribute('aria-current'));

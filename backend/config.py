@@ -55,18 +55,113 @@ TRANSPORT_TYPES = {
     "AUTO": {"label": "Auto Rickshaw", "group": "Road"},
 }
 
-# Roles that must pass Admin approval before operating on the platform.
-PROVIDER_ROLES = {ROLES["RAILWAY_ADMIN"], ROLES["TRANSPORT_ADMIN"], ROLES["TOURIST_SPOT_ADMIN"],
+# Roles that must pass Main Admin approval before operating on the platform.
+# RAILWAY_ADMIN is deliberately excluded from public registration: railway
+# inventory is operated solely by Indian Railways / IRCTC and can only be added
+# through the internal privileged account (see IRCTC_ADMIN_EMAIL).
+PROVIDER_ROLES = {ROLES["TRANSPORT_ADMIN"], ROLES["TOURIST_SPOT_ADMIN"],
                   ROLES["HOTEL_ADMIN"], ROLES["RESTAURANT_ADMIN"],
                   ROLES["GUIDE"]}
 
-# TripMind Partner Hub (/tripmind-partner) — the provider-facing experience for
-# transport services: bus operators, drivers/vehicle owners and travel
-# operators. These accounts reuse the TRANSPORT_ADMIN role (so the existing
-# approval flow, fleet documents and booking pipeline are untouched) and are the
-# only roles allowed inside the Partner Hub. Every other provider role keeps
-# using the provider portal (portal.html).
-PARTNER_ROLES = {ROLES["TRANSPORT_ADMIN"]}
+# The single IRCTC-authorised account permitted to add or manage TRAIN services
+# (and railway lounges). Enforced server-side on every train mutation.
+# Overridable only so a local demo environment can provision a matching
+# account - production must keep the default.
+IRCTC_ADMIN_EMAIL = os.getenv("IRCTC_ADMIN_EMAIL", "irctc@tripmind.com").strip().lower()
+RAILWAY_ADMIN_ROLE = ROLES["RAILWAY_ADMIN"]
+
+# TripMind Partner Hub (/tripmind-partner) — the single provider-facing
+# experience for every operational (non-passenger) role.
+#
+# Each entry describes how the role appears in the hub and whether it may be
+# self-registered publicly. Main Admin (ADMIN) is intentionally NOT listed: it
+# operates the hub, it does not live in it, and it can never be self-registered.
+# RAILWAY_ADMIN is also not listed because train inventory is restricted to the
+# authorised IRCTC account above.
+PARTNER_ROLE_MAP = {
+    ROLES["TRANSPORT_ADMIN"]: {
+        "slug": "transport",
+        "label": "Bus, Cab & Auto Operator",
+        "blurb": "Operate buses, cabs and auto rickshaws across Tamil Nadu.",
+        "selfRegister": True,
+    },
+    ROLES["HOTEL_ADMIN"]: {
+        "slug": "hotel",
+        "label": "Hotel, Homestay & Resort",
+        "blurb": "List rooms and properties for TripMind travellers.",
+        "selfRegister": True,
+    },
+    ROLES["RESTAURANT_ADMIN"]: {
+        "slug": "restaurant",
+        "label": "Restaurant & Cafe",
+        "blurb": "Accept TripMind dining reservations.",
+        "selfRegister": True,
+    },
+    ROLES["TOURIST_SPOT_ADMIN"]: {
+        "slug": "tourist-spot",
+        "label": "Tourist Spot, Attraction & Museum",
+        "blurb": "List attractions, museums and guides-only heritage sites.",
+        "selfRegister": True,
+    },
+    ROLES["GUIDE"]: {
+        "slug": "guide",
+        "label": "Tour Guide",
+        "blurb": "Offer licensed sightseeing and itinerary services.",
+        "selfRegister": True,
+    },
+}
+
+# Partner Hub membership = every self-registerable operational role.
+PARTNER_ROLES = set(PARTNER_ROLE_MAP)
+
+# Roles that own a public listing on the platform (i.e. a searchable entity in
+# addition to the account). Used to decide which dashboards/sections render.
+PARTNER_LISTING_ROLES = {
+    ROLES["TRANSPORT_ADMIN"], ROLES["HOTEL_ADMIN"],
+    ROLES["RESTAURANT_ADMIN"], ROLES["TOURIST_SPOT_ADMIN"],
+}
+
+# ------------------------------------------------------------------
+# Tamil Nadu districts (server-side single source of truth)
+# ------------------------------------------------------------------
+# 38 districts, per the Tamil Nadu Government (Lok Bhavan) district list and the
+# Revenue & Disaster Management Department Economic Policy Note 2025-26
+# ("The State is divided into 38 Districts"). The frontend never hardcodes a
+# district list; it renders whatever GET /api/partner/meta returns.
+TAMIL_NADU_DISTRICTS = (
+    "Ariyalur", "Chengalpattu", "Chennai", "Coimbatore", "Cuddalore",
+    "Dharmapuri", "Dindigul", "Erode", "Kallakurichi", "Kancheepuram",
+    "Karur", "Krishnagiri", "Madurai", "Mayiladuthurai", "Nagapattinam",
+    "Kanyakumari", "Namakkal", "Perambalur", "Pudukkottai", "Ramanathapuram",
+    "Ranipet", "Salem", "Sivaganga", "Tenkasi", "Thanjavur", "Theni",
+    "Thiruvallur", "Thiruvarur", "Thoothukudi", "Tiruchirappalli",
+    "Tirunelveli", "Tirupathur", "Tiruppur", "Tiruvannamalai",
+    "The Nilgiris", "Vellore", "Viluppuram", "Virudhunagar",
+)
+
+# ------------------------------------------------------------------
+# Partner media + verification limits
+# ------------------------------------------------------------------
+# Images are stored inline as data URIs on the user document, so the limits are
+# deliberately conservative to stay under MongoDB's 16 MB document ceiling.
+MIN_PARTNER_IMAGES = 5
+MAX_IMAGE_BYTES = 400 * 1024          # 400 KB per image
+MAX_IMAGES_PER_PARTNER = 10
+ALLOWED_IMAGE_MIME = ("image/jpeg", "image/png", "image/webp")
+MAX_DATA_URI_CHARS = 600 * 1024        # ~450 KB of base64 payload
+
+# ------------------------------------------------------------------
+# Optional email / notification delivery
+# ------------------------------------------------------------------
+# Empty SMTP config = notifications are recorded in-app and the send is skipped.
+# No message is ever fabricated or reported as "sent" when unconfigured.
+SMTP_HOST = os.getenv("SMTP_HOST", "")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587") or 587)
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+SMTP_FROM = os.getenv("SMTP_FROM", "") or SMTP_USER
+SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() in ("1", "true", "yes")
+NOTIFICATIONS_ENABLED = bool(SMTP_HOST and SMTP_FROM)
 
 # URL prefix of the Partner Hub. Every Partner Hub page lives under it and the
 # Flask app serves them from frontend/tripmind-partner/.

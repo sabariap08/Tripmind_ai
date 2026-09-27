@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Passenger Details — TripMind AI</title>
+    <meta name="description" content="Save the travellers you book for, so every TripMind booking is prepared for the right people.">
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        .px-wrap { max-width: 68rem; margin-inline: auto; }
+        .px-grid { display: grid; grid-template-columns: minmax(0, 20rem) minmax(0, 1fr); gap: clamp(1.25rem, 3vw, 2.5rem); align-items: start; }
+        @media (max-width: 900px) { .px-grid { grid-template-columns: 1fr; } }
+        .px-card { background: var(--tm-white); border: 1px solid var(--tm-line); border-radius: var(--tm-r-lg); box-shadow: var(--tm-sh-1); }
+        .px-card__head { display: flex; align-items: center; justify-content: space-between; gap: var(--tm-s3); padding: 1.1rem 1.25rem; border-bottom: 1px solid var(--tm-line); }
+        .px-card__body { padding: 1.25rem; }
+        .px-list { list-style: none; margin: 0; padding: 0; }
+        .px-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .3rem .85rem; align-items: center; padding: .95rem 1.25rem; border-bottom: 1px solid var(--tm-line-2); }
+        .px-item:last-child { border-bottom: 0; }
+        .px-item.is-default { background: rgba(15, 122, 88, .05); }
+        .px-avatar { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: var(--tm-f-sm); color: var(--tm-white); background: var(--tm-ink-3); grid-row: span 2; }
+        .px-item__name { font-weight: 640; color: var(--tm-ink); display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
+        .px-item__meta { grid-column: 2 / -1; font-size: var(--tm-f-xs); color: var(--tm-muted); }
+        .px-tag { display: inline-flex; align-items: center; gap: .25rem; padding: .1rem .5rem; border-radius: var(--tm-pill); font-size: var(--tm-f-2xs); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; background: rgba(15, 122, 88, .12); color: #0b6e4f; }
+        .px-tag--jade { background: rgba(15, 122, 88, .12); color: #0b6e4f; }
+        .px-tag--amber { background: rgba(234, 115, 21, .14); color: #a1500f; }
+        .px-tag--slate { background: rgba(6, 32, 43, .08); color: var(--tm-ink-soft); }
+        .px-actions { display: flex; gap: .3rem; flex-wrap: wrap; justify-content: flex-end; }
+        .px-secure { display: grid; gap: .5rem; padding: 1rem 1.25rem; background: var(--tm-sand-2); border: 1px solid var(--tm-line); border-radius: var(--tm-r-md); font-size: var(--tm-f-xs); color: var(--tm-ink-soft); }
+        .px-secure li { display: grid; grid-template-columns: auto 1fr; gap: .5rem; align-items: start; }
+        .px-secure svg { width: 16px; height: 16px; margin-top: .15rem; stroke: #0b6e4f; }
+        .px-field-note { font-size: var(--tm-f-2xs); color: var(--tm-muted); margin-top: .3rem; }
+        .px-consent { background: rgba(234, 115, 21, .07); border: 1px solid rgba(234, 115, 21, .28); border-radius: var(--tm-r-md); padding: 1rem 1.1rem; }
+        .px-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--tm-s4); }
+        .px-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--tm-s4); }
+        @media (max-width: 620px) { .px-grid-2, .px-grid-3 { grid-template-columns: 1fr; } }
+        .px-chips { display: flex; flex-wrap: wrap; gap: .4rem; }
+        .px-chip { display: inline-flex; align-items: center; gap: .35rem; padding: .38rem .7rem; border: 1px solid var(--tm-line); border-radius: var(--tm-pill); background: var(--tm-white); font-size: var(--tm-f-xs); color: var(--tm-ink-soft); cursor: pointer; min-height: 36px; }
+        .px-chip input { position: absolute; opacity: 0; pointer-events: none; }
+        .px-chip:has(input:checked) { background: var(--tm-ink); border-color: var(--tm-ink); color: var(--tm-white); }
+        .px-chip:has(input:focus-visible) { box-shadow: 0 0 0 3px rgba(6, 32, 43, .2); }
+        .px-empty { padding: 2.25rem 1.25rem; text-align: center; }
+        .px-flash { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%); z-index: 90; display: flex; align-items: center; gap: .6rem; padding: .7rem 1.1rem; border-radius: var(--tm-pill); background: var(--tm-ink); color: var(--tm-white); font-size: var(--tm-f-xs); box-shadow: var(--tm-sh-2); }
+        .px-flash[hidden] { display: none; }
+    </style>
+    <meta name="theme-color" content="#06202b">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+    <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TripMind AI">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-1290x2796.jpg">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-1170x2532.jpg">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-828x1792.jpg">
+    <link rel="stylesheet" href="/css/theme.css">
+    <script src="/js/ui.js"></script>
+</head>
+<body>
+    <a class="skip-link" href="#pxMain">Skip to your travellers</a>
+    <nav class="tm-nav" id="pxNav">
+        <div class="tm-container tm-nav__inner">
+            <a href="/" class="tm-brand" aria-label="TripMind AI home">
+                <span class="tm-brand__mark"><svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                <span class="tm-brand__text">
+                    <span class="tm-brand__name">TripMind AI</span>
+                    <span class="tm-brand__tag">Traveling Uniquely</span>
+                </span>
+            </a>
+            <div class="tm-nav__links">
+                <a class="tm-nav__link" href="dashboard.html">My Trips</a>
+                <a class="tm-nav__link" href="passengers.html" aria-current="page">Travellers</a>
+                <a class="tm-nav__link" href="/">Explore</a>
+            </div>
+            <a class="tm-btn tm-btn--secondary tm-btn--sm" href="planner.html">Plan a trip</a>
+            <button class="tm-nav__burger" type="button" aria-label="Open menu" aria-expanded="false" data-tm-drawer-open>
+                <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
+            </button>
+        </div>
+    </nav>
+    <div class="tm-drawer" id="pxDrawer" role="dialog" aria-modal="true" aria-label="Menu">
+        <div class="tm-drawer__head">
+            <a href="/" class="tm-brand">
+                <span class="tm-brand__mark"><svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                <span class="tm-brand__text"><span class="tm-brand__name">TripMind AI</span></span>
+            </a>
+            <button class="tm-drawer__close" type="button" aria-label="Close menu" data-tm-drawer-close>&times;</button>
+        </div>
+        <nav class="tm-drawer__links">
+            <a class="tm-drawer__link" href="dashboard.html">My Trips <span>01</span></a>
+            <a class="tm-drawer__link" href="passengers.html">Travellers <span>02</span></a>
+            <a class="tm-drawer__link" href="/">Explore <span>03</span></a>
+        </nav>
+    </div>
+
+    <main class="tm-section" id="pxMain">
+        <div class="tm-container px-wrap">
+            <header style="margin-bottom:clamp(1.5rem,4vw,2.5rem);max-width:44rem;">
+                <p class="tm-eyebrow">Saved travellers</p>
+                <h1 class="tm-h1" style="margin:.35rem 0 .6rem;">Passenger details</h1>
+                <p class="tm-muted">Save the people you travel with once. When you book, we will pick them up automatically and only ever share what a partner genuinely needs to prepare.</p>
+            </header>
+
+            <div class="px-grid">
+                <div style="display:grid;gap:var(--tm-s4);">
+                    <section class="px-card" aria-labelledby="pxListHead">
+                        <div class="px-card__head">
+                            <h2 class="tm-h4" id="pxListHead" style="margin:0;">Your travellers</h2>
+                            <span class="tm-f-2xs tm-muted" id="pxCount"></span>
+                        </div>
+                        <ul class="px-list" id="pxList" aria-live="polite"></ul>
+                        <div class="px-card__head" style="border-bottom:0;border-top:1px solid var(--tm-line);">
+                            <button class="tm-btn tm-btn--secondary tm-btn--sm tm-btn--block" type="button" id="pxAddBtn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                                Add a traveller
+                            </button>
+                        </div>
+                    </section>
+
+                    <section class="px-secure" aria-labelledby="pxSecureHead">
+                        <h2 class="tm-f-xs" id="pxSecureHead" style="margin:0;color:var(--tm-ink);letter-spacing:.08em;text-transform:uppercase;">What stays private</h2>
+                        <ul style="list-style:none;margin:0;padding:0;display:grid;gap:.55rem;">
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>ID numbers are reduced to a masked reference on our servers. The full number is never stored.</span></li>
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Health, mobility and dietary notes are saved <strong>only</strong> when you tick the consent box, and never shown to a partner as free text.</span></li>
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>A partner booking sees a headcount and coarse flags such as &ldquo;step-free access needed&rdquo; &mdash; never a name, an age or a diagnosis.</span></li>
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Only you can read this page. You can delete any traveller, and the record goes with them.</span></li>
+                        </ul>
+                    </section>
+                </div>
+
+                <section class="px-card" id="pxEditorCard" aria-labelledby="pxEditorHead" hidden>
+                    <div class="px-card__head">
+                        <h2 class="tm-h4" id="pxEditorHead" style="margin:0;">Add a traveller</h2>
+                        <button class="tm-btn tm-btn--ghost tm-btn--sm" type="button" id="pxCancelBtn">Close</button>
+                    </div>
+                    <div class="px-card__body">
+                        <form id="pxForm" novalidate>
+                            <p class="tm-eyebrow" id="pxFormEyebrow">New traveller</p>
+
+                            <div class="px-grid-2">
+                                <div class="tm-field">
+                                    <label class="tm-label" for="pxName">Full name <span aria-hidden="true" style="color:var(--tm-danger);">*</span></label>
+                                    <input class="tm-input" type="text" id="pxName" name="fullName" required autocomplete="name" placeholder="As printed on the ID">
+                                    <p class="px-field-note">Only you and your own bookings use this. Partners never see it.</p>
+                                </div>
+                                <div class="tm-field">
+                                    <label class="tm-label" for="pxRelationship">Relationship</label>
+                                    <select class="tm-select" id="pxRelationship" name="relationship">
+                                        <option value="SELF">Myself</option>
+                                        <option value="SPOUSE">Spouse or partner</option>
+                                        <option value="CHILD">Child</option>
+                                        <option value="PARENT">Parent</option>
+                                        <option value="SIBLING">Sibling</option>
+                                        <option value="FRIEND">Friend</option>
+                                        <option value="COLLEAGUE">Colleague</option>
+                                        <option value="OTHER">Other</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="px-grid-3">
+                                <div class="tm-field">
+                                    <label class="tm-label" for="pxDob">Date of birth</label>
+                                    <input class="tm-input" type="date" id="pxDob" name="dob" max="">
+                                    <p class="px-field-note" id="pxAgeNote">Used for age-appropriate planning.</p>
+                                </div>
+                                <div class="tm-field">
+                                    <label class="tm-label" for="pxGender">Gender</label>
+                                    <select class="tm-select" id="pxGender" name="gender">
+                                        <option value="">Prefer not to say</option>
+                                        <option value="FEMALE">Female</option>
+                                        <option value="MALE">Male</option>
+                                        <option value="OTHER">Other</option>
+                                    </select>
+                                </div>
+                                <div class="tm-field">
+                                    <label class="tm-label" for="pxPhone">Mobile</label>
+                                    <input class="tm-input" type="tel" id="pxPhone" name="phone" autocomplete="tel" placeholder="+91">
+                                </div>
+                            </div>
+
+                            <div class="px-grid-2">
+                                <div class="tm-field">
+                                    <label class="tm-label" for="pxEmail">Email</label>
+                                    <input class="tm-input" type="email" id="pxEmail" name="email" autocomplete="email" placeholder="Optional">
+                                </div>
+                                <div class="tm-field">
+                                    <label class="tm-label" for="pxEmergency">Emergency contact</label>
+                                    <input class="tm-input" type="text" id="pxEmergency" name="emergencyContact" placeholder="Name and number">
+                                    <p class="px-field-note">Kept for you. Never shared with a partner or an AI planner.</p>
+                                </div>
+                            </div>
+
+                            <fieldset style="border:1px solid var(--tm-line);border-radius:var(--tm-r-md);padding:1rem 1.1rem;margin:0 0 var(--tm-s4);">
+                                <legend class="tm-f-xs" style="padding:0 .4rem;color:var(--tm-ink-soft);letter-spacing:.06em;text-transform:uppercase;">ID proof</legend>
+                                <div class="px-grid-2">
+                                    <div class="tm-field" style="margin-bottom:var(--tm-s3);">
+                                        <label class="tm-label" for="pxProofType">Document type</label>
+                                        <select class="tm-select" id="pxProofType" name="proofType">
+                                            <option value="">Not provided</option>
+                                            <option value="AADHAAR">Aadhaar</option>
+                                            <option value="PASSPORT">Passport</option>
+                                            <option value="DL">Driving licence</option>
+                                            <option value="VOTER_ID">Voter ID</option>
+                                            <option value="OTHER">Other</option>
+                                        </select>
+                                    </div>
+                                    <div class="tm-field" style="margin-bottom:var(--tm-s3);">
+                                        <label class="tm-label" for="pxProofNo">Document number</label>
+                                        <input class="tm-input" type="text" id="pxProofNo" name="proofNumber" placeholder="XXXXXX1234" autocomplete="off">
+                                        <p class="px-field-note">We keep only the first and last two characters. The full number is discarded and never stored, logged or emailed.</p>
+                                    </div>
+                                </div>
+                                <p class="px-field-note" id="pxProofNote" style="margin-top:.2rem;">Optional. A masked reference helps operators match a traveller at a counter without holding your document.</p>
+                            </fieldset>
+
+                            <div class="px-consent" style="margin-bottom:var(--tm-s4);">
+                                <label class="tm-check" for="pxConsent" style="min-height:0;">
+                                    <input type="checkbox" id="pxConsent" name="healthConsent">
+                                    <span>
+                                        <strong style="color:var(--tm-ink);">Share preparation needs with my bookings.</strong>
+                                        <span style="display:block;font-size:var(--tm-f-xs);color:var(--tm-muted);margin-top:.15rem;">Turn this on if TripMind may note step-free access, mobility help, allergies or dietary needs so operators can prepare. You can change it at any time, and even then partners only see a coarse flag &mdash; never your words or a diagnosis.</span>
+                                    </span>
+                                </label>
+                                <div id="pxHealthFields" hidden style="margin-top:.9rem;padding-top:.9rem;border-top:1px solid rgba(234,115,21,.25);">
+                                    <div class="px-grid-2">
+                                        <div class="tm-field" style="margin-bottom:var(--tm-s3);">
+                                            <label class="tm-label" for="pxMobility">Mobility</label>
+                                            <select class="tm-select" id="pxMobility" name="mobility">
+                                                <option value="NONE">No assistance needed</option>
+                                                <option value="SOME_ASSISTANCE">Occasional help with steps or walking</option>
+                                                <option value="WHEELCHAIR">Step-free / wheelchair access needed</option>
+                                            </select>
+                                        </div>
+                                        <div class="tm-field" style="margin-bottom:var(--tm-s3);">
+                                            <label class="tm-f-xs" id="pxDietLabel" style="display:block;color:var(--tm-ink-soft);margin-bottom:.4rem;">Dietary needs</label>
+                                            <div class="px-chips" role="group" aria-labelledby="pxDietLabel" id="pxDiet">
+                                                <label class="px-chip"><input type="checkbox" name="dietary" value="VEGETARIAN"> Vegetarian</label>
+                                                <label class="px-chip"><input type="checkbox" name="dietary" value="VEGAN"> Vegan</label>
+                                                <label class="px-chip"><input type="checkbox" name="dietary" value="JAIN"> Jain</label>
+                                                <label class="px-chip"><input type="checkbox" name="dietary" value="HALAL"> Halal</label>
+                                                <label class="px-chip"><input type="checkbox" name="dietary" value="NO_PREFERENCE"> No preference</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="tm-field" style="margin-bottom:0;">
+                                        <label class="tm-label" for="pxNotes">Anything we should know</label>
+                                        <textarea class="tm-textarea" id="pxNotes" name="medicalNotes" maxlength="500" placeholder="For example: long walking days are difficult; please request a wheelchair at check-in."></textarea>
+                                        <p class="px-field-note">Never sent to a partner, never used in AI planning, and never emailed. Stored so you do not have to retype it.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="tm-row tm-row--between" style="margin-top:var(--tm-s5);">
+                                <label class="tm-check" style="min-height:0;margin:0;">
+                                    <input type="checkbox" id="pxDefault">
+                                    <span>Use as my default traveller</span>
+                                </label>
+                                <div class="tm-row" style="gap:.5rem;">
+                                    <button class="tm-btn tm-btn--ghost tm-btn--sm" type="button" id="pxDeleteBtn" hidden>Delete</button>
+                                    <button class="tm-btn tm-btn--primary tm-btn--sm" type="submit" id="pxSaveBtn">Save traveller</button>
+                                </div>
+                            </div>
+                            <p class="tm-f-xs" id="pxFormError" role="alert" style="color:var(--tm-danger);margin:var(--tm-s3) 0 0;min-height:1.2em;"></p>
+                        </form>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <footer style="border-top:1px solid var(--tm-line);padding-block:1.5rem;">
+        <div class="tm-container tm-row tm-row--between">
+            <p class="tm-f-2xs tm-muted" style="margin:0;">TripMind AI &middot; your travellers stay yours</p>
+            <a class="tm-f-2xs" href="dashboard.html">Back to my trips</a>
+        </div>
+    </footer>
+
+    <div class="px-flash" id="pxFlash" role="status" hidden></div>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/pwa.js" defer></script>
+    <script>
+    (function () {
+        'use strict';
+
+        const state = { list: [], editing: null, flashTimer: null };
+
+        const $ = (id) => document.getElementById(id);
+        const esc = TM.esc;
+        const badge = TM.statusBadge || function () { return ''; };
+
+        const AGE_BAND_LABEL = {
+            INFANT: 'Infant', TODDLER: 'Toddler', CHILD: 'Child',
+            TEEN: 'Teen', ADULT: 'Adult', SENIOR: 'Senior'
+        };
+        const RELATIONSHIP = {
+            SELF: 'Me', SPOUSE: 'Spouse', CHILD: 'Child', PARENT: 'Parent',
+            SIBLING: 'Sibling', FRIEND: 'Friend', COLLEAGUE: 'Colleague', OTHER: 'Other'
+        };
+
+        function flash(message) {
+            const el = $('pxFlash');
+            el.textContent = message;
+            el.hidden = false;
+            clearTimeout(state.flashTimer);
+            state.flashTimer = setTimeout(() => { el.hidden = true; }, 3200);
+        }
+
+        function fail(err) {
+            $('pxFormError').textContent = (err && err.message) || 'Something went wrong. Please try again.';
+        }
+
+        function initials(name) {
+            const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+            if (!parts.length) return '?';
+            return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+        }
+
+        function listMarkup() {
+            if (!state.list.length) {
+                return `<li class="px-empty">
+                    <p class="tm-f-sm tm-muted" style="margin:0 0 .75rem;">No travellers saved yet. Add yourself once and every booking can use it.</p>
+                    <button class="tm-btn tm-btn--accent tm-btn--sm" type="button" data-add>Add your first traveller</button>
+                </li>`;
+            }
+            return state.list.map(p => {
+                const tags = [];
+                if (p.isDefault) tags.push('<span class="px-tag px-tag--jade">Default</span>');
+                if (p.ageBand) tags.push(`<span class="px-tag px-tag--slate">${esc(AGE_BAND_LABEL[p.ageBand] || p.ageBand)}</span>`);
+                if (p.health && p.health.consent && (p.health.mobility && p.health.mobility !== 'NONE')) {
+                    tags.push('<span class="px-tag px-tag--amber">Access needs shared</span>');
+                }
+                const meta = [];
+                if (p.age != null) meta.push(`Age ${p.age}`);
+                if (RELATIONSHIP[p.relationship]) meta.push(RELATIONSHIP[p.relationship]);
+                if (p.proofMasked) meta.push(`ID ${esc(p.proofMasked)}`);
+                if (p.health && p.health.consent && (p.health.dietary || []).length) {
+                    const items = p.health.dietary.filter(d => d !== 'NO_PREFERENCE').length;
+                    if (items) meta.push(`${items} dietary flag${items > 1 ? 's' : ''}`);
+                }
+                if (p.health && !p.health.consent && p.health.dietary == null) meta.push('Needs not shared');
+                return `<li class="px-item ${p.isDefault ? 'is-default' : ''}">
+                    <span class="px-avatar" aria-hidden="true">${esc(initials(p.fullName))}</span>
+                    <span class="px-item__name">${esc(p.fullName)}${tags.join('')}</span>
+                    <span class="px-actions">
+                        ${p.isDefault ? '' : `<button class="tm-btn tm-btn--ghost tm-btn--sm" type="button" data-default="${esc(p.id)}">Make default</button>`}
+                        <button class="tm-btn tm-btn--secondary tm-btn--sm" type="button" data-edit="${esc(p.id)}">Edit</button>
+                    </span>
+                    <span class="px-item__meta">${esc(meta.join(' &middot; ') || 'Saved traveller')}</span>
+                </li>`;
+            }).join('');
+        }
+
+        function renderList() {
+            $('pxList').innerHTML = listMarkup();
+            $('pxCount').textContent = state.list.length
+                ? `${state.list.length} saved`
+                : '';
+        }
+
+        function openEditor(passenger) {
+            state.editing = passenger || null;
+            const f = $('pxForm');
+            f.reset();
+            $('pxFormError').textContent = '';
+            $('pxHealthFields').hidden = true;
+            $('pxConsent').checked = false;
+            $('pxDob').value = '';
+            $('pxDefault').checked = false;
+            ['pxName', 'pxPhone', 'pxEmail', 'pxEmergency', 'pxProofNo', 'pxNotes']
+                .forEach(id => { $(id).value = ''; });
+            $('pxRelationship').value = 'OTHER';
+            $('pxGender').value = '';
+            $('pxProofType').value = '';
+            $('pxMobility').value = 'NONE';
+            $('pxDiet').querySelectorAll('input').forEach(i => { i.checked = false; });
+
+            if (passenger) {
+                $('pxFormEyebrow').textContent = 'Editing traveller';
+                $('pxEditorHead').textContent = passenger.fullName;
+                $('pxSaveBtn').textContent = 'Save changes';
+                $('pxDeleteBtn').hidden = false;
+                $('pxName').value = passenger.fullName || '';
+                $('pxRelationship').value = passenger.relationship || 'OTHER';
+                $('pxGender').value = passenger.gender || '';
+                $('pxPhone').value = passenger.phone || '';
+                $('pxEmail').value = passenger.email || '';
+                $('pxEmergency').value = passenger.emergencyContact || '';
+                $('pxDob').value = passenger.dob || '';
+                $('pxDefault').checked = !!passenger.isDefault;
+                if (passenger.health && passenger.health.consent) {
+                    $('pxConsent').checked = true;
+                    $('pxHealthFields').hidden = false;
+                    $('pxMobility').value = passenger.health.mobility || 'NONE';
+                    (passenger.health.dietary || []).forEach(d => {
+                        const input = $('pxDiet').querySelector(`input[value="${d}"]`);
+                        if (input) input.checked = true;
+                    });
+                    $('pxNotes').value = passenger.health.notes || '';
+                }
+            } else {
+                $('pxFormEyebrow').textContent = 'New traveller';
+                $('pxEditorHead').textContent = 'Add a traveller';
+                $('pxSaveBtn').textContent = 'Save traveller';
+                $('pxDeleteBtn').hidden = true;
+            }
+
+            $('pxEditorCard').hidden = false;
+            $('pxEditorCard').scrollIntoView({ behavior: TM.reducedMotion() ? 'auto' : 'smooth', block: 'nearest' });
+            $('pxName').focus({ preventScroll: true });
+            updateAgeNote();
+        }
+
+        function closeEditor() {
+            state.editing = null;
+            $('pxEditorCard').hidden = true;
+            $('pxFormError').textContent = '';
+        }
+
+        function updateAgeNote() {
+            const dob = $('pxDob').value;
+            const note = $('pxAgeNote');
+            if (!dob) {
+                note.textContent = 'Used for age-appropriate planning.';
+                return;
+            }
+            const born = new Date(dob + 'T00:00:00');
+            if (isNaN(born.getTime())) {
+                note.textContent = 'That date does not look right.';
+                return;
+            }
+            const now = new Date();
+            let age = now.getFullYear() - born.getFullYear();
+            const m = now.getMonth() - born.getMonth();
+            if (m < 0 || (m === 0 && now.getDate() < born.getDate())) age -= 1;
+            note.textContent = age < 0
+                ? 'That date is in the future.'
+                : `Age ${age} on travel day. Partners see the age group, never the date.`;
+        }
+
+        function collect() {
+            const payload = {
+                fullName: $('pxName').value.trim(),
+                relationship: $('pxRelationship').value,
+                gender: $('pxGender').value,
+                dob: $('pxDob').value || '',
+                phone: $('pxPhone').value.trim(),
+                email: $('pxEmail').value.trim(),
+                emergencyContact: $('pxEmergency').value.trim(),
+                proofType: $('pxProofType').value,
+                proofNumber: $('pxProofNo').value.trim(),
+                isDefault: $('pxDefault').checked,
+                health: {
+                    consent: $('pxConsent').checked,
+                    mobility: $('pxConsent').checked ? $('pxMobility').value : 'NONE',
+                    dietary: $('pxConsent').checked
+                        ? Array.from($('pxDiet').querySelectorAll('input:checked')).map(i => i.value)
+                        : [],
+                    notes: $('pxConsent').checked ? $('pxNotes').value.trim() : ''
+                }
+            };
+            if (!payload.fullName) throw new Error('Please enter this traveller’s full name.');
+            if (payload.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(payload.email)) {
+                throw new Error('That email address does not look right.');
+            }
+            if (payload.dob) {
+                const born = new Date(payload.dob + 'T00:00:00');
+                if (isNaN(born.getTime()) || born > new Date()) {
+                    throw new Error('Please check the date of birth.');
+                }
+            }
+            if (payload.proofType && !payload.proofNumber) {
+                throw new Error('Add the document number, or set the document type to “Not provided”.');
+            }
+            if (!payload.proofType && payload.proofNumber) {
+                throw new Error('Choose which document this number belongs to.');
+            }
+            if (payload.health.consent && !payload.health.notes && payload.health.mobility === 'NONE'
+                && !payload.health.dietary.length) {
+                payload.health.consent = false;
+            }
+            return payload;
+        }
+
+        async function load() {
+            try {
+                state.list = await TM.api.passengers();
+                renderList();
+            } catch (e) {
+                $('pxList').innerHTML = `<li class="px-empty"><p class="tm-f-sm" style="color:var(--tm-danger);margin:0;">${esc(e.message)}</p></li>`;
+            }
+        }
+
+        $('pxAddBtn').addEventListener('click', () => openEditor(null));
+        $('pxCancelBtn').addEventListener('click', closeEditor);
+        $('pxConsent').addEventListener('change', e => {
+            $('pxHealthFields').hidden = !e.target.checked;
+        });
+        $('pxDob').addEventListener('change', updateAgeNote);
+        $('pxDob').max = new Date().toISOString().slice(0, 10);
+
+        $('pxList').addEventListener('click', async (e) => {
+            const add = e.target.closest('[data-add]');
+            if (add) { openEditor(null); return; }
+
+            const editId = e.target.closest('[data-edit]');
+            if (editId) {
+                const p = state.list.find(x => x.id === editId.dataset.edit);
+                if (p) openEditor(p);
+                return;
+            }
+
+            const defId = e.target.closest('[data-default]');
+            if (defId) {
+                defId.disabled = true;
+                try {
+                    await TM.api.setDefaultPassenger(defId.dataset.default);
+                    flash('Default traveller updated.');
+                    await load();
+                } catch (err) {
+                    flash(err.message);
+                } finally {
+                    defId.disabled = false;
+                }
+            }
+        });
+
+        $('pxForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            let payload;
+            try {
+                payload = collect();
+            } catch (err) {
+                fail(err);
+                return;
+            }
+            const btn = $('pxSaveBtn');
+            btn.classList.add('is-loading');
+            try {
+                if (state.editing) {
+                    await TM.api.updatePassenger(state.editing.id, payload);
+                    flash(`${payload.fullName.split(' ')[0]}’s details saved.`);
+                } else {
+                    await TM.api.createPassenger(payload);
+                    flash(`${payload.fullName.split(' ')[0]} added.`);
+                }
+                closeEditor();
+                await load();
+            } catch (err) {
+                fail(err);
+            } finally {
+                btn.classList.remove('is-loading');
+            }
+        });
+
+        $('pxDeleteBtn').addEventListener('click', async () => {
+            if (!state.editing) return;
+            const name = state.editing.fullName;
+            if (!confirm(`Delete ${name}? This also removes them from future booking selections.`)) return;
+            const btn = $('pxDeleteBtn');
+            btn.classList.add('is-loading');
+            try {
+                await TM.api.deletePassenger(state.editing.id);
+                closeEditor();
+                flash(`${name} deleted.`);
+                await load();
+            } catch (err) {
+                fail(err);
+            } finally {
+                btn.classList.remove('is-loading');
+            }
+        });
+
+        load();
+    })();
+    </script>
+</body>
+</html>

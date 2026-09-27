@@ -47,10 +47,27 @@ def ensure_unique_indexes():
         ("guide_locations", [("name", 1)], {"unique": True, "collation": _CI}),
         ("lounges", [("ownerId", 1), ("name", 1)], {"unique": True, "collation": _CI}),
         ("bookings", [("uniquenessKey", 1)], {"unique": True, "sparse": True}),
+        # One checklist per owner + booking, so a double-clicked "generate"
+        # can never fork the traveller's list.
+        ("checklists", [("ownerId", 1), ("bookingId", 1)], {"unique": True}),
+        # Passengers are owner-scoped; the composite index backs every list and
+        # the "selected travellers still exist" check on a booking.
+        ("passengers", [("ownerId", 1), ("createdAt", 1)], {}),
     ]
     for coll_name, keys, opts in specs:
         try:
             get_collection(coll_name).create_index(keys, **opts)
+        except Exception as exc:  # pragma: no cover - startup resilience
+            errors.append("%s (%s): %s" % (coll_name, keys, exc))
+
+    # Read indexes for the notification feed. Not unique: duplicates are a
+    # cosmetic annoyance, never a correctness problem, so a failure here must
+    # not be as loud as a uniqueness violation.
+    for coll_name, keys in [("notifications", [("userId", 1), ("createdAt", -1)]),
+                            ("notifications", [("userId", 1), ("read", 1)]),
+                            ("bookings", [("userId", 1), ("date", 1)])]:
+        try:
+            get_collection(coll_name).create_index(keys)
         except Exception as exc:  # pragma: no cover - startup resilience
             errors.append("%s (%s): %s" % (coll_name, keys, exc))
     return errors

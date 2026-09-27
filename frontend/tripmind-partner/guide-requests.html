@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Guide requests — TripMind Partner Hub</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#06202b">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="../css/theme.css">
+    <link rel="stylesheet" href="css/partner.css">
+</head>
+<body>
+    <a class="ph-skip" href="#phMain">Skip to content</a>
+
+    <header class="ph-topbar">
+        <div class="ph-topbar__inner">
+            <button class="ph-burger" type="button" data-ph-burger aria-expanded="false" aria-controls="phDrawer" aria-label="Open menu"><span></span></button>
+            <a class="ph-wordmark" href="/tripmind-partner/dashboard">
+                <span class="ph-wordmark__mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="#06202b"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                <span class="ph-wordmark__text">
+                    <span class="ph-wordmark__name" data-ph-role-note>TripMind AI</span>
+                    <span class="ph-wordmark__hub">Partner Hub</span>
+                </span>
+            </a>
+            <div class="ph-topbar__spacer"></div>
+            <span class="ph-user">
+                <span class="ph-user__avatar" data-ph-user-avatar aria-hidden="true">P</span>
+                <span class="ph-user__name" data-ph-user-name>Partner</span>
+            </span>
+            <button class="tm-btn tm-btn--on-dark-ghost tm-btn--sm" type="button" data-ph-signout>Sign out</button>
+        </div>
+    </header>
+
+    <div class="ph-drawer" data-ph-drawer id="phDrawer" hidden>
+        <div class="ph-drawer__scrim" data-ph-drawer-scrim></div>
+        <div class="ph-drawer__panel" role="dialog" aria-modal="true" aria-label="Partner Hub menu">
+            <div class="ph-drawer__head">
+                <span class="ph-wordmark" style="color:var(--tm-ink)">
+                    <span class="ph-wordmark__mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="#06202b"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                    <span class="ph-wordmark__text">
+                        <span class="ph-wordmark__name">TripMind AI</span>
+                        <span class="ph-wordmark__hub" style="color:var(--tm-clay)">Partner Hub</span>
+                    </span>
+                </span>
+                <button class="ph-drawer__close" type="button" data-ph-drawer-close aria-label="Close menu">&times;</button>
+            </div>
+            <p class="ph-drawer__group">Operating</p>
+            <ul class="ph-drawer__links" data-ph-nav></ul>
+            <div class="ph-drawer__foot">
+                <span class="tm-2xs tm-muted">Signed in as <b data-ph-partner-type>guide partner</b></span>
+                <a href="/portal.html">Open the provider console</a>
+                <a href="/">Traveller site</a>
+                <button class="tm-btn tm-btn--ghost tm-btn--sm" type="button" data-ph-signout style="margin-top:.5rem">Sign out</button>
+            </div>
+        </div>
+    </div>
+
+    <main class="ph-main" id="phMain">
+        <div class="ph-head">
+            <div>
+                <p class="tm-eyebrow">Guiding</p>
+                <h1>Guide requests</h1>
+                <p>Travellers asking for your guiding on a date. Accept the ones you can take, decline the ones you
+                    cannot.</p>
+            </div>
+            <div class="ph-head__actions">
+                <a class="tm-btn tm-btn--ghost" href="/tripmind-partner/bookings">All bookings</a>
+                <a class="tm-btn tm-btn--primary" href="/tripmind-partner/profile">My profile</a>
+            </div>
+        </div>
+
+        <div class="ph-note" style="margin-bottom:1.5rem">
+            <div><b>You only see what the traveller needs.</b> TripMind never shares their identity documents, exact
+                ages or contact details. Health or accessibility needs appear only as a preparation note, and only if the
+                traveller consented to share them.</div>
+        </div>
+
+        <section class="ph-panel" id="phListPanel">
+            <div class="ph-panel__head">
+                <div>
+                    <h2>Open requests</h2>
+                    <p>Respond quickly — travellers book the first guide who answers.</p>
+                </div>
+            </div>
+            <div class="ph-panel__body ph-panel__body--flush" id="phList"></div>
+        </section>
+    </main>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/ui.js"></script>
+    <script src="js/partner.js"></script>
+    <script>
+        (function () {
+            'use strict';
+            var P = TM_PARTNER;
+
+            function flags(snap) {
+                if (!snap) return [];
+                var out = [];
+                if (snap.requirements && snap.requirements.length) out.push('needs: ' + snap.requirements.join(', '));
+                if (snap.accessibility) out.push('accessibility: ' + snap.accessibility);
+                if (snap.count) out.push('party of ' + snap.count);
+                return out;
+            }
+
+            function render(rows) {
+                var host = P.q('#phList');
+                if (!rows.length) {
+                    host.innerHTML = P.empty('No open requests',
+                        'When a traveller asks for your guiding on a date, it arrives here for you to accept or decline.',
+                        '<a class="tm-btn tm-btn--ghost" href="/tripmind-partner/profile">Update my availability</a>');
+                    return;
+                }
+                host.innerHTML = '<ul class="ph-rows">' + rows.map(function (b) {
+                    var d = b.details || {};
+                    var f = flags(b.partySnapshot);
+                    return '<li class="ph-row" data-req="' + P.esc(b.id) + '">' +
+                        '<div class="ph-row__main">' +
+                        '<div class="ph-row__title">' + P.esc(d.location || b.tripId || 'Guiding request') + ' ' + P.pill(b.status) + '</div>' +
+                        '<p class="ph-row__meta">' + P.esc(P.fmtDate(b.date)) +
+                        (d.startTime ? ' · ' + P.esc(d.startTime) + '–' + P.esc(d.endTime || '') : '') +
+                        (d.hours ? ' · ' + P.esc(d.hours) + 'h' : '') + '</p>' +
+                        (f.length ? '<p class="ph-row__meta tm-2xs tm-muted">' + P.esc(f.join(' · ')) + '</p>' : '') +
+                        '</div><div class="ph-row__side">' +
+                        '<span class="tm-sm">' + P.esc(P.money(b.total)) + '</span>' +
+                        '<div class="ph-req-actions" hidden>' +
+                        '<button class="tm-btn tm-btn--primary tm-btn--sm" type="button" data-accept>Accept</button>' +
+                        '<button class="tm-btn tm-btn--ghost tm-btn--sm" type="button" data-decline>Decline</button>' +
+                        '</div>' +
+                        '<button class="tm-btn tm-btn--ghost tm-btn--sm" type="button" data-toggle>Respond</button>' +
+                        '</div></li>';
+                }).join('') + '</ul>';
+
+                P.qa('[data-req]', host).forEach(function (li) {
+                    var id = li.getAttribute('data-req');
+                    var actions = li.querySelector('.ph-req-actions');
+                    var toggle = li.querySelector('[data-toggle]');
+                    var msg = null;
+
+                    if (toggle) {
+                        toggle.addEventListener('click', function () {
+                            if (!msg) {
+                                msg = document.createElement('input');
+                                msg.className = 'tm-input';
+                                msg.type = 'text';
+                                msg.maxLength = 200;
+                                msg.placeholder = 'Optional message to the traveller';
+                                msg.style.marginTop = '.5rem';
+                                msg.style.width = '100%';
+                                li.querySelector('.ph-row__side').appendChild(msg);
+                            }
+                            actions.hidden = !actions.hidden;
+                        });
+                    }
+
+                    function respond(action, btn) {
+                        P.busy(btn, true);
+                        apiRequest('/api/guide/requests/' + encodeURIComponent(id), {
+                            method: 'POST',
+                            body: { action: action, message: msg ? msg.value.trim() : '' }
+                        }).then(function () {
+                            P.toast(action === 'ACCEPT' ? 'Accepted. The traveller has been told.' : 'Declined.',
+                                'success');
+                            li.remove();
+                            if (!P.qa('[data-req]', host).length) render([]);
+                        }).catch(function (e) {
+                            P.toast(e.message, 'error');
+                        }).then(function () { P.busy(btn, false); });
+                    }
+
+                    var accept = li.querySelector('[data-accept]');
+                    var decline = li.querySelector('[data-decline]');
+                    if (accept) accept.addEventListener('click', function () { respond('ACCEPT', accept); });
+                    /* The API action word is REJECT, not DECLINE. */
+                    if (decline) decline.addEventListener('click', function () { respond('REJECT', decline); });
+                });
+            }
+
+            P.boot({
+                view: function (state) {
+                    if (state.role !== 'GUIDE') {
+                        P.go('dashboard');
+                        return;
+                    }
+                    var host = P.q('#phList');
+                    host.innerHTML = P.loading();
+                    api.guideRequests()
+                        .then(function (r) { render((r && r.requests) || []); })
+                        .catch(function (e) { P.fail(host, e); });
+                }
+            });
+        })();
+    </script>
+    <script src="/js/pwa.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>My restaurants — TripMind Partner Hub</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#06202b">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="../css/theme.css">
+    <link rel="stylesheet" href="css/partner.css">
+</head>
+<body>
+    <a class="ph-skip" href="#phMain">Skip to content</a>
+
+    <header class="ph-topbar">
+        <div class="ph-topbar__inner">
+            <button class="ph-burger" type="button" data-ph-burger aria-expanded="false" aria-controls="phDrawer" aria-label="Open menu"><span></span></button>
+            <a class="ph-wordmark" href="/tripmind-partner/dashboard">
+                <span class="ph-wordmark__mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="#06202b"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                <span class="ph-wordmark__text">
+                    <span class="ph-wordmark__name" data-ph-role-note>TripMind AI</span>
+                    <span class="ph-wordmark__hub">Partner Hub</span>
+                </span>
+            </a>
+            <div class="ph-topbar__spacer"></div>
+            <span class="ph-user">
+                <span class="ph-user__avatar" data-ph-user-avatar aria-hidden="true">P</span>
+                <span class="ph-user__name" data-ph-user-name>Partner</span>
+            </span>
+            <button class="tm-btn tm-btn--on-dark-ghost tm-btn--sm" type="button" data-ph-signout>Sign out</button>
+        </div>
+    </header>
+
+    <div class="ph-drawer" data-ph-drawer id="phDrawer" hidden>
+        <div class="ph-drawer__scrim" data-ph-drawer-scrim></div>
+        <div class="ph-drawer__panel" role="dialog" aria-modal="true" aria-label="Partner Hub menu">
+            <div class="ph-drawer__head">
+                <span class="ph-wordmark" style="color:var(--tm-ink)">
+                    <span class="ph-wordmark__mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="#06202b"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                    <span class="ph-wordmark__text">
+                        <span class="ph-wordmark__name">TripMind AI</span>
+                        <span class="ph-wordmark__hub" style="color:var(--tm-clay)">Partner Hub</span>
+                    </span>
+                </span>
+                <button class="ph-drawer__close" type="button" data-ph-drawer-close aria-label="Close menu">&times;</button>
+            </div>
+            <p class="ph-drawer__group">Operating</p>
+            <ul class="ph-drawer__links" data-ph-nav></ul>
+            <div class="ph-drawer__foot">
+                <span class="tm-2xs tm-muted">Signed in as <b data-ph-partner-type>restaurant partner</b></span>
+                <a href="/portal.html">Open the provider console</a>
+                <a href="/">Traveller site</a>
+                <button class="tm-btn tm-btn--ghost tm-btn--sm" type="button" data-ph-signout style="margin-top:.5rem">Sign out</button>
+            </div>
+        </div>
+    </div>
+
+    <main class="ph-main" id="phMain">
+        <div class="ph-head">
+            <div>
+                <p class="tm-eyebrow">Food</p>
+                <h1>My restaurants</h1>
+                <p>Every restaurant you have listed with TripMind, with its review status and opening hours.</p>
+            </div>
+            <div class="ph-head__actions">
+                <a class="tm-btn tm-btn--ghost" href="/tripmind-partner/bookings">Bookings</a>
+                <a class="tm-btn tm-btn--primary" href="#add">Add a restaurant</a>
+            </div>
+        </div>
+
+        <div class="ph-stats" id="phStats" aria-live="polite">
+            <div class="ph-stat"><b>—</b><span>Loading</span></div>
+        </div>
+
+        <div class="ph-note ph-note--wait" id="phPendingNote" hidden style="margin-bottom:1.5rem">
+            <div><b>Some restaurants are still under review.</b> The TripMind team checks every new restaurant before
+                travellers can see it, so these do not appear in the planner yet.</div>
+        </div>
+
+        <section class="ph-panel" id="phListPanel" style="margin-bottom:1.5rem">
+            <div class="ph-panel__head">
+                <div>
+                    <h2>Your restaurants</h2>
+                    <p>Approved restaurants are live for travellers.</p>
+                </div>
+            </div>
+            <div class="ph-panel__body ph-panel__body--flush" id="phList"></div>
+        </section>
+
+        <section class="ph-panel" id="add">
+            <div class="ph-panel__head">
+                <div>
+                    <h2 id="phFormTitle">Add a restaurant</h2>
+                    <p id="phFormSub">Enter the restaurant, its cuisines and opening hours. The TripMind team reviews
+                        it before travellers can book a table.</p>
+                </div>
+            </div>
+            <div class="ph-panel__body">
+                <form id="phRestForm" novalidate class="ph-form">
+                    <p class="ph-form__legend">Restaurant</p>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="rName">Restaurant name <span class="req">*</span></label>
+                            <input class="tm-input" type="text" id="rName" name="name" placeholder="e.g. Saravana Bhavan" maxlength="120" required>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="rType">Restaurant type <span class="req">*</span></label>
+                            <select class="tm-select" id="rType" name="restaurantType" required>
+                                <option value="">Select a type</option>
+                                <option>Vegetarian</option>
+                                <option>Non-vegetarian</option>
+                                <option>Pure vegetarian</option>
+                                <option>Multi-cuisine</option>
+                                <option>Cafe</option>
+                                <option>Bakery</option>
+                                <option>Food court</option>
+                                <option>Other</option>
+                            </select>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                    </div>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="rCity">City <span class="req">*</span></label>
+                            <input class="tm-input" type="text" id="rCity" name="city" placeholder="e.g. Chennai" maxlength="80" required>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="rAddress">Address <span class="req">*</span></label>
+                            <input class="tm-input" type="text" id="rAddress" name="address" placeholder="Street and area" maxlength="200" required>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                    </div>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="rPhone">Contact number <span class="req">*</span></label>
+                            <input class="tm-input" type="tel" id="rPhone" name="contactNumber" placeholder="98765 43210" maxlength="20" required>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="rEmail">Contact email</label>
+                            <input class="tm-input" type="email" id="rEmail" name="email" placeholder="hello@example.com" maxlength="120">
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                    </div>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="rCuisines">Cuisines (comma separated)</label>
+                            <input class="tm-input" type="text" id="rCuisines" name="cuisines" placeholder="South Indian, Chettinad" maxlength="200">
+                        </div>
+                    </div>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="rDays">Operating days (comma separated)</label>
+                            <input class="tm-input" type="text" id="rDays" name="operatingDays" placeholder="Monday, Tuesday, Wednesday" maxlength="200">
+                        </div>
+                    </div>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="rHours">Opening hours (comma separated)</label>
+                            <input class="tm-input" type="text" id="rHours" name="openingHours" placeholder="11:00-14:30, 18:00-22:30" maxlength="200">
+                        </div>
+                    </div>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="rImages">Image URLs (one per line)</label>
+                            <textarea class="tm-textarea" id="rImages" name="images" rows="3" placeholder="https://…/dining.jpg"></textarea>
+                        </div>
+                    </div>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="rDescription">Description</label>
+                            <textarea class="tm-textarea" id="rDescription" name="description" rows="3" placeholder="What travellers will find here."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="ph-form__actions">
+                        <button class="tm-btn tm-btn--primary" type="submit" id="phSubmit">Submit for review</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+    </main>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/ui.js"></script>
+    <script src="js/partner.js"></script>
+    <script src="js/catalogue.js"></script>
+    <script>
+        (function () {
+            var P = TM_PARTNER;
+
+            P.boot({
+                view: function (state) {
+                    if (state.role !== 'RESTAURANT_ADMIN') {
+                        P.go('dashboard');
+                        return;
+                    }
+                    TM_CATALOGUE.mount({
+                        form: '#phRestForm',
+                        list: '#phList',
+                        stats: '#phStats',
+                        pendingNote: '#phPendingNote',
+                        title: '#phFormTitle',
+                        sub: '#phFormSub',
+                        submit: '#phSubmit',
+                        entity: 'restaurant',
+                        addTitle: 'Add a restaurant',
+                        editTitle: 'Edit this restaurant',
+                        addSub: 'Enter the restaurant, its cuisines and opening hours. The TripMind team reviews it before travellers can book a table.',
+                        editSub: 'Changes to details and hours are re-reviewed before travellers see them.',
+                        load: function () { return api.getMyRestaurants().then(function (r) { return r.restaurants || []; }); },
+                        create: function (data) { return apiRequest('/api/restaurants', { method: 'POST', body: data }); },
+                        update: function (id, data) { return apiRequest('/api/restaurants/' + encodeURIComponent(id), { method: 'PUT', body: data }); },
+                        fields: TM_CATALOGUE.restaurantFields,
+                        row: function (v) {
+                            return {
+                                title: v.name || 'Restaurant',
+                                status: v.status,
+                                meta: [v.restaurantType, (v.cuisines || []).join(', '), v.city, v.address]
+                                    .filter(Boolean).join(' · '),
+                                side: (v.operatingDays || []).length
+                                    ? v.operatingDays.length + ' days a week'
+                                    : 'Days not set',
+                                detail: (v.openingHours || []).join('  |  ')
+                            };
+                        }
+                    });
+                }
+            });
+        })();
+    </script>
+    <script src="/js/pwa.js" defer></script>
+</body>
+</html>

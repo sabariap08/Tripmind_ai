@@ -159,6 +159,19 @@ def create_booking(data, user):
     reference = "TB" + _id()[-6:].upper()
     qty = max(1, int(data.get("qty") or 1))
 
+    # Resolve the travellers for this booking BEFORE any capacity is reserved, so
+    # a bad selection cannot half-consume seats/rooms.
+    #
+    # Only a non-identifying snapshot is stored: a headcount plus coarse
+    # requirements. Names, ages in years, health free text and ID proof never
+    # reach the booking document, so they can never leak to a provider. The
+    # reference ids are kept so the traveller can re-open the same selection.
+    from services import passenger_service
+    party, party_err = passenger_service.party_snapshot(
+        user["id"], data.get("passengerIds") or [], qty)
+    if party_err:
+        return None, party_err
+
     transport = None
     spot = None
     hotel = None
@@ -342,7 +355,8 @@ def create_booking(data, user):
         "unitPrice": unit_price,
         "total": total,
         "date": data.get("date") or datetime.utcnow().strftime("%Y-%m-%d"),
-        "passengers": data.get("passengers") or [],
+        "passengerIds": [str(p) for p in (data.get("passengerIds") or []) if p][:20],
+        "partySnapshot": party,
         "details": data.get("details") or {},
         "hotelId": str(hotel["_id"]) if hotel else None,
         "roomTypeId": data.get("roomTypeId") if btype == "HOTEL" else None,

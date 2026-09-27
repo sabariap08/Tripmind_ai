@@ -87,6 +87,7 @@ const api = {
         const qs = new URLSearchParams(params).toString();
         return apiRequest(`/api/spots${qs ? `?${qs}` : ''}`);
     },
+    getMySpots: () => apiRequest('/api/spots/mine'),
     createSpot: (data) => apiRequest('/api/spots', { method: 'POST', body: data }),
     getGuideLocations: () => apiRequest('/api/guide-locations'),
     addGuideLocation: (data) => apiRequest('/api/guide-locations', { method: 'POST', body: data }),
@@ -145,6 +146,34 @@ const api = {
     guideRespond: (id, action, message) => apiRequest(`/api/guide/requests/${id}`, { method: 'POST', body: { action, message } }),
     guideAssignments: () => apiRequest('/api/guide/assignments'),
 
+    // Passenger profiles (owner-only, masked proof, consent-gated health)
+    passengers: () => apiRequest('/api/passengers'),
+    passenger: (id) => apiRequest(`/api/passengers/${encodeURIComponent(id)}`),
+    createPassenger: (data) => apiRequest('/api/passengers', { method: 'POST', body: data }),
+    updatePassenger: (id, data) => apiRequest(`/api/passengers/${encodeURIComponent(id)}`, { method: 'PUT', body: data }),
+    deletePassenger: (id) => apiRequest(`/api/passengers/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    setDefaultPassenger: (id) => apiRequest(`/api/passengers/${encodeURIComponent(id)}/default`, { method: 'POST' }),
+    passengerPartyPreview: (ids, travellers = 1) => apiRequest('/api/passengers/party', { method: 'POST', body: { passengerIds: ids || [], travellers } }),
+
+    // Pre-trip checklist (AI assisted, persisted per booking)
+    checklists: () => apiRequest('/api/checklists'),
+    checklist: (bookingId) => apiRequest(`/api/checklists/${encodeURIComponent(bookingId)}`),
+    generateChecklist: (bookingId, data = {}) => apiRequest(`/api/checklists/${encodeURIComponent(bookingId)}`, { method: 'POST', body: data }),
+    regenerateChecklist: (bookingId) => apiRequest(`/api/checklists/${encodeURIComponent(bookingId)}`, { method: 'POST', body: { regenerate: true } }),
+    addChecklistItem: (bookingId, text, category, dueOffsetDays) => apiRequest(
+        `/api/checklists/${encodeURIComponent(bookingId)}/items`,
+        { method: 'POST', body: { text, category, dueOffsetDays } }),
+    setChecklistItem: (bookingId, itemId, done) => apiRequest(
+        `/api/checklists/${encodeURIComponent(bookingId)}/items/${encodeURIComponent(itemId)}`,
+        { method: 'PATCH', body: { done: !!done } }),
+    deleteChecklistItem: (bookingId, itemId) => apiRequest(
+        `/api/checklists/${encodeURIComponent(bookingId)}/items/${encodeURIComponent(itemId)}`, { method: 'DELETE' }),
+
+    // Notifications (in-app; email only when a partner has opted in)
+    notifications: () => apiRequest('/api/notifications'),
+    readNotification: (id) => apiRequest(`/api/notifications/${encodeURIComponent(id)}/read`, { method: 'POST' }),
+    readAllNotifications: () => apiRequest('/api/notifications/read-all', { method: 'POST' }),
+
     // Bookings
     getBookings: () => apiRequest('/api/bookings'),
     providerBookings: (type) => apiRequest(`/api/provider/bookings?type=${encodeURIComponent(type)}`),
@@ -202,6 +231,15 @@ const api = {
         return apiRequest(`/api/admin/users${qs ? `?${qs}` : ''}`);
     },
     adminSetApproval: (id, status, reason) => apiRequest(`/api/admin/users/${id}/approval`, { method: 'POST', body: { status, reason } }),
+    // Role-aware Partner Hub approval queue (all five operational roles)
+    adminPartners: ({ status = 'PENDING', role = 'ALL' } = {}) => apiRequest(
+        `/api/admin/partners?status=${encodeURIComponent(status)}&role=${encodeURIComponent(role)}`),
+    partnerDecision: (id, action, reason) => apiRequest(
+        `/api/admin/partners/${encodeURIComponent(id)}/decision`,
+        { method: 'POST', body: { action, reason } }),
+    partnerSchema: (role) => apiRequest(`/api/partner/schema/${encodeURIComponent(role)}`),
+    partnerMeta: () => apiRequest('/api/partner/meta'),
+    partnerMe: () => apiRequest('/api/partner/me'),
     contentReview: () => apiRequest('/api/admin/content-review'),
     reviewContent: (kind, id, action, reason) => apiRequest(`/api/admin/content/${kind}/${id}/review`, { method: 'POST', body: { action, reason } }),
     adminAvailability: () => apiRequest('/api/admin/availability'),

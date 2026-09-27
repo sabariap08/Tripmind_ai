@@ -132,11 +132,18 @@ def update_spot(data, owner_id):
     if data.get("recommendedTimes") is not None or data.get("optimalTimes") is not None:
         if len(slots) < 5:
             return None, "A spot must keep at least 5 optimal visiting time slots."
+    loc = _loc(data)
+    # Merge over the stored location so an edit that only changes, say, the
+    # description never blanks the coordinates or district a partner already
+    # picked on the map.
+    old_loc = doc.get("location") or {}
+    loc = {k: (loc.get(k) if loc.get(k) not in (None, "") else old_loc.get(k))
+           for k in ("name", "address", "lat", "lng", "city", "district", "state", "country")}
     upd = {
         "name": defer(data.get("name")) or doc["name"],
         "city": defer(data.get("city")) or doc["city"],
         "category": data.get("category") or doc["category"],
-        "location": _loc(data),
+        "location": loc,
         "description": data.get("description", doc["description"]),
         "entryFee": to_float(data.get("entryFee")) if data.get("entryFee") is not None else doc["entryFee"],
         "openingTime": data.get("openingTime") or doc["openingTime"],
@@ -144,8 +151,13 @@ def update_spot(data, owner_id):
         "recommendedTimes": slots or doc.get("recommendedTimes", []),
         "optimalTimes": slots or doc.get("optimalTimes", []),
         "workingDays": _working_days(data.get("workingDays")) or doc.get("workingDays") or [],
-        "popularity": int(data.get("popularity") or 0),
-        "visitingTravelers": int(data.get("visitingTravelers") or 0),
+        # popularity and visitingTravelers are counters the platform maintains.
+        # A partner edit must never reset them, so they are only touched when
+        # the caller actually sends a value.
+        "popularity": int(data["popularity"]) if data.get("popularity") is not None
+        else int(doc.get("popularity") or 0),
+        "visitingTravelers": int(data["visitingTravelers"]) if data.get("visitingTravelers") is not None
+        else int(doc.get("visitingTravelers") or 0),
         "images": img,
         "updatedAt": datetime.utcnow().isoformat(),
     }
@@ -160,6 +172,41 @@ def list_spots(city=None, approved_only=True):
     if approved_only:
         q["status"] = "APPROVED"
     return list(get_collection("tourist_spots").find(q).sort("popularity", -1))
+
+
+def public_spot(d):
+    """Partner-safe view of a spot: no owner identity, nested location
+    flattened the same way the public list does."""
+    loc = d.get("location") or {}
+    return {
+        "id": str(d["_id"]),
+        "name": d.get("name"),
+        "city": d.get("city") or "",
+        "category": d.get("category") or "",
+        "address": loc.get("address") or "",
+        "lat": loc.get("lat"),
+        "lng": loc.get("lng"),
+        "description": d.get("description") or "",
+        "entryFee": d.get("entryFee") or 0,
+        "openingTime": d.get("openingTime") or "09:00",
+        "closingTime": d.get("closingTime") or "18:00",
+        "recommendedTimes": d.get("recommendedTimes") or [],
+        "workingDays": d.get("workingDays") or [],
+        "images": d.get("images") or [],
+        "popularity": d.get("popularity", 0),
+        "visitingTravelers": d.get("visitingTravelers", 0),
+        "status": d.get("status", "APPROVED"),
+        "createdAt": d.get("createdAt"),
+    }
+
+
+def list_my_spots(owner_id):
+    """Every spot this owner has created, PENDING ones included, so a spot
+    partner can see their own listings awaiting Main Admin review. Owner
+    identity is stripped."""
+    return [public_spot(s) for s in
+            get_collection("tourist_spots").find({"ownerId": owner_id})
+            .sort("createdAt", -1)]
 
 
 def get_spot(sid):

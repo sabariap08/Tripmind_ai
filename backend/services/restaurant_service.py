@@ -11,6 +11,7 @@ from datetime import datetime
 from pymongo.errors import DuplicateKeyError
 from services.mongodb import get_collection
 from services import duplicate
+from services.auth import resource_status
 
 FOOD_CATEGORIES = ("VEG", "NON_VEG", "VEGAN", "BEVERAGE", "DESSERT", "OTHER")
 
@@ -82,7 +83,9 @@ def create_restaurant(owner_id, data):
         "openingHours": data.get("openingHours") or [],
         "cuisines": data.get("cuisines") or [],
         "images": data.get("images") or [],
-        "status": "APPROVED",
+        # Provider-created restaurants stay PENDING until the Main Admin
+        # approves them. Only a Main Admin account auto-approves.
+        "status": resource_status(owner_id),
         "createdAt": _now(),
         "updatedAt": _now(),
     }

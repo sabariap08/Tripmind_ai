@@ -80,7 +80,7 @@
     function navFor(role) {
         const fixtures = {
             USER: [
-                { group: '', items: [['Dashboard', 'overview'], ['Profile', 'myprofile']] },
+                { group: '', items: [['Dashboard', 'overview'], ['Passenger Details', 'url:/passengers.html'], ['Profile', 'myprofile']] },
                 { group: 'Plan', items: [['Plan My Trip', 'plantrip']] },
                 { group: 'My Stuff', items: [['My Bookings', 'book'], ['My Wallet', 'wallet'], ['Feedback', 'pfeedback']] },
             ],
@@ -220,6 +220,7 @@
         dash: 'M3 3h8v8H3V3zM13 3h8v5h-8V3zM13 10h8v11h-8V10zM3 13h8v8H3v-8z',
         approvals: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 15l2 2 5-5',
         users: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M8 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75',
+        'url:/passengers.html': 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
     };
     const ICON_SVG = (d) => `<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
     const navIcon = (id) => NAV_ICONS[id] ? ICON_SVG(NAV_ICONS[id]) : '';
@@ -227,8 +228,13 @@
     function renderNav() {
         const nav = $('portalNav');
         nav.innerHTML = navFor(user.role).map(sec => {
-            const items = sec.items.map(([label, id]) =>
-                `<a href="#" data-panel="${id}">${navIcon(id)}<span>${esc(label)}</span></a>`).join('');
+            const items = sec.items.map(([label, id]) => {
+                if (typeof id === 'string' && id.startsWith('url:')) {
+                    const href = id.slice(4);
+                    return `<a href="${esc(href)}">${navIcon(id)}<span>${esc(label)}</span></a>`;
+                }
+                return `<a href="#" data-panel="${id}">${navIcon(id)}<span>${esc(label)}</span></a>`;
+            }).join('');
             const head = sec.group ? `<div class="portal-nav-group">${esc(sec.group)}</div>` : '';
             return head + items;
         }).join('') +
@@ -653,6 +659,194 @@
         window.open('/pages/verify.html?token=' + encodeURIComponent(res.token), '_blank');
     });
 
+    /* ---------------------------------------------------------------------
+       Passenger picker
+       Shared by every booking dialog. Selecting travellers is optional: if
+       nobody is picked the server still records a headcount of the seats
+       bought, so an existing booking flow never breaks.
+       --------------------------------------------------------------------- */
+    let partyCache = null;
+
+    async function loadParty() {
+        if (partyCache) return partyCache;
+        try { partyCache = await api.passengers(); }
+        catch (e) { partyCache = []; }
+        return partyCache;
+    }
+
+    async function partyPickerMarkup(expected) {
+        const people = await loadParty();
+        if (!people.length) {
+            return `<div class="party-pick">
+                <p class="text-muted" style="margin:0;">No saved travellers. <a href="/pages/passengers.html" target="_blank" rel="noopener">Add passenger details</a> so operators can prepare — it is optional.</p>
+            </div>`;
+        }
+        const rows = people.map(p => `<label class="party-pick__row">
+            <input type="checkbox" data-px="${esc(p.id)}" ${p.isDefault ? 'checked' : ''}>
+            <span class="party-pick__name">${esc(p.fullName)}</span>
+            <span class="party-pick__meta">${esc([
+                p.age != null ? 'Age ' + p.age : null,
+                p.ageBand || null,
+                p.health && p.health.consent && p.health.mobility && p.health.mobility !== 'NONE' ? 'access needs' : null
+            ].filter(Boolean).join(' · ') || 'Saved traveller')}</span>
+        </label>`).join('');
+        return `<fieldset class="party-pick" data-party data-expected="${expected || 0}">
+            <legend class="party-pick__legend">Who is travelling? <span class="text-muted">optional</span></legend>
+            ${rows}
+            <p class="party-pick__note" data-party-note>Partners only ever see a headcount and coarse flags — never a name, age or health note.</p>
+        </fieldset>`;
+    }
+
+    function partySelected(scope) {
+        const box = (scope || document).querySelector('[data-party]');
+        if (!box) return [];
+        const expected = parseInt(box.dataset.expected || '0', 10);
+        const picked = Array.from(box.querySelectorAll('[data-px]:checked')).map(i => i.dataset.px);
+        const note = box.querySelector('[data-party-note]');
+        if (note) {
+            if (expected && picked.length > expected) {
+                note.textContent = `You picked ${picked.length} travellers for ${expected} seat${expected > 1 ? 's' : ''}. Reduce the selection or buy more seats.`;
+                note.classList.add('is-late');
+            } else if (expected && picked.length && picked.length < expected) {
+                note.textContent = `${expected - picked.length} seat${expected - picked.length > 1 ? 's' : ''} still unnamed — that is fine, we will just record the headcount.`;
+                note.classList.remove('is-late');
+            } else {
+                note.textContent = 'Partners only ever see a headcount and coarse flags — never a name, age or health note.';
+                note.classList.remove('is-late');
+            }
+        }
+        if (expected && picked.length > expected) throw new Error('You selected more travellers than seats on this booking.');
+        return picked;
+    }
+
+    /* ---------------------------------------------------------------------
+       Pre-trip checklist
+       The list is generated once and stored against the booking, so progress
+       survives refreshes, a new device, and an AI regeneration. Nothing from a
+       traveller's profile is sent to the model: the booking only carries a
+       headcount and coarse flags.
+       --------------------------------------------------------------------- */
+    const CHECKLIST_CATEGORY = {
+        DOCUMENTS: 'Documents', MONEY: 'Money', HEALTH: 'Health', LUGGAGE: 'Luggage',
+        CONNECTIVITY: 'Connectivity', LOCAL: 'Local', SAFETY: 'Safety', OTHER: 'Other'
+    };
+
+    function checklistDueLabel(item) {
+        if (!item.dueDate) return '';
+        const days = Math.round(
+            (new Date(item.dueDate + 'T00:00:00') - new Date(new Date().toDateString())) / 86400000);
+        if (days === 0) return 'today';
+        if (days === 1) return 'tomorrow';
+        if (days > 1) return `in ${days} days`;
+        if (days === -1) return 'yesterday';
+        return `${Math.abs(days)} days ago`;
+    }
+
+    function checklistItemsMarkup(doc) {
+        if (!doc.items || !doc.items.length) {
+            return '<p class="text-muted">Nothing on the list yet.</p>';
+        }
+        return doc.items.map(i => {
+            const due = checklistDueLabel(i);
+            const overdue = i.dueDate && !i.done && due.indexOf('ago') > -1;
+            return `<li class="ck-item ${i.done ? 'is-done' : ''}">
+                <label class="ck-item__label">
+                    <input type="checkbox" data-ck="${esc(i.id)}" ${i.done ? 'checked' : ''}>
+                    <span class="ck-item__body">
+                        <span class="ck-item__text">${esc(i.text)}</span>
+                        <span class="ck-item__meta">
+                            <span class="pill">${esc(CHECKLIST_CATEGORY[i.category] || 'Other')}</span>
+                            ${due ? `<span class="ck-item__due ${overdue ? 'is-late' : ''}">${esc(due)}</span>` : ''}
+                        </span>
+                    </span>
+                </label>
+                <button class="ck-item__del" type="button" data-ck-del="${esc(i.id)}" title="Remove">&times;</button>
+            </li>`;
+        }).join('');
+    }
+
+    async function openChecklist(bookingId) {
+        const m = dialog(`<h3>Pre-trip preparation</h3>
+            <p class="text-muted" id="ckSub">Reading your booking…</p>
+            <ul class="ck-list" id="ckList"></ul>
+            <div class="ck-add">
+                <input id="ckNew" class="form-input" placeholder="Add your own item…">
+                <button class="btn btn-outline btn-sm" id="ckAddBtn">Add</button>
+            </div>
+            <div class="flex between mt-4" style="align-items:center;">
+                <span class="ck-progress" id="ckProgress"></span>
+                <span class="flex gap">
+                    <button class="btn btn-outline" id="ckRegen" data-close>Close</button>
+                    <button class="btn btn-primary" id="ckGen">Generate checklist</button>
+                    <button class="btn btn-outline" id="ckAgain" hidden>Refresh suggestions</button>
+                </span>
+            </div>`);
+        m.get('#ckGen').addEventListener('click', () => loadChecklist(m, bookingId, true));
+        m.get('#ckAgain').addEventListener('click', () => run(async () => {
+            if (!confirm('Ask the planner for a fresh set of suggestions? Your ticks are kept.')) return;
+            m.get('#ckAgain').disabled = true;
+            try { paintChecklist(m, await api.regenerateChecklist(bookingId)); toast('Checklist refreshed.'); }
+            finally { m.get('#ckAgain').disabled = false; }
+        }));
+        m.get('#ckAddBtn').addEventListener('click', () => run(async () => {
+            const input = m.get('#ckNew');
+            const text = input.value.trim();
+            if (!text) return;
+            input.value = '';
+            paintChecklist(m, await api.addChecklistItem(bookingId, text));
+        }));
+        m.get('#ckNew').addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); m.get('#ckAddBtn').click(); }
+        });
+        m.get('#ckList').addEventListener('change', e => {
+            const box = e.target.closest('[data-ck]');
+            if (!box) return;
+            run(async () => {
+                paintChecklist(m, await api.setChecklistItem(bookingId, box.dataset.ck, box.checked));
+            });
+        });
+        m.get('#ckList').addEventListener('click', e => {
+            const del = e.target.closest('[data-ck-del]');
+            if (!del) return;
+            run(async () => {
+                paintChecklist(m, await api.deleteChecklistItem(bookingId, del.dataset.ckDel));
+            });
+        });
+        loadChecklist(m, bookingId, false);
+    }
+
+    function paintChecklist(m, payload) {
+        const doc = payload.checklist || {};
+        const progress = payload.progress || {};
+        m.get('#ckSub').textContent = doc.generatedAt
+            ? (doc.source === 'AI' ? 'Generated by the TripMind planner.' : 'Generated from the TripMind template.')
+            : 'Nothing generated for this booking yet.';
+        m.get('#ckList').innerHTML = checklistItemsMarkup(doc);
+        m.get('#ckProgress').textContent = (progress.done || 0) + ' of ' + (progress.total || 0) + ' done';
+        const has = !!(doc.items && doc.items.length);
+        m.get('#ckGen').hidden = has;
+        m.get('#ckAgain').hidden = !has;
+    }
+
+    async function loadChecklist(m, bookingId, generate) {
+        try {
+            const existing = await api.checklist(bookingId).catch(() => null);
+            if (existing && existing.checklist && existing.checklist.items
+                && existing.checklist.items.length) {
+                paintChecklist(m, existing);
+                return;
+            }
+            if (!generate) { paintChecklist(m, { checklist: {}, progress: {} }); return; }
+            m.get('#ckGen').disabled = true;
+            m.get('#ckSub').textContent = 'Building your list… this takes a few seconds.';
+            paintChecklist(m, await api.generateChecklist(bookingId));
+        } catch (e) {
+            m.get('#ckSub').textContent = e.message || 'Could not load the checklist.';
+        } finally {
+            m.get('#ckGen').disabled = false;
+        }
+    }
+
     /* Consolidated My Bookings: one card per booked trip (with ONE downloadable
        PDF ticket per trip) plus the individual service bookings underneath. */
     async function userMyBookings() {
@@ -672,6 +866,7 @@
                 <td><span class="pill ${x.status === 'CONFIRMED' ? 'good' : x.status === 'CANCELLED' || x.status === 'REJECTED' ? 'bad' : 'info'}">${esc(x.status)}</span></td>
                 <td>
                     ${x.status === 'CONFIRMED' ? `<button class="btn btn-outline btn-sm" onclick="TM.ticket('${x._id}', this)">PDF</button>` : ''}
+                    ${x.status === 'CONFIRMED' ? `<button class="btn btn-outline btn-sm" onclick="TM.checklist('${x._id}')">Prep</button>` : ''}
                     <button class="btn btn-outline btn-sm" onclick="TM.verify('${x._id}', this)" ${x.status !== 'CONFIRMED' ? 'disabled' : ''}>Verify</button>
                     <button class="btn btn-outline btn-sm" onclick="TM.cancel('${x._id}', this)" ${x.status !== 'CONFIRMED' ? 'disabled' : ''}>Cancel</button>
                 </td>
@@ -717,6 +912,9 @@
             try { await api.downloadTicket(id); toast('Ticket downloaded.'); }
             finally { btn.disabled = false; }
         });
+        /* AI-assisted pre-trip checklist, stored per booking. The traveller keeps
+           the tick marks if the AI rewrites the list later. */
+        window.TM.checklist = (id) => openChecklist(id);
         window.TM.reviewTrip = async (id, origin, destination) => {
             const m = dialog(`<h3>Review your trip</h3>
                 <p class="text-muted">${esc(origin)} → ${esc(destination)}</p>
@@ -901,20 +1099,38 @@
                 <td><button class="btn btn-primary btn-sm" onclick="TM.ptBookTransport('${x.transportId}', '${x.type}')">Book</button></td></tr>`).join('') + '</table>'
             : '<p class="text-muted">No transports found for this corridor.</p>';
     });
-    window.TM.ptBookTransport = async (tid, type) => run(async () => {
+    window.TM.ptBookTransport = async (tid, type) => {
         const date = $('pt_date').value || new Date().toISOString().slice(0, 10);
         const seatType = window.prompt('Seat / class type (e.g. SLEEPER, SL, Economy):', type === 'BUS' ? 'SLEEPER' : type === 'TRAIN' ? 'SL' : type === 'FLIGHT' ? 'Economy' : 'Standard') || 'Standard';
-        const qty = window.prompt('Number of seats/units:', '2') || '2';
-        const details = {};
-        if (type === 'CAB' || type === 'AUTO') {
-            const km = parseFloat(window.prompt('Trip distance (km) for the fare quote:', '10'));
-            if (!(km > 0)) { toast('Distance in km is required for cab/auto fares.'); return; }
-            details.distanceKm = km;
-        }
-        await api.createBooking({ type: 'TRANSPORT', transportId: tid, qty: parseInt(qty, 10), seatType, date, details });
-        toast('Transport booked.');
-        window.TM.ptSearch();
-    });
+        const qty = parseInt(window.prompt('Number of seats/units:', '2') || '2', 10);
+        if (!(qty > 0)) { toast('Enter how many seats you need.'); return; }
+        const m = dialog(`<h3>Book this ${esc(String(type).toLowerCase())} service</h3>
+            <p class="text-muted">${esc(qty)} seat${qty > 1 ? 's' : ''} · ${esc(seatType)} · ${esc(date)}</p>
+            <div id="pt_party"></div>
+            <div class="flex end gap">
+                <button class="btn btn-outline" data-close>Cancel</button>
+                <button class="btn btn-primary" id="__ok">Confirm Booking</button>
+            </div>`);
+        m.get('#pt_party').innerHTML = await partyPickerMarkup(qty);
+        m.get('#__ok').addEventListener('click', () => run(async () => {
+            const details = {};
+            if (type === 'CAB' || type === 'AUTO') {
+                const km = parseFloat(window.prompt('Trip distance (km) for the fare quote:', '10'));
+                if (!(km > 0)) { toast('Distance in km is required for cab/auto fares.'); return; }
+                details.distanceKm = km;
+            }
+            let passengerIds;
+            try { passengerIds = partySelected(m.el); }
+            catch (e) { toast(e.message); return; }
+            await api.createBooking({
+                type: 'TRANSPORT', transportId: tid, qty, seatType, date, details,
+                passengerIds,
+            });
+            m.close();
+            toast('Transport booked.');
+            window.TM.ptSearch();
+        }));
+    };
     window.TM.ptHotels = () => run(async () => {
         const res = await api.searchHotels({
             city: $('pt_hcity').value.trim() || undefined,
@@ -958,7 +1174,7 @@
             Amenities: ${esc((h.hotel.amenities || []).join(', '))}</p>
             <div class="hr-label">Room types</div>${rooms}`);
     });
-    window.TM.ptBookHotel = (hid, rtid, name, price) => {
+    window.TM.ptBookHotel = async (hid, rtid, name, price) => {
         const m = dialog(`<h3>Book · ${esc(name)}</h3>
             <div class="form-row">
                 ${field('Check-in', 'b_in', input('b_in', 'type="date" value="' + new Date().toISOString().slice(0, 10) + '"'))}
@@ -967,18 +1183,30 @@
                 ${field('Guests', 'b_guests', num('b_guests', 'value="2" min="1"'))}
             </div>
             <p class="text-muted">Nightly rate: ${money(price)} per room. Availability is confirmed at booking time.</p>
+            <div id="pt_party"></div>
             <div class="flex end gap">
                 <button class="btn btn-outline" data-close>Cancel</button>
                 <button class="btn btn-primary" id="__ok">Confirm Booking</button>
             </div>`);
+        const syncParty = async () => {
+            const guests = +m.get('#b_guests').value || 1;
+            m.get('#pt_party').innerHTML = await partyPickerMarkup(guests);
+        };
+        await syncParty();
+        m.get('#b_guests').addEventListener('change', syncParty);
         m.get('#__ok').addEventListener('click', () => run(async () => {
             const rooms = +m.get('#b_rooms').value || 1;
+            const guests = +m.get('#b_guests').value || 2;
             const nights = Math.max(1, Math.round((new Date(m.get('#b_out').value) - new Date(m.get('#b_in').value)) / 86400000));
+            let passengerIds;
+            try { passengerIds = partySelected(m.el); }
+            catch (e) { toast(e.message); return; }
             await api.createBooking({
                 type: 'HOTEL', hotelId: hid, roomTypeId: rtid, qty: rooms,
                 date: m.get('#b_in').value,
-                details: { checkin: m.get('#b_in').value, checkout: m.get('#b_out').value, nights, guests: +m.get('#b_guests').value || 2 },
+                details: { checkin: m.get('#b_in').value, checkout: m.get('#b_out').value, nights, guests },
                 unitPrice: price * nights,
+                passengerIds,
             });
             m.close();
             toast('Hotel booked successfully.');
@@ -1031,7 +1259,7 @@
             </div>`).join('')
             : '<p class="text-muted">No guides available for that location/date.</p>';
     });
-    window.TM.ptBookGuide = (gid, loc) => {
+    window.TM.ptBookGuide = async (gid, loc) => {
         const m = dialog(`<h3>Request a Guide</h3>
             ${field('Date', 'bg_date', input('bg_date', 'type="date" value="' + new Date().toISOString().slice(0, 10) + '"'))}
             <div class="form-row">
@@ -1039,16 +1267,28 @@
                 ${field('To (24h)', 'bg_t', input('bg_t', 'value="13:00"'))}
             </div>
             ${field('Location', 'bg_loc', input('bg_loc', 'value="' + esc(loc || '') + '"'))}
+            ${field('Travellers', 'bg_qty', num('bg_qty', 'value="1" min="1"'))}
             <p class="text-muted">The guide will confirm your request.</p>
+            <div id="pt_party"></div>
             <div class="flex end gap">
                 <button class="btn btn-outline" data-close>Cancel</button>
                 <button class="btn btn-primary" id="__ok">Send Request</button>
             </div>`);
+        const syncParty = async () => {
+            m.get('#pt_party').innerHTML = await partyPickerMarkup(+m.get('#bg_qty').value || 1);
+        };
+        await syncParty();
+        m.get('#bg_qty').addEventListener('change', syncParty);
         m.get('#__ok').addEventListener('click', () => run(async () => {
+            const qty = +m.get('#bg_qty').value || 1;
+            let passengerIds;
+            try { passengerIds = partySelected(m.el); }
+            catch (e) { toast(e.message); return; }
             await api.createBooking({
-                type: 'GUIDE', guideId: gid, qty: 1,
+                type: 'GUIDE', guideId: gid, qty,
                 date: m.get('#bg_date').value,
                 details: { startTime: m.get('#bg_f').value, endTime: m.get('#bg_t').value, location: m.get('#bg_loc').value.trim() },
+                passengerIds,
             });
             m.close();
             toast('Request sent to the guide.');
@@ -2509,106 +2749,166 @@
     };
 
     async function adminApprovals() {
-        setPageTitle('Approvals');
-        await renderApprovals();
+        setPageTitle('Partner approvals');
+        window.apprRole = window.apprRole || 'ALL';
+        $('portalContent').innerHTML = '<div id="approvalsRoot"></div>';
+        await renderApprovals('PENDING');
     }
 
-    async function renderApprovals() {
-        const PROVIDERS = ['RAILWAY_ADMIN', 'TRANSPORT_ADMIN', 'TOURIST_SPOT_ADMIN', 'HOTEL_ADMIN', 'RESTAURANT_ADMIN', 'GUIDE'];
-        const root = document.createElement('div');
-        root.className = 'approvals-root';
-        $('portalContent').innerHTML = '';
-        $('portalContent').appendChild(root);
+    async function renderApprovals(status = 'PENDING') {
+        const root = document.getElementById('approvalsRoot');
+        if (!root) return;
         root.innerHTML = loadingState();
         try {
-            const res = await api.adminUsers({ approvalStatus: 'PENDING' });
-            const users = (res.users || []).filter(u => PROVIDERS.includes(u.role));
-            window.TM.apprView = (uid) => openApproval(users.find(x => x.id === uid) || {});
-            window.TM.apprApprove = (uid) => confirmDialog('Approve registration',
-                `Approve the provider account of ${esc((users.find(x => x.id === uid) || {}).name || 'this user')}? They will be able to log in and publish immediately.`,
-                () => run(async () => {
-                    await api.adminSetApproval(uid, 'APPROVED');
-                    toast('Registration approved. Provider can now log in.');
-                    renderApprovals();
-                }), 'Approve');
-            window.TM.apprReject = (uid) => promptDialog('Reject registration',
-                'Enter the rejection reason (visible to the provider):',
+            const res = await api.adminPartners({ status });
+            const partners = res.partners || [];
+            const roleFilter = window.apprRole || 'ALL';
+            const shown = roleFilter === 'ALL' ? partners
+                : partners.filter(p => p.role === roleFilter);
+
+            window.TM.apprFilterRole = (r) => { window.apprRole = r; renderApprovals(status); };
+            window.TM.apprFilterStatus = (s) => {
+                window.apprStatus = s;
+                document.querySelectorAll('[data-appr-status]').forEach(b =>
+                    b.classList.toggle('btn-primary', b.dataset.apprStatus === s));
+                renderApprovals(s);
+            };
+            window.TM.apprView = (pid) => openApproval(
+                partners.find(p => p.id === pid) || {});
+            window.TM.apprApprove = (pid) => {
+                const p = partners.find(x => x.id === pid) || {};
+                confirmDialog('Approve partner',
+                    `Approve ${esc(p.partnerLabel || p.role)} account of ${esc(p.name || 'this partner')}? They will be able to sign in and publish immediately.`,
+                    () => run(async () => {
+                        await api.partnerDecision(pid, 'approve');
+                        toast('Approved. The partner can now sign in and publish.');
+                        renderApprovals(status);
+                    }), 'Approve');
+            };
+            window.TM.apprReject = (pid) => promptDialog('Reject partner',
+                'Give the partner a reason. They will see it, so be specific about what to fix:',
                 (reason) => run(async () => {
-                    await api.adminSetApproval(uid, 'REJECTED', reason);
-                    toast('Registration rejected.');
-                    renderApprovals();
+                    await api.partnerDecision(pid, 'reject', reason);
+                    toast('Rejected and the reason was recorded.');
+                    renderApprovals(status);
                 }), 'Not compliant with platform guidelines');
-            const head = `<div class="admin-head"><div><h1>Approvals</h1>
-                <div class="admin-head-sub">Provider registrations awaiting your review</div></div></div>`;
-            if (!users.length) {
-                root.innerHTML = head + section('Pending Provider Registrations',
-                    emptyState('No pending approvals', 'Provider registrations awaiting a decision will appear here.'));
+
+            const statusTabs = ['PENDING', 'APPROVED', 'REJECTED', 'ALL'].map(s =>
+                `<button class="btn btn-sm ${s === status ? 'btn-primary' : 'btn-outline'}" data-appr-status="${s}" onclick="TM.apprFilterStatus('${s}')">${s[0] + s.slice(1).toLowerCase()}</button>`).join(' ');
+
+            const roleTabs = ['ALL'].concat(res.roles || []).map(r =>
+                `<button class="btn btn-sm ${r === roleFilter ? 'btn-primary' : 'btn-outline'}" onclick="TM.apprFilterRole('${r}')">${r === 'ALL' ? 'All roles' : esc(roleFriendly(r))}</button>`).join(' ');
+
+            const head = `<div class="admin-head"><div><h1>Partner approvals</h1>
+                <div class="admin-head-sub">Every operational role is reviewed by the Main Admin before it can publish.</div></div></div>
+                <div class="flex gap" style="margin-bottom:.75rem;">${statusTabs}</div>
+                <div class="flex gap" style="margin-bottom:1rem;">${roleTabs}</div>`;
+
+            if (!shown.length) {
+                root.innerHTML = head + section(
+                    status === 'PENDING' ? 'Pending partner registrations' : 'Partner accounts',
+                    emptyState('Nothing here',
+                        status === 'PENDING'
+                            ? 'Every partner registration has had a decision. New submissions land here automatically.'
+                            : 'No partner accounts match this filter.'));
                 return;
             }
-            const rows = users.map(u => `<tr>
-                <td><div class="u-name">${esc(u.name)}</div><div class="u-email">${esc(u.email)}</div></td>
-                <td>${esc(roleFriendly(u.role))}</td>
-                <td>${esc((u.createdAt || '').slice(0, 10))}</td>
-                <td><span class="pill warn">PENDING</span></td>
-                <td>
-                    <div class="flex gap">
-                        <button class="btn btn-outline btn-sm" onclick="window.TM.apprView('${u.id}')">Review</button>
-                        <button class="btn btn-success btn-sm" onclick="window.TM.apprApprove('${u.id}')">Approve</button>
-                        <button class="btn btn-danger btn-sm" onclick="window.TM.apprReject('${u.id}')">Reject</button>
-                    </div>
-                </td></tr>`).join('');
-            root.innerHTML = head + section('Pending Provider Registrations',
+
+            const rows = shown.map(p => {
+                const reg = p.registration || {};
+                const where = [reg.address, reg.city, reg.district].filter(Boolean).join(', ');
+                const docs = (p.documents || []).length;
+                const stamp = (p.approvedAt || p.rejectedAt || p.createdAt || '').slice(0, 10);
+                return `<tr>
+                    <td>
+                        <div class="u-name">${esc(p.name)}</div>
+                        <div class="u-email">${esc(p.email)}</div>
+                        ${where ? `<div class="u-email">${esc(where)}</div>` : ''}
+                    </td>
+                    <td><span class="pill info">${esc(p.partnerLabel || roleFriendly(p.role))}</span></td>
+                    <td>
+                        ${docs} document${docs === 1 ? '' : 's'}
+                        ${p.imageCount ? ` · ${p.imageCount} photo${p.imageCount === 1 ? '' : 's'}` : ''}
+                    </td>
+                    <td>${esc(stamp)}</td>
+                    <td><span class="pill ${p.approvalStatus === 'APPROVED' ? 'ok' : p.approvalStatus === 'REJECTED' ? 'bad' : 'warn'}">${esc(p.approvalStatus || 'PENDING')}</span></td>
+                    <td>
+                        <div class="flex gap">
+                            <button class="btn btn-outline btn-sm" onclick="TM.apprView('${p.id}')">Review</button>
+                            ${p.approvalStatus === 'PENDING' ? `
+                                <button class="btn btn-success btn-sm" onclick="TM.apprApprove('${p.id}')">Approve</button>
+                                <button class="btn btn-danger btn-sm" onclick="TM.apprReject('${p.id}')">Reject</button>` : ''}
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            root.innerHTML = head + section(
+                status === 'PENDING' ? 'Pending partner registrations' : 'Partner accounts',
                 `<div class="table-scroll"><table class="admin-table">
-                    <thead><tr><th>Name</th><th>Role</th><th>Registered</th><th>Status</th><th>Actions</th></tr></thead>
+                    <thead><tr><th>Partner</th><th>Role</th><th>Evidence</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
                     <tbody>${rows}</tbody></table></div>
-                    <div class="admin-section-note">${users.length} pending registration${users.length === 1 ? '' : 's'}. Approving re-enables login immediately; rejecting and approving both remove the request from this list.</div>`);
+                 <div class="admin-section-note">${shown.length} partner account${shown.length === 1 ? '' : 's'}. A rejection needs a reason and unpublishes any listing immediately; re-approving publishes it again.</div>`);
         } catch (e) {
-            root.innerHTML = section('Pending Provider Registrations', errorState(e.message, '() => renderApprovals()'));
+            root.innerHTML = section('Partner approvals', errorState(e.message, '() => renderApprovals()'));
         }
     }
 
-    function openApproval(u) {
-        if (!u || !u.id) return;
-        const reg = u.registration || {};
-        const prof = u.profile || {};
-        const extra = [];
-        if (prof.scope) extra.push(['Scope', esc(prof.scope)]);
-        if (prof.serviceName) extra.push(['Service Name', esc(prof.serviceName)]);
-        if (prof.contact) extra.push(['Contact', esc(prof.contact)]);
-        if (prof.locations && prof.locations.length) extra.push(['Locations', esc(prof.locations.join(', '))]);
-        const imgs = (Array.isArray(u.images) ? u.images : []).filter(Boolean);
-        const docs = (Array.isArray(u.documents) ? u.documents : []).filter(Boolean);
-        const regRowsHtml = Object.entries(reg).filter(([, v]) => v != null && String(v).trim() !== '')
-            .map(([k, v]) => `<div class="detail-item"><span class="k">${esc(k)}</span><span class="v">${
-                /^data:/i.test(String(v)) ? 'Uploaded file (' + esc(mediaSub(v)) + ')' : esc(String(v))
-            }</span></div>`).join('');
-        const m = dialog(`
-            <h3>Registration review</h3>
-            <div class="text-muted" style="font-size:.85rem;margin-bottom:.75rem;">${esc(u.name)} · ${esc(u.email)} · ${esc(roleFriendly(u.role))} · PENDING</div>
-            <div class="detail-list">
-                ${regRowsHtml}
-                ${extra.map(([k, v]) => `<div class="detail-item"><span class="k">${esc(k)}</span><span class="v">${v}</span></div>`).join('')}
-            </div>
-            ${docs.length ? `<div class="subsection-title" style="margin-top:1rem;">Documents / Proof</div>${documentChips(docs)}` : ''}
-            ${imgs.length ? `<div class="subsection-title" style="margin-top:1rem;">Uploaded images</div><div class="image-grid">${imgs.map(i => imageTile(i, 'registration image')).join('')}</div>` : ''}
-            <div class="flex end gap" style="margin-top:1.25rem;">
-                <button class="btn btn-outline" data-close>Close</button>
-                <button class="btn btn-danger" id="__rej">Reject</button>
-                <button class="btn btn-success" id="__appr">Approve</button>
-            </div>`);
-        const box = m.el.querySelector('.modal-box');
-        if (box) box.classList.add('wide');
-        m.get('#__appr').addEventListener('click', () => run(async () => {
-            m.close();
-            await api.adminSetApproval(u.id, 'APPROVED');
-            toast('Registration approved. Provider can now log in.');
-            renderApprovals();
-        }));
-        m.get('#__rej').addEventListener('click', () => {
-            m.close();
-            window.TM.apprReject(u.id);
-        });
+function openApproval(u) {
+    if (!u || !u.id) return;
+    const reg = u.registration || {};
+    /* Documents may arrive either as a plain data-URI list (legacy) or as the
+       new {id, label, classification, source} records. Render both. */
+    const docRecords = (u.documents || []).filter(d => d && typeof d === 'object');
+    const docUris = (u.documents || []).filter(d => typeof d === 'string');
+    const reqs = (u.requirements || u.verification || []);
+    const statusPill = { APPROVED: 'ok', REJECTED: 'bad' }[u.approvalStatus] || 'warn';
+    const regRowsHtml = Object.entries(reg).filter(([, v]) => v != null && String(v).trim() !== '' &&
+    !/^data:/i.test(String(v)))
+    .map(([k, v]) => `<div class="detail-item"><span class="k">${esc(k)}</span><span class="v">${
+    Array.isArray(v) ? esc(v.join(', ')) : esc(String(v))
+    }</span></div>`).join('');
+    const m = dialog(`
+    <h3>Partner registration review</h3>
+    <div class="text-muted" style="font-size:.85rem;margin-bottom:.75rem;">
+    ${esc(u.name)} &middot; ${esc(u.email)} &middot; ${esc(u.partnerLabel || roleFriendly(u.role))} &middot;
+    <span class="pill ${statusPill}">${esc(u.approvalStatus || 'PENDING')}</span></div>
+    ${u.identityNumber ? `<div class="detail-item"><span class="k">${esc(u.identityType || 'ID')}</span><span class="v">${esc(u.identityNumber)}</span></div>` : ''}
+    ${u.mobile ? `<div class="detail-item"><span class="k">Mobile</span><span class="v">${esc(u.mobile)}</span></div>` : ''}
+    <div class="detail-list">${regRowsHtml}</div>
+    ${reqs.length ? `<div class="subsection-title" style="margin-top:1rem;">Verification requirements for this role</div>
+    <ul class="appr-reqs">${reqs.map(r => {
+        const cls = r.requirement === 'MANDATORY' ? 'bad' : r.requirement === 'CONDITIONAL' ? 'warn' : 'info';
+        const submitted = (docRecords.find(d => d.id === r.id) || {}).data;
+        return `<li>
+    <span class="pill ${cls}">${esc(r.requirement || 'OPTIONAL')}</span>
+    <span class="appr-req__label">${esc(r.label || r.id)}${r.verified === false ? ' <span class="text-muted">(threshold unverified)</span>' : ''}</span>
+    <span class="appr-req__note">${esc(r.condition || r.help || '')}${submitted ? '' : ' · not supplied'}</span>
+    <span class="appr-req__src">${esc(r.source || '')}</span>
+    </li>`; }).join('')}</ul>` : ''}
+    ${docRecords.length ? `<div class="subsection-title" style="margin-top:1rem;">Submitted documents</div>
+    <ul class="appr-reqs">${docRecords.map(d => `<li>
+    <span class="pill ${d.data ? 'ok' : 'bad'}">${d.data ? 'Attached' : 'Missing'}</span>
+    <span class="appr-req__label">${esc(d.label || d.id)}</span>
+    <span class="appr-req__src">${esc(d.type || '')}</span>
+    </li>`).join('')}</ul>` : ''}
+    ${docUris.length ? `<div class="subsection-title" style="margin-top:1rem;">Documents / Proof</div>${documentChips(docUris)}` : ''}
+    ${u.imageCount ? `<div class="subsection-title" style="margin-top:1rem;">Uploaded images</div><p class="text-muted">${u.imageCount} photo${u.imageCount === 1 ? '' : 's'} received and passed the format and size check.</p>` : ''}
+    ${u.approvalReason ? `<p class="text-muted" style="margin-top:1rem;">Recorded reason: ${esc(u.approvalReason)}</p>` : ''}
+    <div class="flex end gap" style="margin-top:1.25rem;">
+    <button class="btn btn-outline" data-close>Close</button>
+    ${u.approvalStatus === 'PENDING' ? `
+    <button class="btn btn-danger" id="__rej">Reject</button>
+    <button class="btn btn-success" id="__appr">Approve</button>` : ''}
+    </div>`);
+    const box = m.el.querySelector('.modal-box');
+    if (box) box.classList.add('wide');
+    const appr = m.get('#__appr');
+    if (appr) appr.addEventListener('click', () => { m.close(); window.TM.apprApprove(u.id); });
+    const rej = m.get('#__rej');
+    if (rej) rej.addEventListener('click', () => { m.close(); window.TM.apprReject(u.id); });
     }
+
 
     /* Preserved across View → Back navigation so search/role state survives. */
     const USER_FILTERS = [

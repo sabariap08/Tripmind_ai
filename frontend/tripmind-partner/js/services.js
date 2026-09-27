@@ -270,7 +270,12 @@
     }
 
     P.boot({
-        view: function () {
+        view: function (state) {
+            /* Only transport partners manage buses/cabs/autos. */
+            if (state.role !== 'TRANSPORT_ADMIN') {
+                P.go('dashboard');
+                return;
+            }
             f.querySelectorAll('input[name="svcType"]').forEach(function (r) {
                 r.addEventListener('change', function () {
                     if (editing) clearForm();

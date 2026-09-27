@@ -119,11 +119,15 @@ function redirectToLogin() {
     return null;
 }
 
-/* Where a freshly signed-in account belongs. Transport partners have their own
- * hub; every other provider category keeps the existing provider console. */
+/* Where a freshly signed-in account belongs. Every partner role lives in the
+ * TripMind Partner Hub now. Passengers and ADMIN land on their own consoles. */
 function roleLanding(user) {
     const role = user && user.role;
-    if (role === 'TRANSPORT_ADMIN') return '/tripmind-partner/dashboard';
+    if (role === 'TRANSPORT_ADMIN' || role === 'HOTEL_ADMIN' ||
+        role === 'RESTAURANT_ADMIN' || role === 'TOURIST_SPOT_ADMIN' ||
+        role === 'GUIDE') {
+        return '/tripmind-partner/dashboard';
+    }
     return '/portal.html';
 }
 

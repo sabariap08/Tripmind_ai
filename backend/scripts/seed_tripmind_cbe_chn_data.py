@@ -140,8 +140,10 @@ ACCOUNTS = [
     {"role": "USER", "name": "TripMind Traveller", "company": "Passenger",
      "email": "user@tripmind.com", "city": "Chennai", "companyId": "usr"},
     # -- Railway / IRCTC Admin --
+    # Must match config.IRCTC_ADMIN_EMAIL or the seed account will not be able
+    # to create/manage trains (the check is on the email, not just the role).
     {"role": "RAILWAY_ADMIN", "name": "T. Narayanan", "company": "Southern Railway — Coimbatore Division",
-     "email": "railway.southern@tripmind.demo", "city": "Coimbatore", "companyId": "ir"},
+     "email": os.getenv("IRCTC_ADMIN_EMAIL", "irctc@tripmind.com"), "city": "Coimbatore", "companyId": "ir"},
     # -- Transport Admins --
     {"role": "TRANSPORT_ADMIN", "name": "S. Ramesh", "company": "SRL Travels",
      "email": "transport.srl@tripmind.demo", "city": "Coimbatore", "companyId": "srl"},

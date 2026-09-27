@@ -116,7 +116,12 @@
     }
 
     P.boot({
-        view: function () {
+        view: function (state) {
+            /* Only transport partners have boarding points. */
+            if (state.role !== 'TRANSPORT_ADMIN') {
+                P.go('dashboard');
+                return;
+            }
             ['ptLat', 'ptLng'].forEach(function (id) {
                 el(id).addEventListener('input', function () {
                     el(id).value = el(id).value.replace(/[^\d.-]/g, '');

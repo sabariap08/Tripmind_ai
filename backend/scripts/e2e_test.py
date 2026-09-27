@@ -124,13 +124,30 @@ def main():
         "yearsExperience": "5", "pricePerHour": "700", "pricePerDay": "4000"})
     approve_user(gid)
 
-    # Trains may only be created by a Railways/IRCTC admin (see _can_manage_ttype).
-    rae = "e2e_railway_%s@test.in" % POSTFIX
-    _, reid = signup(c, "RAILWAY_ADMIN", rae, "Passw0rd@123", {
-        "companyName": "E2E Railways %s" % POSTFIX, "serviceArea": "Tamil Nadu",
-        "companyCity": "Chennai", "companyAddress": "Egmore",
-        "companyPhone": "9999999995"})
-    approve_user(reid)
+    # Trains may only be created by the authorised IRCTC account. RAILWAY_ADMIN
+    # is deliberately not self-registerable, so the fixture is provisioned
+    # directly and gated on the configured IRCTC email.
+    from services.auth import is_irctc_admin
+    from config import ROLES
+    from datetime import datetime
+    from services.auth import hash_password
+    rail_email = os.getenv("IRCTC_ADMIN_EMAIL", "irctc@tripmind.com").lower()
+    rail_user_id = "e2e_rail_%s" % POSTFIX
+    get_collection("users").update_one(
+        {"_id": rail_user_id},
+        {"$set": {
+            "_id": rail_user_id, "name": "E2E Railways", "email": rail_email,
+            "mobile": "9999999995", "role": ROLES["RAILWAY_ADMIN"],
+            "passwordHash": hash_password("Passw0rd@123"),
+            "status": "ACTIVE", "approvalStatus": "APPROVED",
+            "createdAt": datetime.utcnow().isoformat()}},
+        upsert=True)
+    ok("railway fixture is the authorised IRCTC account",
+       bool(get_collection("users").find_one(
+           {"_id": rail_user_id, "email": rail_email})), rail_email)
+    ok("a non-IRCTC railway email is refused",
+       is_irctc_admin({"role": ROLES["RAILWAY_ADMIN"], "email": "rail@other.com"}) is False)
+    reid = rail_user_id
 
     # ------------------------------------------------------- fixtures (catalogues)
     def approve_doc(coll, doc_id):
@@ -225,8 +242,8 @@ def main():
                                 {"day": "Sun", "departure": "20:30", "arrival": "04:00"}]}})
 
     # Second service on the same route so AI transport switching has an
-    # alternative. Trains are registered by the Railways admin.
-    login(c, rae, "Passw0rd@123")
+    # alternative. Trains are registered by the authorised IRCTC account.
+    login(c, rail_email, "Passw0rd@123")
     r = c.post("/api/transport/register", json={
         "type": "TRAIN", "trainNumber": "E2E-TRN-%s" % POSTFIX,
         "trainName": "E2E Express", "boardingStation": "Coimbatore Jn", "departureTime": "19:00",

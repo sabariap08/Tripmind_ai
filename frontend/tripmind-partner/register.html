@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Become a TripMind partner — Partner Hub</title>
-    <meta name="description" content="Apply to run your buses and vehicles on TripMind. Register once, then list services, set boarding points and track bookings.">
+    <meta name="description" content="Apply to list your bus, hotel, restaurant, attraction or guiding service on TripMind. One application, Main Admin reviewed.">
     <meta name="theme-color" content="#06202b">
     <meta name="robots" content="noindex, follow">
     <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
@@ -12,8 +12,9 @@
     <link rel="manifest" href="/manifest.json">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="css/partner.css">
+    <link rel="stylesheet" href="../css/style.css">
 </head>
-<body>
+<body class="ph-reg">
     <a class="ph-skip" href="#phApply">Skip to the form</a>
 
     <div class="ph-auth">
@@ -28,235 +29,95 @@
             </a>
             <div class="ph-auth__body">
                 <p class="tm-eyebrow tm-eyebrow--on-dark">Partner application</p>
-                <h2>One application. Your buses on TripMind.</h2>
+                <h2>One application for every TripMind service.</h2>
                 <ul class="ph-auth__points">
-                    <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2Z"/></svg>Takes about two minutes — no documents needed to apply.</li>
-                    <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2Z"/></svg>We review every partner before any service goes live.</li>
-                    <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2Z"/></svg>You keep control of routes, schedules, seats and fares.</li>
+                    <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2Z"/></svg>Operators, hotels, restaurants, attractions and guides all apply here.</li>
+                    <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2Z"/></svg>We only ask for what your role genuinely needs — nothing invented.</li>
+                    <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2Z"/></svg>Every application is reviewed by a TripMind Main Admin.</li>
                 </ul>
             </div>
             <p class="tm-2xs" style="color:var(--tm-on-dark-2);margin:0">Already a partner? <a href="/tripmind-partner/login" style="color:var(--tm-gold-soft)">Sign in instead</a>.</p>
         </aside>
 
         <main class="ph-auth__main" id="phApply">
-            <div class="ph-auth__box" style="max-width:31rem">
+            <div class="ph-auth__box ph-auth__box--wide">
                 <a class="ph-backlink" href="/tripmind-partner">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12 15.4 5.4Z"/></svg>
                     TripMind Partner Hub
                 </a>
+
                 <h1 class="tm-h2" style="margin-top:1.5rem">Apply to partner</h1>
-                <p class="tm-sm tm-muted" style="margin:.5rem 0 1.75rem">
-                    We only ask for what we need to review and run your service. You will be able to add buses and
-                    boarding points as soon as your account is approved.
+                <p class="tm-sm tm-muted" style="margin:.5rem 0 1.5rem">
+                    Tell us what you run. The form changes to match your service, and every
+                    requirement is labelled <strong>required</strong>, <strong>conditional</strong>
+                    or <strong>optional</strong> with the rule it comes from.
                 </p>
 
-                <form id="phRegForm" novalidate>
-                    <p class="ph-form__legend">What kind of partner are you?</p>
-                    <div class="ph-choice" style="margin-bottom:1.25rem" role="radiogroup" aria-label="Partner type">
-                        <label class="ph-choice__opt">
-                            <input type="radio" name="partnerType" value="BUS_OPERATOR" checked data-validate="required">
-                            <span>Bus operator<small>Own or run buses on fixed routes</small></span>
-                        </label>
-                        <label class="ph-choice__opt">
-                            <input type="radio" name="partnerType" value="DRIVER" data-validate="required">
-                            <span>Driver / vehicle owner<small>Cabs and autos you drive</small></span>
-                        </label>
-                        <label class="ph-choice__opt">
-                            <input type="radio" name="partnerType" value="TRAVEL_OPERATOR" data-validate="required">
-                            <span>Travel operator<small>Multi-city or multi-vehicle travel</small></span>
-                        </label>
-                        <label class="ph-choice__opt">
-                            <input type="radio" name="partnerType" value="OTHER" data-validate="required">
-                            <span>Other<small>Tell us in the company description</small></span>
-                        </label>
+                <div id="phMetaError" class="tm-alert tm-alert--error" hidden></div>
+
+                <!-- Role chooser -->
+                <section id="phRoleStep" class="ph-step" aria-labelledby="phRoleStepH">
+                    <h2 class="ph-form__legend" id="phRoleStepH">1. What kind of partner are you?</h2>
+                    <div class="ph-rolegrid" id="phRoleGrid" role="radiogroup" aria-label="Partner type">
+                        <p class="tm-sm tm-muted">Loading partner types…</p>
+                    </div>
+                </section>
+
+                <!-- Everything below is rendered from the server schema -->
+                <form id="phRegForm" novalidate hidden>
+                    <ol class="ph-steps" id="phStepBar" aria-label="Application steps"></ol>
+
+                    <div class="ph-step" data-step="account">
+                        <h2 class="ph-form__legend">2. Your sign-in details</h2>
+                        <div id="phAccountFields"></div>
                     </div>
 
-                    <p class="ph-form__legend">Business</p>
-                    <div class="tm-field">
-                        <label class="tm-label" for="phCompany">Business / operator name <span class="req">*</span></label>
-                        <input class="tm-input" type="text" id="phCompany" name="companyName" autocomplete="organization"
-                               placeholder="e.g. Southern Express Lines" data-validate="required" maxlength="80">
-                        <span class="tm-error" aria-live="polite"></span>
-                    </div>
-                    <div class="tm-field">
-                        <label class="tm-label" for="phGst">GST / registration number <span class="tm-muted">(optional)</span></label>
-                        <input class="tm-input" type="text" id="phGst" name="gst" placeholder="Optional" maxlength="24">
-                        <span class="tm-hint">If you have one, it helps us verify the operator faster.</span>
-                        <span class="tm-error" aria-live="polite"></span>
-                    </div>
-                    <div class="tm-field">
-                        <label class="tm-label" for="phArea">Operating area <span class="req">*</span></label>
-                        <input class="tm-input" type="text" id="phArea" name="companyAddress" placeholder="e.g. Coimbatore → Chennai"
-                               data-validate="required" maxlength="120">
-                        <span class="tm-error" aria-live="polite"></span>
+                    <div class="ph-step" data-step="business">
+                        <h2 class="ph-form__legend" id="phBusinessLegend">3. About your service</h2>
+                        <div id="phBusinessFields"></div>
                     </div>
 
-                    <p class="ph-form__legend">Your details</p>
-                    <div class="tm-field">
-                        <label class="tm-label" for="phName">Full name <span class="req">*</span></label>
-                        <input class="tm-input" type="text" id="phName" name="name" autocomplete="name"
-                               placeholder="Your full name" data-validate="required" maxlength="60">
-                        <span class="tm-error" aria-live="polite"></span>
-                    </div>
-                    <div class="tm-field">
-                        <label class="tm-label" for="phRegEmail">Email <span class="req">*</span></label>
-                        <input class="tm-input" type="email" id="phRegEmail" name="email" autocomplete="email"
-                               placeholder="you@operator.com" data-validate="required,email" maxlength="120">
-                        <span class="tm-error" aria-live="polite"></span>
-                    </div>
-                    <div class="tm-field">
-                        <label class="tm-label" for="phPhone">Mobile number <span class="req">*</span></label>
-                        <input class="tm-input" type="tel" id="phPhone" name="mobile" autocomplete="tel"
-                               inputmode="numeric" placeholder="10-digit mobile number" data-validate="required" maxlength="10">
-                        <span class="tm-hint">Used by the TripMind team if we need to reach you about the application.</span>
-                        <span class="tm-error" aria-live="polite"></span>
+                    <div class="ph-step" data-step="location" id="phLocationStep">
+                        <h2 class="ph-form__legend">4. Business location</h2>
+                        <div id="phLocationFields"></div>
                     </div>
 
-                    <p class="ph-form__legend">Password</p>
-                    <div class="tm-field">
-                        <label class="tm-label" for="phRegPassword">Password <span class="req">*</span></label>
-                        <input class="tm-input" type="password" id="phRegPassword" name="password"
-                               autocomplete="new-password" placeholder="At least 8 characters" data-validate="required,minlen:8">
-                        <span class="tm-error" aria-live="polite"></span>
+                    <div class="ph-step" data-step="hours" id="phHoursStep">
+                        <h2 class="ph-form__legend">5. Weekly operating hours</h2>
+                        <div id="phScheduleFields"></div>
                     </div>
-                    <div class="tm-field">
-                        <label class="tm-label" for="phConfirm">Confirm password <span class="req">*</span></label>
-                        <input class="tm-input" type="password" id="phConfirm" name="confirmPassword"
-                               autocomplete="new-password" placeholder="Type it once more" data-validate="required,match:#phRegPassword">
-                        <span class="tm-error" aria-live="polite"></span>
-                    </div>
-                    <label class="tm-check" style="margin-bottom:1rem">
-                        <input type="checkbox" id="phTerms" name="terms">
-                        <span class="tm-check__text">I confirm I am authorised to offer these services on TripMind.</span>
-                    </label>
 
-                    <button class="tm-btn tm-btn--primary tm-btn--block" type="submit" id="phRegBtn">Submit application</button>
-                    <p class="tm-formnote" id="phRegNote" data-show="false" role="status"></p>
+                    <div class="ph-step" data-step="photos" id="phPhotosStep">
+                        <h2 class="ph-form__legend">6. Photos</h2>
+                        <div id="phImageFields"></div>
+                    </div>
+
+                    <div class="ph-step" data-step="documents">
+                        <h2 class="ph-form__legend">7. Verification documents</h2>
+                        <div id="phDocumentFields"></div>
+                    </div>
+
+                    <div class="ph-step" data-step="review">
+                        <h2 class="ph-form__legend">8. Review &amp; submit</h2>
+                        <div id="phReview"></div>
+                    </div>
+
+                    <div class="ph-form__actions">
+                        <button type="button" class="tm-btn tm-btn--ghost" id="phBack" hidden>Back</button>
+                        <button type="button" class="tm-btn" id="phNext">Continue</button>
+                        <button type="submit" class="tm-btn tm-btn--primary" id="phSubmit" hidden>Submit application</button>
+                    </div>
                 </form>
 
-                <div class="ph-auth__alt" id="phRegAlt" hidden>
-                    <p style="margin:0 0 .75rem">
-                        <strong>Already approved and ready to work?</strong>
-                        <a href="/tripmind-partner/login">Sign in to the Partner Hub</a>.
-                    </p>
-                    <p class="tm-2xs tm-muted" style="margin:0">
-                        Application status? Sign in with the same email — we will tell you where it stands.
-                    </p>
-                </div>
-
-                <div class="ph-auth__alt" id="phRegFoot">
-                    <p class="tm-2xs tm-muted" style="margin:0">
-                        Planning trips as a traveller? <a href="/register.html">Create a traveller account</a> —
-                        or run a hotel, restaurant, tour, guide or rail service on the
-                        <a href="/register.html?provider=1">provider application</a>.
-                    </p>
-                </div>
+                <div id="phDone" hidden></div>
             </div>
         </main>
     </div>
 
-    <script src="../js/api.js"></script>
-    <script src="../js/ui.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/maps.js"></script>
     <script src="js/partner.js"></script>
-    <script>
-        (function () {
-            var form = document.getElementById('phRegForm');
-            var btn = document.getElementById('phRegBtn');
-            var note = document.getElementById('phRegNote');
-
-            function say(message, kind) {
-                note.textContent = message;
-                note.dataset.show = 'true';
-                note.className = 'tm-formnote' + (kind === 'error' ? ' tm-formnote--error' : kind === 'warn' ? ' tm-formnote--warn' : '');
-            }
-
-            function fieldErrorOn(id, message) {
-                var input = document.getElementById(id);
-                if (!input) return;
-                TM.fieldError(input, message);
-                input.focus();
-            }
-
-            /* A ten-digit mobile is what the backend accepts; fail fast in the
-             * browser so nobody waits on a server round trip for it. */
-            var phone = document.getElementById('phPhone');
-            phone.addEventListener('input', function () {
-                phone.value = phone.value.replace(/\D/g, '').slice(0, 10);
-            });
-            phone.addEventListener('blur', function () {
-                if (phone.value && phone.value.length !== 10) {
-                    TM.fieldError(phone, 'Enter a valid 10-digit mobile number.');
-                }
-            });
-
-            TM.forms(form, {
-                onSubmit: async function () {
-                    var terms = document.getElementById('phTerms');
-                    if (!terms.checked) {
-                        terms.setAttribute('aria-invalid', 'true');
-                        say('Please confirm you are authorised to offer these services.', 'error');
-                        terms.focus();
-                        return;
-                    }
-                    terms.setAttribute('aria-invalid', 'false');
-                    if (document.getElementById('phPhone').value.length !== 10) {
-                        fieldErrorOn('phPhone', 'Enter a valid 10-digit mobile number.');
-                        return;
-                    }
-                    var company = document.getElementById('phCompany').value.trim();
-                    var area = document.getElementById('phArea').value.trim();
-                    var partnerType = form.querySelector('input[name="partnerType"]:checked').value;
-                    var gst = document.getElementById('phGst').value.trim();
-                    /* The Partner Hub reuses the existing provider account: the
-                     * service details live in `registration` (reviewed by the
-                     * TripMind team) and the service name in `profile`, which is
-                     * what the fleet documents read. Nothing new is invented. */
-                    var payload = {
-                        role: TM_PARTNER.PARTNER_ROLE,
-                        name: document.getElementById('phName').value.trim(),
-                        email: document.getElementById('phRegEmail').value.trim(),
-                        mobile: document.getElementById('phPhone').value.trim(),
-                        password: document.getElementById('phRegPassword').value,
-                        gst: gst,
-                        registration: {
-                            partnerType: partnerType,
-                            companyName: company,
-                            companyAddress: area,
-                            operatingArea: area,
-                            gst: gst,
-                            contactNumber: document.getElementById('phPhone').value.trim()
-                        },
-                        profile: {
-                            serviceName: company,
-                            contact: document.getElementById('phPhone').value.trim()
-                        }
-                    };
-                    TM.button(btn, true);
-                    note.dataset.show = 'false';
-                    try {
-                        var res = await api.register(payload);
-                        /* Provider accounts are created PENDING by design — say so
-                         * plainly rather than pretending the account is live. */
-                        form.hidden = true;
-                        document.getElementById('phRegAlt').hidden = false;
-                        document.getElementById('phRegFoot').hidden = true;
-                        var heading = document.getElementById('phRegAlt');
-                        heading.insertAdjacentHTML('afterbegin',
-                            '<div class="ph-note ph-note--wait" style="margin-bottom:1rem">' +
-                            '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15h-2v-2h2v2Zm0-4h-2V7h2v6Z"/></svg>' +
-                            '<div><b>Application received.</b> ' + TM_PARTNER.esc(res.message || 'Your partner account is pending approval.') +
-                            ' We review every partner before any service goes live, and you will be able to sign in as soon as it is approved.</div></div>');
-                        window.scrollTo({ top: 0, behavior: TM.reducedMotion() ? 'auto' : 'smooth' });
-                    } catch (e) {
-                        if (e.message && /mobile/i.test(e.message)) fieldErrorOn('phPhone', e.message);
-                        else if (e.message && /email/i.test(e.message)) fieldErrorOn('phRegEmail', e.message);
-                        else say(e.message, 'error');
-                        TM.button(btn, false);
-                    }
-                }
-            });
-        })();
-    </script>
-    <script src="/js/pwa.js" defer></script>
+    <script src="js/register.js"></script>
+    <script src="../js/pwa.js" defer></script>
 </body>
 </html>

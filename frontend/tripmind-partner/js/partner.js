@@ -13,8 +13,69 @@ var PARTNER_PREFIX = '/tripmind-partner';
 var TM_PARTNER = (function () {
     'use strict';
 
-    var PARTNER_ROLE = 'TRANSPORT_ADMIN';
+    /* All five operational roles share this hub. Nothing here assumes
+     * transport: the role comes from the signed-in session and drives the nav,
+     * the dashboard and which management pages exist. */
+    var PARTNER_ROLES = ['TRANSPORT_ADMIN', 'HOTEL_ADMIN', 'RESTAURANT_ADMIN',
+                         'TOURIST_SPOT_ADMIN', 'GUIDE'];
 
+    var ROLE_META = {
+        TRANSPORT_ADMIN: { label: 'Transport partner', short: 'Transport', entity: 'service' },
+        HOTEL_ADMIN: { label: 'Hotel partner', short: 'Hotels', entity: 'property' },
+        RESTAURANT_ADMIN: { label: 'Restaurant partner', short: 'Restaurants', entity: 'restaurant' },
+        TOURIST_SPOT_ADMIN: { label: 'Tourist spot partner', short: 'Spots', entity: 'spot' },
+        GUIDE: { label: 'Guide partner', short: 'Guides', entity: 'guide profile' }
+    };
+
+    /* Per-role navigation. A guide has no fleet or boarding points, and no
+     * role manages another role's inventory. */
+    var NAV_BY_ROLE = {
+        TRANSPORT_ADMIN: [
+            { href: 'dashboard', label: 'Dashboard', n: '01' },
+            { href: 'buses', label: 'My services', n: '02' },
+            { href: 'boarding-points', label: 'Boarding points', n: '03' },
+            { href: 'bookings', label: 'Bookings', n: '04' },
+            { href: 'profile', label: 'Profile', n: '05' }
+        ],
+        HOTEL_ADMIN: [
+            { href: 'dashboard', label: 'Dashboard', n: '01' },
+            { href: 'hotels', label: 'My properties', n: '02' },
+            { href: 'bookings', label: 'Bookings', n: '03' },
+            { href: 'profile', label: 'Profile', n: '04' }
+        ],
+        RESTAURANT_ADMIN: [
+            { href: 'dashboard', label: 'Dashboard', n: '01' },
+            { href: 'restaurants', label: 'My restaurants', n: '02' },
+            { href: 'bookings', label: 'Bookings', n: '03' },
+            { href: 'profile', label: 'Profile', n: '04' }
+        ],
+        TOURIST_SPOT_ADMIN: [
+            { href: 'dashboard', label: 'Dashboard', n: '01' },
+            { href: 'spots', label: 'My spots', n: '02' },
+            { href: 'bookings', label: 'Bookings', n: '03' },
+            { href: 'profile', label: 'Profile', n: '04' }
+        ],
+        GUIDE: [
+            { href: 'dashboard', label: 'Dashboard', n: '01' },
+            { href: 'guide-requests', label: 'Guide requests', n: '02' },
+            { href: 'bookings', label: 'Bookings', n: '03' },
+            { href: 'profile', label: 'Profile', n: '04' }
+        ]
+    };
+
+    var NAV = NAV_BY_ROLE.TRANSPORT_ADMIN;
+
+    var state = { user: null, role: 'TRANSPORT_ADMIN', partnerType: 'BUS_OPERATOR', meta: null };
+
+    function roleMeta(role) { return ROLE_META[role] || ROLE_META.TRANSPORT_ADMIN; }
+    function isPartner(user) {
+        return !!(user && PARTNER_ROLES.indexOf(user.role) > -1);
+    }
+    function navFor(role) { return NAV_BY_ROLE[role] || NAV; }
+    function currentNav() { return navFor(state.role); }
+
+    /* Transport-only subtypes. Other roles do not use these, so they live
+     * here rather than being assumed for everyone. */
     var PARTNER_TYPES = {
         BUS_OPERATOR: { label: 'Bus operator', service: 'BUS' },
         DRIVER: { label: 'Driver / vehicle owner', service: 'CAB' },
@@ -22,15 +83,9 @@ var TM_PARTNER = (function () {
         OTHER: { label: 'Other travel partner', service: 'BUS' }
     };
 
-    var NAV = [
-        { href: 'dashboard', label: 'Dashboard', n: '01' },
-        { href: 'buses', label: 'My services', n: '02' },
-        { href: 'boarding-points', label: 'Boarding points', n: '03' },
-        { href: 'bookings', label: 'Bookings', n: '04' },
-        { href: 'profile', label: 'Profile', n: '05' }
-    ];
-
-    var state = { user: null, partnerType: 'BUS_OPERATOR' };
+    function serviceForType() {
+        return (PARTNER_TYPES[state.partnerType] || PARTNER_TYPES.BUS_OPERATOR).service;
+    }
 
     /* ------------------------------------------------------------- helpers */
     function q(sel, root) { return (root || document).querySelector(sel); }
@@ -47,26 +102,39 @@ var TM_PARTNER = (function () {
         return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
     }
 
-    function typeLabel(key) {
-        return (PARTNER_TYPES[key] || {}).label || 'Travel partner';
-    }
-
-    function partnerTypeOf(user) {
-        var reg = (user && user.registration) || {};
-        var key = String(reg.partnerType || '').toUpperCase().replace(/[\s-]+/g, '_');
-        return PARTNER_TYPES[key] ? key : 'BUS_OPERATOR';
-    }
-
+    /* The display name a partner recognises: the hotel name, the restaurant
+     * name, the spot name, the guide name or the operator's company. Falls
+     * back through every role's field so no role ever sees a blank header. */
     function serviceName() {
-        var prof = (state.user && state.user.profile) || {};
-        return prof.serviceName || (reg(state.user).companyName) || (state.user && state.user.name) || 'Your service';
+        var u = state.user || {};
+        var r = reg(u);
+        return r.propertyName || r.restaurantName || r.spotName || r.guideName ||
+            r.companyName || (u.profile && u.profile.serviceName) || u.name || 'Your listing';
     }
 
     function reg(user) { return ((user || {}).registration) || {}; }
 
-    function serviceForType() {
-        return (PARTNER_TYPES[state.partnerType] || PARTNER_TYPES.BUS_OPERATOR).service;
+    /* The verification checklist this role was reviewed against, so the hub
+     * can show a partner exactly what the Main Admin checked. */
+    function requirements() {
+        return (state.meta && state.meta.requirements) || [];
     }
+
+    function classificationCounts() {
+        var counts = { MANDATORY: 0, CONDITIONAL: 0, OPTIONAL: 0, NOT_APPLICABLE: 0 };
+        requirements().forEach(function (r) {
+            if (counts[r.requirement] != null) counts[r.requirement] += 1;
+        });
+        return counts;
+    }
+
+    function partnerTypeOf(user) {
+        var r = reg(user);
+        var key = String(r.partnerType || '').toUpperCase().replace(/[\s-]+/g, '_');
+        return PARTNER_TYPES[key] ? key : 'BUS_OPERATOR';
+    }
+
+    function reg(user) { return ((user || {}).registration) || {}; }
 
     function fmtDate(value) {
         if (!value) return '—';
@@ -131,19 +199,26 @@ var TM_PARTNER = (function () {
         var av = q('[data-ph-user-avatar]');
         if (av) av.textContent = initials(name);
         var who = q('[data-ph-partner-type]');
-        if (who) who.textContent = typeLabel(state.partnerType);
+        if (who) who.textContent = roleMeta(state.role).label;
         qa('[data-ph-role-note]').forEach(function (n) { n.textContent = serviceName(); });
+        var roleBadge = q('[data-ph-role-badge]');
+        if (roleBadge) roleBadge.textContent = roleMeta(state.role).label;
+        var approval = (state.user && state.user.approvalStatus) || 'PENDING';
+        qa('[data-ph-approval]').forEach(function (n) {
+            n.innerHTML = pill(approval);
+        });
     }
 
     function renderNav() {
         var host = q('[data-ph-nav]');
         if (!host) return;
         var here = (location.pathname.replace(/\/+$/, '') || PARTNER_PREFIX).split('/').pop() || 'dashboard';
-        host.innerHTML = NAV.map(function (item) {
+        var items = currentNav();
+        host.innerHTML = items.map(function (item, i) {
             var current = item.href === here;
             return '<li><a class="ph-drawer__link" href="' + PARTNER_PREFIX + '/' + item.href + '"' +
                 (current ? ' aria-current="page"' : '') + '>' + esc(item.label) +
-                '<span>' + esc(item.n) + '</span></a></li>';
+                '<span>' + esc(item.n || ('0' + (i + 1))) + '</span></a></li>';
         }).join('');
     }
 
@@ -206,14 +281,24 @@ var TM_PARTNER = (function () {
             location.replace(PARTNER_PREFIX + '/login?next=' + encodeURIComponent(location.pathname));
             return;
         }
-        if (user.role !== PARTNER_ROLE) {
+        if (!isPartner(user)) {
             location.replace(PARTNER_PREFIX + '/forbidden');
             return;
         }
         state.user = user;
+        state.role = user.role;
         state.partnerType = partnerTypeOf(user);
+        document.documentElement.setAttribute('data-partner', state.role.toLowerCase());
+
+        // Load this role's verification requirements so the hub can show the
+        // partner exactly what the Main Admin reviewed. Never fatal: the page
+        // still works if the lookup fails.
+        try {
+            var schema = await api.partnerSchema(state.role);
+            state.meta = schema && (schema.schema || schema);
+        } catch (e) { state.meta = null; }
+
         initShell();
-        document.documentElement.setAttribute('data-partner', state.partnerType.toLowerCase());
         if (opts.view) {
             try { await opts.view(state); }
             catch (e) { console.error('[partner]', e); toast('Something went wrong loading this page.', 'error'); }
@@ -311,15 +396,19 @@ var TM_PARTNER = (function () {
     }
 
     return {
-        PARTNER_ROLE: PARTNER_ROLE,
+        PARTNER_ROLES: PARTNER_ROLES,
+        ROLE_META: ROLE_META,
+        NAV_BY_ROLE: NAV_BY_ROLE,
         PARTNER_TYPES: PARTNER_TYPES,
         NAV: NAV,
         state: state,
+        roleMeta: roleMeta, isPartner: isPartner, navFor: navFor, currentNav: currentNav,
+        requirements: requirements, classificationCounts: classificationCounts,
         q: q, qa: qa, esc: esc, money: money,
         pill: pill, empty: empty, loading: loading, fail: fail,
         toast: toast, busy: busy, initials: initials, reducedMotion: reducedMotion,
-        typeLabel: typeLabel, partnerTypeOf: partnerTypeOf, serviceName: serviceName,
-        serviceForType: serviceForType, reg: reg,
+        partnerTypeOf: partnerTypeOf, serviceName: serviceName, reg: reg,
+        serviceForType: serviceForType,
         fmtDate: fmtDate, fmtDayTime: fmtDayTime,
         boot: boot, go: go, logout: logout, safeNext: safeNext, initShell: initShell,
         locationPicker: locationPicker, fillLocation: fillLocation, readLocation: readLocation,

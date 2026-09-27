@@ -16,6 +16,10 @@ app = Flask(__name__, static_folder=None)
 CORS(app, supports_credentials=True)
 app.config["SECRET_KEY"] = __import__("config").SECRET_KEY
 app.permanent_session_lifetime = __import__("datetime").timedelta(days=7)
+# Partner registrations post photos and evidence as data URIs. Cap the body at
+# a little over the worst legitimate case (10 photos + documents) so an
+# oversized request is refused by the server rather than by hope.
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 
 from routes.trips import trips_bp
 from routes.ai import ai_bp
@@ -33,6 +37,7 @@ from routes.ratings import ratings_bp
 from routes.analytics import analytics_bp
 from routes.wallet import wallet_bp
 from routes.tickets import ticket_bp
+from routes.partner import partner_bp
 app.register_blueprint(trips_bp)
 app.register_blueprint(ai_bp)
 app.register_blueprint(auth_bp)
@@ -49,6 +54,7 @@ app.register_blueprint(ratings_bp)
 app.register_blueprint(analytics_bp)
 app.register_blueprint(wallet_bp)
 app.register_blueprint(ticket_bp)
+app.register_blueprint(partner_bp)
 
 
 @app.route("/")

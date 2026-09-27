@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>My properties — TripMind Partner Hub</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#06202b">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="../css/theme.css">
+    <link rel="stylesheet" href="css/partner.css">
+</head>
+<body>
+    <a class="ph-skip" href="#phMain">Skip to content</a>
+
+    <header class="ph-topbar">
+        <div class="ph-topbar__inner">
+            <button class="ph-burger" type="button" data-ph-burger aria-expanded="false" aria-controls="phDrawer" aria-label="Open menu"><span></span></button>
+            <a class="ph-wordmark" href="/tripmind-partner/dashboard">
+                <span class="ph-wordmark__mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="#06202b"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                <span class="ph-wordmark__text">
+                    <span class="ph-wordmark__name" data-ph-role-note>TripMind AI</span>
+                    <span class="ph-wordmark__hub">Partner Hub</span>
+                </span>
+            </a>
+            <div class="ph-topbar__spacer"></div>
+            <span class="ph-user">
+                <span class="ph-user__avatar" data-ph-user-avatar aria-hidden="true">P</span>
+                <span class="ph-user__name" data-ph-user-name>Partner</span>
+            </span>
+            <button class="tm-btn tm-btn--on-dark-ghost tm-btn--sm" type="button" data-ph-signout>Sign out</button>
+        </div>
+    </header>
+
+    <div class="ph-drawer" data-ph-drawer id="phDrawer" hidden>
+        <div class="ph-drawer__scrim" data-ph-drawer-scrim></div>
+        <div class="ph-drawer__panel" role="dialog" aria-modal="true" aria-label="Partner Hub menu">
+            <div class="ph-drawer__head">
+                <span class="ph-wordmark" style="color:var(--tm-ink)">
+                    <span class="ph-wordmark__mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="#06202b"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                    <span class="ph-wordmark__text">
+                        <span class="ph-wordmark__name">TripMind AI</span>
+                        <span class="ph-wordmark__hub" style="color:var(--tm-clay)">Partner Hub</span>
+                    </span>
+                </span>
+                <button class="ph-drawer__close" type="button" data-ph-drawer-close aria-label="Close menu">&times;</button>
+            </div>
+            <p class="ph-drawer__group">Operating</p>
+            <ul class="ph-drawer__links" data-ph-nav></ul>
+            <div class="ph-drawer__foot">
+                <span class="tm-2xs tm-muted">Signed in as <b data-ph-partner-type>hotel partner</b></span>
+                <a href="/portal.html">Open the provider console</a>
+                <a href="/">Traveller site</a>
+                <button class="tm-btn tm-btn--ghost tm-btn--sm" type="button" data-ph-signout style="margin-top:.5rem">Sign out</button>
+            </div>
+        </div>
+    </div>
+
+    <main class="ph-main" id="phMain">
+        <div class="ph-head">
+            <div>
+                <p class="tm-eyebrow">Hospitality</p>
+                <h1>My properties</h1>
+                <p>Every property you have listed with TripMind, with its review status, rooms and nightly rate.</p>
+            </div>
+            <div class="ph-head__actions">
+                <a class="tm-btn tm-btn--ghost" href="/tripmind-partner/bookings">Bookings</a>
+                <a class="tm-btn tm-btn--primary" href="#add">Add a property</a>
+            </div>
+        </div>
+
+        <div class="ph-stats" id="phStats" aria-live="polite">
+            <div class="ph-stat"><b>—</b><span>Loading</span></div>
+        </div>
+
+        <div class="ph-note ph-note--wait" id="phPendingNote" hidden style="margin-bottom:1.5rem">
+            <div><b>Some properties are still under review.</b> The TripMind team checks every new property before
+                travellers can see it, so these do not appear in the planner yet.</div>
+        </div>
+
+        <section class="ph-panel" id="phListPanel" style="margin-bottom:1.5rem">
+            <div class="ph-panel__head">
+                <div>
+                    <h2>Your properties</h2>
+                    <p>Approved properties are live for travellers.</p>
+                </div>
+            </div>
+            <div class="ph-panel__body ph-panel__body--flush" id="phList"></div>
+        </section>
+
+        <section class="ph-panel" id="add">
+            <div class="ph-panel__head">
+                <div>
+                    <h2 id="phFormTitle">Add a property</h2>
+                    <p id="phFormSub">Enter the property, its room types and nightly rates. The TripMind team reviews it
+                        before travellers can book it.</p>
+                </div>
+            </div>
+            <div class="ph-panel__body">
+                <form id="phHotelForm" novalidate class="ph-form">
+                    <p class="ph-form__legend">Property</p>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="hName">Property name <span class="req">*</span></label>
+                            <input class="tm-input" type="text" id="hName" name="name" placeholder="e.g. Beach View Residency" maxlength="120" required>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="hCategory">Category <span class="req">*</span></label>
+                            <select class="tm-select" id="hCategory" name="category" required>
+                                <option value="">Select a category</option>
+                                <option>Hotel</option>
+                                <option>Resort</option>
+                                <option>Homestay</option>
+                                <option>Guest house</option>
+                                <option>Hostel</option>
+                                <option>Other</option>
+                            </select>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                    </div>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="hCity">City <span class="req">*</span></label>
+                            <input class="tm-input" type="text" id="hCity" name="city" placeholder="e.g. Mahabalipuram" maxlength="80" required>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="hAddress">Address <span class="req">*</span></label>
+                            <input class="tm-input" type="text" id="hAddress" name="address" placeholder="Street and area" maxlength="200" required>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                    </div>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="hTotalRooms">Total rooms <span class="req">*</span></label>
+                            <input class="tm-input" type="number" id="hTotalRooms" name="totalRooms" min="1" step="1" value="1" inputmode="numeric" required>
+                            <span class="tm-hint">The room-type counts you add below must add up to this number.</span>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="hStar">Star rating</label>
+                            <select class="tm-select" id="hStar" name="starRating">
+                                <option value="">Not classified</option>
+                                <option value="1">1 star</option>
+                                <option value="2">2 star</option>
+                                <option value="3">3 star</option>
+                                <option value="4">4 star</option>
+                                <option value="5">5 star</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="hCheckIn">Check-in time</label>
+                            <input class="tm-input" type="time" id="hCheckIn" name="checkInTime" value="12:00">
+                        </div>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="hCheckOut">Check-out time</label>
+                            <input class="tm-input" type="time" id="hCheckOut" name="checkOutTime" value="11:00">
+                        </div>
+                    </div>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="hPhone">Contact number <span class="req">*</span></label>
+                            <input class="tm-input" type="tel" id="hPhone" name="contactNumber" placeholder="98765 43210" maxlength="20" required>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="hEmail">Contact email</label>
+                            <input class="tm-input" type="email" id="hEmail" name="email" placeholder="frontdesk@example.com" maxlength="120">
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                    </div>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="hAmenities">Amenities (comma separated)</label>
+                            <input class="tm-input" type="text" id="hAmenities" name="amenities" placeholder="Wi-Fi, Pool, Parking" maxlength="200">
+                        </div>
+                    </div>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="hImages">Image URLs (one per line)</label>
+                            <textarea class="tm-textarea" id="hImages" name="images" rows="3" placeholder="https://…/front.jpg&#10;https://…/room.jpg"></textarea>
+                            <span class="tm-hint">Travellers see these on your property page. Add as many as you have.</span>
+                        </div>
+                    </div>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="hDescription">Description</label>
+                            <textarea class="tm-textarea" id="hDescription" name="description" rows="3" placeholder="What makes this property worth staying at."></textarea>
+                        </div>
+                    </div>
+
+                    <p class="ph-form__legend">Room types</p>
+                    <div id="phRoomTypes" class="ph-form__row"></div>
+                    <button class="tm-btn tm-btn--ghost tm-btn--sm" type="button" id="phAddRoom">Add a room type</button>
+                    <span class="tm-error" id="phRoomError" aria-live="polite" style="display:block"></span>
+
+                    <div class="ph-form__actions">
+                        <button class="tm-btn tm-btn--primary" type="submit" id="phSubmit">Submit for review</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+    </main>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/ui.js"></script>
+    <script src="js/partner.js"></script>
+    <script src="js/catalogue.js"></script>
+    <script>
+        (function () {
+            var P = TM_PARTNER;
+
+            P.boot({
+                view: function (state) {
+                    if (state.role !== 'HOTEL_ADMIN') {
+                        P.go('dashboard');
+                        return;
+                    }
+                    TM_CATALOGUE.mount({
+                        form: '#phHotelForm',
+                        list: '#phList',
+                        stats: '#phStats',
+                        pendingNote: '#phPendingNote',
+                        title: '#phFormTitle',
+                        sub: '#phFormSub',
+                        submit: '#phSubmit',
+                        resource: 'hotels',
+                        entity: 'property',
+                        addTitle: 'Add a property',
+                        editTitle: 'Edit this property',
+                        addSub: 'Enter the property, its room types and nightly rates. The TripMind team reviews it before travellers can book it.',
+                        editSub: 'Changes to rates, rooms and details are re-reviewed before travellers see them.',
+                        load: function () { return api.getMyHotels().then(function (r) { return r.hotels || []; }); },
+                        create: function (data) { return apiRequest('/api/hotels', { method: 'POST', body: data }); },
+                        update: function (id, data) { return apiRequest('/api/hotels/' + encodeURIComponent(id), { method: 'PUT', body: data }); },
+                        fields: TM_CATALOGUE.hotelFields,
+                        roomTypes: true,
+                        row: function (h) {
+                            return {
+                                title: h.name || 'Property',
+                                status: h.status,
+                                meta: [h.category, h.starRating ? h.starRating + ' star' : '', h.city, h.address]
+                                    .filter(Boolean).join(' · '),
+                                side: (h.totalRooms || 0) + ' rooms',
+                                detail: (h.roomTypes || []).map(function (r) {
+                                    return r.name + ' · ' + r.totalRooms + ' · ' + P.money(r.pricePerNight) + '/night';
+                                }).join('  |  ')
+                            };
+                        }
+                    });
+                }
+            });
+        })();
+    </script>
+    <script src="/js/pwa.js" defer></script>
+</body>
+</html>
