@@ -1,8 +1,9 @@
-"""Database + parameter driven travel journey flow for the Route Map.
+"""Database + parameter driven travel journey flow.
 
 This service builds a single continuous, connected travel pathway for an
-arbitrary origin -> destination pair. It is consumed by /pages/mindmap.html and
-by the AI chat flow responses.
+arbitrary origin -> destination pair. It is consumed by the AI chat flow
+responses (``GET /api/mindmap/flow``). The standalone Route Map page that used to
+render it was removed — nothing in the UI links to a static map any more.
 
 Unlike the previous version there are no hardcoded routes, hotels or spots and
 no emojis. Every stage is assembled at request time from the Mongo database:

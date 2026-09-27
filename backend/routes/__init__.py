@@ -2064,10 +2064,11 @@ def login():
     data = request.get_json() or {}
     if not data.get("email") or not data.get("password"):
         return jsonify({"error": "Email and password are required."}), 400
-    user, err = login_user(data["email"], data["password"])
+    remember = bool(data.get("remember"))
+    user, err = login_user(data["email"], data["password"], remember=remember)
     if err:
         return jsonify({"error": err}), 401
-    return jsonify({"user": user, "message": "Logged in."})
+    return jsonify({"user": user, "message": "Logged in.", "remember": remember})
 
 
 @auth_bp.route("/api/auth/logout", methods=["POST"])

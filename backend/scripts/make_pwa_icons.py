@@ -1,29 +1,33 @@
-"""Generate the TripMind AI PWA icon set from the existing brand mark.
+"""Generate the TripMind AI PWA icon set from the current brand mark.
 
 Run:  python scripts/make_pwa_icons.py   (from the backend directory)
 Writes frontend/img/{favicon-32,apple-touch-icon,icon-192,icon-512,
 icon-maskable-512}.png.
 
-Rounded amber gradient tile with the paper-plane path already used in the
-navbar, plus a maskable variant (extra padding, full-bleed background) so the
-icon is not cropped by Android's adaptive-icon mask.
+Deep-ink tile with the paper-plane mark used across the site, a soft gold glow
+behind it and a dashed route arc that echoes the logo lockup. A maskable
+variant (full bleed, more padding) is generated so Android's adaptive-icon mask
+cannot crop the mark.
 """
 import os
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(BACKEND, "..", "frontend", "img")
 os.makedirs(OUT, exist_ok=True)
 
-START = (245, 158, 11)    # --primary
-END = (180, 83, 9)        # --gradient-end
-SS = 8                     # supersample factor for smooth edges
+INK_TOP = (11, 53, 66)       # --ink lifted for a little depth
+INK_BOTTOM = (6, 32, 43)     # --ink
+GOLD = (240, 160, 30)        # --gold
+GOLD_SOFT = (255, 212, 137)  # --gold-soft
+PLANE_FOLD = (255, 233, 197)
+SS = 8                       # supersample factor for smooth edges
 
-# navbar brand mark: <path d="M3 11l18-7-7 18-2.5-7.5L3 11z"> in a 24x24 box
+# The brand plane (24x24 box) as used in the navbar and the splash screen.
 PLANE = [(3, 11), (21, 4), (14, 22), (11.5, 14.5)]
 
 
-def gradient(size, top=START, bottom=END):
+def gradient(size, top=INK_TOP, bottom=INK_BOTTOM):
     img = Image.new("RGB", (1, size[1]))
     px = img.load()
     for y in range(size[1]):
@@ -43,6 +47,31 @@ def plane_polygon(size, inset_ratio):
 def make(size, name, rounded=True, inset=0.22, bleed=False):
     big = size * SS
     base = gradient((big, big)).convert("RGBA")
+
+    # Soft gold glow behind the mark so the tile is not a flat block at 32px.
+    glow = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+    gd = ImageDraw.Draw(glow)
+    cx, cy = big * 0.5, big * 0.46
+    gd.ellipse([cx - big * 0.34, cy - big * 0.34, cx + big * 0.34, cy + big * 0.34],
+               fill=GOLD + (54,))
+    glow = glow.filter(ImageFilter.GaussianBlur(big * 0.07))
+    base = Image.alpha_composite(base, glow)
+
+    # Dashed route arc across the lower third.
+    arc = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+    ad = ImageDraw.Draw(arc)
+    box = [big * 0.10, big * 0.60, big * 0.90, big * 0.98]
+    steps = 26
+    for i in range(steps):
+        if i % 2:
+            continue
+        t0, t1 = i / steps, (i + 0.9) / steps
+        x0 = box[0] + (box[2] - box[0]) * t0
+        x1 = box[0] + (box[2] - box[0]) * t1
+        ad.line([x0, box[3] - (x0 - box[0]) * 0.16, x1, box[3] - (x1 - box[0]) * 0.16],
+                fill=GOLD + (120,), width=max(1, int(big * 0.012)))
+    base = Image.alpha_composite(base, arc)
+
     mask = Image.new("L", (big, big), 0)
     md = ImageDraw.Draw(mask)
     if rounded and not bleed:
@@ -57,7 +86,11 @@ def make(size, name, rounded=True, inset=0.22, bleed=False):
     shift_x = -big * 0.02
     shift_y = -big * 0.03
     poly = [(x + shift_x, y + shift_y) for x, y in poly]
-    draw.polygon(poly, fill=(255, 255, 255, 255))
+    draw.polygon(poly, fill=GOLD_SOFT + (255,))
+    # Fold: a darker inner triangle gives the plane a little dimension.
+    draw.polygon([poly[0], poly[3], (poly[1][0] * 0.62 + poly[0][0] * 0.38,
+                                     poly[1][1] * 0.62 + poly[0][1] * 0.38)],
+                 fill=GOLD + (255,))
 
     img = base.resize((size, size), Image.LANCZOS)
     path = os.path.join(OUT, name)

@@ -3,93 +3,301 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign In - TripMind AI</title>
+    <title>Sign In — TripMind AI · Traveling Uniquely</title>
+    <meta name="description" content="Sign in to TripMind AI to plan, adjust and book journeys with a real AI travel planner.">
     <link rel="stylesheet" href="css/style.css">
     <style>
-        .auth-wrap { min-height: calc(100vh - 70px); display: flex; align-items: center; justify-content: center; padding: 3rem 1rem; }
-        .auth-card { width: 100%; max-width: 440px; }
-        .auth-msg { min-height: 1.5rem; }
+        /* Auth-specific layout (page-scoped; the system lives in css/theme.css) */
+        .auth-shell { min-height: 100vh; min-height: 100dvh; display: grid; grid-template-columns: 1.05fr .95fr; }
+        .auth-art { position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: clamp(1.5rem, 4vw, 2.75rem); color: var(--tm-on-dark); }
+        .auth-art img.bg { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; }
+        .auth-art::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(170deg, rgba(6, 32, 43, .82), rgba(6, 32, 43, .55) 45%, rgba(6, 32, 43, .92)); }
+        .auth-art__body { margin-block: auto; padding-block: clamp(1rem, 4vh, 3rem); }
+        .auth-art h2 { color: var(--tm-white); font-size: clamp(1.7rem, 1.2rem + 1.8vw, 2.6rem); max-width: 18ch; }
+        .auth-art__points { list-style: none; margin: var(--tm-s5) 0 0; padding: 0; display: grid; gap: .7rem; }
+        .auth-art__points li { display: flex; gap: .7rem; align-items: flex-start; font-size: var(--tm-f-sm); color: var(--tm-on-dark-2); }
+        .auth-art__points svg { width: 20px; height: 20px; flex: 0 0 20px; color: var(--tm-gold-soft); margin-top: .15rem; }
+        .auth-main { display: grid; place-items: center; padding: clamp(1.5rem, 5vw, 3rem) clamp(1rem, 4vw, 3rem); background: var(--tm-sand); }
+        .auth-box { width: 100%; max-width: 27rem; }
+        .auth-switch { position: relative; }
+        .auth-panel { transition: opacity var(--tm-dur-3) var(--tm-ease), transform var(--tm-dur-3) var(--tm-ease), visibility var(--tm-dur-3); }
+        .auth-panel[hidden] { display: block; visibility: hidden; opacity: 0; transform: translateY(10px); pointer-events: none; position: absolute; inset: 0; }
+        .auth-swap { min-height: 44px; padding: .5rem 0; }
+        .auth-swap button { background: none; border: 0; padding: .25rem 0; cursor: pointer; font: inherit; color: var(--tm-ink-soft); font-size: var(--tm-f-sm); }
+        .auth-swap button:hover { color: var(--tm-ink); text-decoration: underline; }
+        .auth-swap b { color: var(--tm-ink); font-weight: 640; }
+        .pw-toggle { position: absolute; right: .5rem; top: 50%; translate: 0 -50%; border: 0; background: none; cursor: pointer; color: var(--tm-muted); padding: .5rem; border-radius: 8px; }
+        .pw-toggle:hover { color: var(--tm-ink); }
+        .auth-alt { margin-top: var(--tm-s5); padding-top: var(--tm-s4); border-top: 1px solid var(--tm-line); }
+        @media (max-width: 900px) {
+            .auth-shell { grid-template-columns: 1fr; }
+            .auth-art { min-height: 0; padding: var(--tm-s4); }
+            .auth-art__body { padding-block: var(--tm-s5) var(--tm-s3); }
+            .auth-art__points { display: none; }
+            .auth-art h2 { font-size: clamp(1.4rem, 1.2rem + 1.6vw, 1.8rem); }
+        }
+        @media (max-width: 400px) { .auth-art { display: none; } }
     </style>
-    <meta name="theme-color" content="#f59e0b">
+    <meta name="theme-color" content="#06202b">
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
     <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="TripMind AI">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-1290x2796.jpg">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-1170x2532.jpg">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-828x1792.jpg">
+    <link rel="stylesheet" href="/css/theme.css">
+    <script src="js/ui.js"></script>
 </head>
 <body>
-    <nav class="navbar">
-        <div class="container">
-            <a href="/" class="navbar-brand">
-                <span class="brand-mark">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-7-7 18-2.5-7.5L3 11z"></path></svg>
-                </span>
-                TripMind AI
-            </a>
-            <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
-            </button>
-            <div class="navbar-links" id="navLinks">
-                <a href="/">Home</a>
-                <a href="/register.html" class="btn btn-primary btn-sm">Register Now</a>
-            </div>
-        </div>
-    </nav>
+    <a class="skip-link" href="#authMain">Skip to sign in</a>
 
-    <div class="auth-wrap">
-        <div class="card auth-card">
-            <div class="card-header">
-                <div class="card-title">Welcome back</div>
+    <!-- Branded startup moment: shown once per session, never blocks navigation -->
+    <div class="tm-splash" data-tm-splash data-tm-splash-max="1400" aria-hidden="true">
+        <div class="tm-splash__inner">
+            <div class="tm-splash__mark">
+                <svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z" opacity=".95"/><path d="M8.8 14.7 21 5.5 10.3 17.4l-1.5-2.7Z" fill="#06202b" opacity=".18"/></svg>
             </div>
-            <div class="card-content">
-                <div class="auth-msg" id="authMsg"></div>
-                <form onsubmit="doLogin(event)">
-                    <div class="form-group">
-                        <label class="form-label">Email</label>
-                        <input id="email" type="email" class="form-input" placeholder="you@example.com">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Password</label>
-                        <input id="password" type="password" class="form-input" placeholder="••••••••">
-                    </div>
-                    <button class="btn btn-primary w-full" type="submit">Sign In</button>
-                </form>
-                <p class="text-muted mt-4" style="text-align:center;">
-                    New here? <a href="/register.html">Create an account</a>
-                </p>
-            </div>
+            <div class="tm-splash__name">TripMind AI</div>
+            <div class="tm-splash__tag">Traveling Uniquely</div>
+            <svg class="tm-splash__path" viewBox="0 0 240 34" fill="none" aria-hidden="true">
+                <path d="M4 26C60 4 150 30 236 8" />
+                <path class="tm-fly" d="M4 26C60 4 150 30 236 8" />
+            </svg>
+            <div class="tm-splash__bar"><i></i></div>
         </div>
+    </div>
+
+    <div class="auth-shell">
+        <!-- Cinematic brand panel -->
+        <section class="auth-art">
+            <img class="bg" src="img/hero-journey.jpg" alt="" aria-hidden="true" fetchpriority="high" width="2400" height="1350">
+            <a href="/" class="tm-brand tm-brand--on-dark" aria-label="TripMind AI home">
+                <span class="tm-brand__mark">
+                    <svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg>
+                </span>
+                <span class="tm-brand__text">
+                    <span class="tm-brand__name">TripMind AI</span>
+                    <span class="tm-brand__tag">Traveling Uniquely</span>
+                </span>
+            </a>
+            <div class="auth-art__body" data-reveal>
+                <span class="tm-eyebrow tm-eyebrow--on-dark">AI travel platform</span>
+                <h2>Plan Smarter.<br>Travel Uniquely.</h2>
+                <p class="tm-lead tm-lead--on-dark">One place for the whole journey — live cab fares, an AI-built day-by-day itinerary, weather-aware packing and changes you can approve before they happen.</p>
+                <ul class="auth-art__points">
+                    <li>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                        <span>Real distance and cab-fare estimates from live maps — not invented numbers.</span>
+                    </li>
+                    <li>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                        <span>Your plan stays editable: the assistant proposes, you confirm.</span>
+                    </li>
+                    <li>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                        <span>Install TripMind on your phone and plan on the move.</span>
+                    </li>
+                </ul>
+            </div>
+            <p class="tm-2xs" style="color:rgba(255,255,255,.45);margin:0;">Ollama runs the planning on your own infrastructure.</p>
+        </section>
+
+        <!-- Auth form -->
+        <main class="auth-main" id="authMain">
+            <div class="auth-box">
+                <div class="tm-row tm-row--between" style="margin-bottom:var(--tm-s6);">
+                    <a href="/" class="tm-brand" aria-label="TripMind AI home">
+                        <span class="tm-brand__mark">
+                            <svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg>
+                        </span>
+                        <span class="tm-brand__text">
+                            <span class="tm-brand__name">TripMind AI</span>
+                            <span class="tm-brand__tag">Traveling Uniquely</span>
+                        </span>
+                    </a>
+                </div>
+
+                <div class="auth-switch" data-auth-switch>
+                    <!-- Sign in (default) -->
+                    <section class="auth-panel" data-auth-panel="signin" aria-labelledby="signinTitle">
+                        <span class="tm-eyebrow">Welcome back</span>
+                        <h1 id="signinTitle" class="tm-h1" style="font-size:clamp(1.6rem,1.3rem+1.4vw,2.1rem);">Sign in</h1>
+                        <p class="tm-sm tm-muted" style="margin-bottom:var(--tm-s5);">Pick up where your journey left off.</p>
+
+                        <form id="signinForm" novalidate>
+                            <div class="tm-field">
+                                <label class="tm-label" for="email">Email <span class="req" aria-hidden="true">*</span></label>
+                                <input id="email" name="email" type="email" class="tm-input" placeholder="you@example.com"
+                                       autocomplete="email" data-validate="required,email" required>
+                                <span class="tm-error" aria-live="polite"></span>
+                            </div>
+                            <div class="tm-field" style="position:relative;">
+                                <label class="tm-label" for="password">Password <span class="req" aria-hidden="true">*</span></label>
+                                <input id="password" name="password" type="password" class="tm-input" placeholder="••••••••"
+                                       autocomplete="current-password" data-validate="required" required style="padding-right:3rem;">
+                                <button type="button" class="pw-toggle" data-pw-toggle="password" aria-label="Show password">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                                </button>
+                                <span class="tm-error" aria-live="polite"></span>
+                            </div>
+
+                            <label class="tm-check" style="margin-bottom:var(--tm-s4);">
+                                <input type="checkbox" id="remember" name="remember">
+                                <span class="tm-check__text">Remember me <small>Stay signed in on this device for 7 days. Never stores your password.</small></span>
+                            </label>
+
+                            <button class="tm-btn tm-btn--primary tm-btn--lg tm-btn--block" type="submit" id="signinBtn">Sign In</button>
+                            <div id="authMsg" class="tm-formnote" style="margin-top:var(--tm-s4);display:none;" role="status" aria-live="polite"></div>
+                        </form>
+
+                        <p class="auth-swap">Don't have an account? <button type="button" data-auth-goto="signup"><b>Create Account</b></button></p>
+                    </section>
+
+                    <!-- Create account -->
+                    <section class="auth-panel" data-auth-panel="signup" hidden aria-labelledby="signupTitle">
+                        <span class="tm-eyebrow">New here</span>
+                        <h1 id="signupTitle" class="tm-h1" style="font-size:clamp(1.6rem,1.3rem+1.4vw,2.1rem);">Create your TripMind account</h1>
+                        <p class="tm-sm tm-muted" style="margin-bottom:var(--tm-s5);">Traveller accounts are active immediately.</p>
+
+                        <form id="signupForm" novalidate>
+                            <div class="tm-field">
+                                <label class="tm-label" for="suName">Full name <span class="req" aria-hidden="true">*</span></label>
+                                <input id="suName" name="name" type="text" class="tm-input" placeholder="As per your ID"
+                                       autocomplete="name" data-validate="required" required>
+                                <span class="tm-error" aria-live="polite"></span>
+                            </div>
+                            <div class="tm-field">
+                                <label class="tm-label" for="suEmail">Email <span class="req" aria-hidden="true">*</span></label>
+                                <input id="suEmail" name="email" type="email" class="tm-input" placeholder="you@example.com"
+                                       autocomplete="email" data-validate="required,email" required>
+                                <span class="tm-error" aria-live="polite"></span>
+                            </div>
+                            <div class="tm-field" style="position:relative;">
+                                <label class="tm-label" for="suPassword">Password <span class="req" aria-hidden="true">*</span></label>
+                                <input id="suPassword" name="password" type="password" class="tm-input" placeholder="At least 8 characters"
+                                       autocomplete="new-password" data-validate="required,minlen:8" required style="padding-right:3rem;">
+                                <button type="button" class="pw-toggle" data-pw-toggle="suPassword" aria-label="Show password">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                                </button>
+                                <span class="tm-hint">Minimum 8 characters.</span>
+                                <span class="tm-error" aria-live="polite"></span>
+                            </div>
+                            <div class="tm-field" style="position:relative;">
+                                <label class="tm-label" for="suConfirm">Confirm password <span class="req" aria-hidden="true">*</span></label>
+                                <input id="suConfirm" name="confirm" type="password" class="tm-input" placeholder="Repeat your password"
+                                       autocomplete="new-password" data-validate="required,match:#suPassword" required style="padding-right:3rem;">
+                                <button type="button" class="pw-toggle" data-pw-toggle="suConfirm" aria-label="Show password">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                                </button>
+                                <span class="tm-error" aria-live="polite"></span>
+                            </div>
+
+                            <button class="tm-btn tm-btn--accent tm-btn--lg tm-btn--block" type="submit" id="signupBtn">Create Account</button>
+                            <div id="signupMsg" class="tm-formnote" style="margin-top:var(--tm-s4);display:none;" role="status" aria-live="polite"></div>
+                        </form>
+
+                        <p class="auth-swap">Already have an account? <button type="button" data-auth-goto="signin"><b>Sign In</b></button></p>
+                        <p class="auth-alt tm-2xs tm-muted" style="margin-bottom:0;">Are you a hotel, transport, spot, restaurant or guide provider? <a href="/register.html">Use the provider registration</a> — it collects the extra details our admin review needs.</p>
+                    </section>
+                </div>
+            </div>
+        </main>
     </div>
 
     <script src="js/api.js"></script>
     <script src="js/utils.js"></script>
     <script>
-        const navToggle = document.getElementById('navToggle');
-        const navLinks = document.getElementById('navLinks');
-        if (navToggle) navToggle.addEventListener('click', () => {
-            const open = navLinks.classList.toggle('open');
-            navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        /* ---- Sign in is the default state; the panels cross-fade --------- */
+        var EMAIL_KEY = 'tmRememberEmail';
+        var panels = { signin: document.querySelector('[data-auth-panel="signin"]'), signup: document.querySelector('[data-auth-panel="signup"]') };
+
+        function showPanel(name) {
+            Object.keys(panels).forEach(function (k) {
+                if (k === name) { panels[k].hidden = false; }
+                else { panels[k].hidden = true; }
+            });
+            var first = panels[name].querySelector('input');
+            if (first && !TM.reducedMotion()) setTimeout(function () { try { first.focus({ preventScroll: true }); } catch (e) {} }, 260);
+        }
+        document.querySelectorAll('[data-auth-goto]').forEach(function (btn) {
+            btn.addEventListener('click', function () { showPanel(btn.getAttribute('data-auth-goto')); });
+        });
+        // Landing-page CTAs link here with ?signup=1 — open that panel directly.
+        var wantsSignup = new URLSearchParams(window.location.search).get('signup') === '1';
+        showPanel(wantsSignup ? 'signup' : 'signin');
+
+        /* ---- Show/hide password ------------------------------------------ */
+        document.querySelectorAll('[data-pw-toggle]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var input = document.getElementById(btn.getAttribute('data-pw-toggle'));
+                var show = input.type === 'password';
+                input.type = show ? 'text' : 'password';
+                btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+                input.focus();
+            });
         });
 
-        async function msg(text, isError) {
-            const el = document.getElementById('authMsg');
-            el.textContent = text || '';
-            el.style.color = isError ? 'var(--danger,#dc2626)' : 'var(--success,#16a34a)';
+        function note(id, text, kind) {
+            var box = document.getElementById(id);
+            if (!box) return;
+            box.textContent = text || '';
+            box.className = 'tm-formnote' + (kind === 'error' ? ' tm-formnote--error' : '');
+            box.style.display = text ? 'flex' : 'none';
         }
 
-        async function doLogin(e) {
-            e.preventDefault();
-            await msg('Signing in…');
-            try {
-                const res = await api.login({ email: document.getElementById('email').value.trim(), password: document.getElementById('password').value });
-                await msg(res.message);
-                location.href = roleLanding(res.user);
-            } catch (err) {
-                await msg(err.message, true);
+        /* ---- Remember me: the *email* is the only thing kept locally ----- */
+        try {
+            var saved = localStorage.getItem(EMAIL_KEY);
+            if (saved) {
+                document.getElementById('email').value = saved;
+                document.getElementById('remember').checked = true;
             }
-        }
+        } catch (e) { /* storage blocked */ }
+
+        TM.forms(document.getElementById('signinForm'), {
+            onSubmit: async function (v, form) {
+                var btn = document.getElementById('signinBtn');
+                TM.button(btn, true);
+                note('authMsg', 'Signing in…');
+                try {
+                    var res = await api.login({ email: v.email.trim(), password: v.password, remember: !!v.remember });
+                    try {
+                        if (v.remember) localStorage.setItem(EMAIL_KEY, v.email.trim());
+                        else localStorage.removeItem(EMAIL_KEY);
+                    } catch (e) { /* storage blocked */ }
+                    note('authMsg', res.message || 'Signed in.');
+                    window.location.href = roleLanding(res.user);
+                } catch (err) {
+                    note('authMsg', err.message, 'error');
+                    TM.button(btn, false);
+                    var pw = document.getElementById('password');
+                    pw.value = '';
+                    pw.focus();
+                }
+            }
+        });
+
+        /* ---- Create account: the real public endpoint (name/email/password) */
+        TM.forms(document.getElementById('signupForm'), {
+            onSubmit: async function (v) {
+                var btn = document.getElementById('signupBtn');
+                TM.button(btn, true);
+                note('signupMsg', 'Creating your account…');
+                try {
+                    await api.register({ role: 'USER', name: v.name.trim(), email: v.email.trim(), password: v.password });
+                    var res = await api.login({ email: v.email.trim(), password: v.password, remember: true });
+                    note('signupMsg', 'Account created. Signing you in…');
+                    window.location.href = roleLanding(res.user);
+                } catch (err) {
+                    note('signupMsg', err.message, 'error');
+                    TM.button(btn, false);
+                }
+            }
+        });
     </script>
     <script src="/js/pwa.js" defer></script>
 </body>

@@ -39,7 +39,7 @@ def _flow_response(origin="Coimbatore", destination="Chennai"):
         else:
             lines.append("%d. %s" % (i, stage["title"]))
         lines.append("  |")
-    lines.append("The full connected, visually traceable map is on the Route Map page.")
+    lines.append("Your planned journey shows the same steps day by day on the trip page.")
     return "\n".join(lines)
 
 
@@ -146,12 +146,24 @@ def handle_ai_chat(trip_id, message):
         "show flow", "journey", "roadmap", "route to", "route from",
     ]
     if any(kw in msg_lower for kw in flow_keywords):
-        origin = (trip or {}).get("origin", "Coimbatore")
-        destination = (trip or {}).get("destination", "Chennai")
+        origin = (trip or {}).get("origin") or ""
+        destination = (trip or {}).get("destination") or ""
+        if not origin or not destination:
+            # Never answer with a made-up route: ask for the real endpoints.
+            return {
+                "response": "Tell me where you are travelling from and to, and I will lay out "
+                            "the connected journey step by step — transport, where you arrive, "
+                            "local travel, a place to stay and the spots along the way.",
+                "suggestions": [
+                    "Plan a new trip",
+                    "Show me transport options",
+                    "Which hotels are available?",
+                ],
+                "timestamp": datetime.utcnow().isoformat(),
+            }
         return {
             "response": _flow_response(origin, destination),
             "suggestions": [
-                "Open the Route Map",
                 "Show me transport options",
                 "Which hotels are available?",
                 "List the tourist spots",
@@ -195,7 +207,7 @@ def handle_ai_chat(trip_id, message):
         return {
             "response": "No alternate approved transport is currently available for %s -> %s."
                         % (trip.get("origin"), trip.get("destination")),
-            "suggestions": ["Show the route map", "Show transport options", "Help me plan"],
+            "suggestions": ["Show transport options", "Help me plan"],
             "timestamp": datetime.utcnow().isoformat(),
         }
 

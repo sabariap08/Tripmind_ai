@@ -3,80 +3,127 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Trips - TripMind AI</title>
+    <title>My Journeys â€” TripMind AI</title>
+    <meta name="description" content="Every trip you have planned with TripMind AI: itineraries, real costs, bookings and live status.">
     <link rel="stylesheet" href="../css/style.css">
-    <meta name="theme-color" content="#f59e0b">
+    <style>
+        /* Journeys list: editorial rows, not a card wall */
+        .js-stats { display: flex; flex-wrap: wrap; gap: .9rem 2.25rem; align-items: baseline; padding-block: var(--tm-s4); border-block: 1px solid var(--tm-line); }
+        .js-stat { display: grid; gap: .1rem; }
+        .js-stat b { font-family: var(--tm-font); font-size: 1.5rem; font-weight: 660; letter-spacing: -.02em; color: var(--tm-ink); line-height: 1; }
+        .js-stat span { font-size: var(--tm-f-2xs); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--tm-muted); }
+        .js-list { list-style: none; margin: var(--tm-s6) 0 0; padding: 0; border-top: 1px solid var(--tm-line); }
+        .js-row { border-bottom: 1px solid var(--tm-line); }
+        .js-row__link { display: grid; grid-template-columns: 1fr auto; gap: .35rem 1.5rem; align-items: center; padding: 1.35rem .25rem; text-decoration: none; color: inherit; transition: background-color var(--tm-dur-1) var(--tm-ease); }
+        .js-row__link:hover { background: var(--tm-white); }
+        .js-row__route { font-family: var(--tm-font); font-size: clamp(1.15rem, 1rem + .8vw, 1.6rem); font-weight: 650; letter-spacing: -.02em; color: var(--tm-ink); display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+        .js-row__route .arrow { color: var(--tm-gold); }
+        .js-row__meta { font-size: var(--tm-f-xs); color: var(--tm-muted); display: flex; flex-wrap: wrap; gap: .35rem 1.1rem; }
+        .js-row__side { display: grid; gap: .3rem; justify-items: end; text-align: right; }
+        .js-row__cost { font-weight: 680; color: var(--tm-ink); white-space: nowrap; }
+        .js-row__cost small { display: block; font-weight: 500; font-size: var(--tm-f-2xs); color: var(--tm-muted); }
+        .js-row__go { font-size: var(--tm-f-xs); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--tm-ink-soft); white-space: nowrap; }
+        .js-row__link:hover .js-row__go { color: var(--tm-gold); }
+        @media (max-width: 640px) {
+            .js-row__link { grid-template-columns: 1fr; }
+            .js-row__side { justify-items: start; text-align: left; }
+        }
+    </style>
+    <meta name="theme-color" content="#06202b">
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
     <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="TripMind AI">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-1290x2796.jpg">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-1170x2532.jpg">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-828x1792.jpg">
+    <link rel="stylesheet" href="/css/theme.css">
+    <script src="/js/ui.js"></script>
 </head>
 <body>
-    <nav class="navbar">
-        <div class="container">
-            <a href="/" class="navbar-brand">
-                <span class="brand-mark">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-7-7 18-2.5-7.5L3 11z"></path></svg>
+    <a class="skip-link" href="#tripsList">Skip to your journeys</a>
+
+    <nav class="tm-nav" id="dashNav">
+        <div class="tm-nav__inner">
+            <a href="/" class="tm-brand" aria-label="TripMind AI home">
+                <span class="tm-brand__mark"><svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                <span class="tm-brand__text">
+                    <span class="tm-brand__name">TripMind AI</span>
+                    <span class="tm-brand__tag">Traveling Uniquely</span>
                 </span>
-                TripMind AI
             </a>
-            <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
-            </button>
-            <div class="navbar-links" id="navLinks">
-                <a href="/">Home</a>
-                <a href="dashboard.html" class="active">Dashboard</a>
-                <a href="planner.html">Plan Trip</a>
-                <a href="mindmap.html">Route Map</a>
+            <div class="tm-nav__links">
+                <a class="tm-nav__link" href="dashboard.html" aria-current="page">My Trips</a>
+                <a class="tm-nav__link" href="/">Explore</a>
             </div>
+            <div class="tm-nav__actions">
+                <a class="tm-btn tm-btn--accent tm-btn--sm" href="planner.html">Plan a trip</a>
+            </div>
+            <button class="tm-burger" type="button" data-tm-drawer-open="dashDrawer" aria-label="Open menu" aria-expanded="false" aria-controls="dashDrawer"><span></span></button>
         </div>
     </nav>
 
-    <div class="container" style="padding-top:2rem;padding-bottom:4rem;">
-        <div class="flex justify-between items-center mb-6">
-            <div>
-                <h1 style="font-size:1.75rem;font-weight:700;">My Trips</h1>
-                <p class="text-sm text-muted mt-1">Manage and track all your travel plans</p>
+    <div class="tm-drawer" id="dashDrawer" data-open="false" role="dialog" aria-modal="true" aria-label="Menu">
+        <div class="tm-drawer__scrim" data-tm-drawer-close></div>
+        <div class="tm-drawer__panel">
+            <div class="tm-drawer__head">
+                <a href="/" class="tm-brand">
+                    <span class="tm-brand__mark"><svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                    <span class="tm-brand__text"><span class="tm-brand__name">TripMind AI</span><span class="tm-brand__tag">Traveling Uniquely</span></span>
+                </a>
+                <button class="tm-drawer__close" type="button" data-tm-drawer-close aria-label="Close menu">&times;</button>
             </div>
-            <div class="flex gap-2">
-                <a href="planner.html" class="btn btn-primary">+ New Trip</a>
+            <nav class="tm-drawer__links">
+                <a class="tm-drawer__link" href="dashboard.html">My Trips <span>01</span></a>
+                <a class="tm-drawer__link" href="/">Explore <span>02</span></a>
+            </nav>
+            <div class="tm-drawer__foot">
+                <a class="tm-btn tm-btn--primary tm-btn--block" href="planner.html">Plan a new trip</a>
             </div>
         </div>
-
-        <div id="statsGrid" class="stats-grid hidden">
-            <div class="stat-card"><div class="stat-value" id="statTotal">0</div><div class="stat-label">Total Trips</div></div>
-            <div class="stat-card"><div class="stat-value" id="statBooked" style="color:var(--emerald);">0</div><div class="stat-label">Booked</div></div>
-            <div class="stat-card"><div class="stat-value" id="statPlanned" style="color:var(--primary);">0</div><div class="stat-label">Planned</div></div>
-            <div class="stat-card"><div class="stat-value" id="statReplanning" style="color:var(--amber);">0</div><div class="stat-label">Replanning</div></div>
-        </div>
-
-        <div id="loading" class="text-center" style="padding:4rem;">
-            <div class="spinner"></div>
-            <p class="text-sm text-muted mt-2">Loading trips...</p>
-        </div>
-
-        <div id="emptyState" class="empty-state hidden">
-            <h3>No trips yet</h3>
-            <p>Start planning your first adventure!</p>
-            <a href="planner.html" class="btn btn-primary">Plan a Trip</a>
-        </div>
-
-        <div id="tripsGrid" class="trips-grid hidden"></div>
     </div>
+
+    <section class="tm-pagehead">
+        <div class="tm-pagehead__bg"><img src="../img/pagehead-journey.jpg" alt="" aria-hidden="true" width="2000" height="900"></div>
+        <div class="tm-container">
+            <span class="tm-eyebrow tm-eyebrow--on-dark">Your journeys</span>
+            <h1 class="tm-h1" style="margin-bottom:.35rem;">My trips</h1>
+            <p style="margin:0;">Every plan you have built with TripMind â€” itineraries, real costs, bookings and where each journey stands today.</p>
+        </div>
+    </section>
+
+    <main class="tm-section">
+        <div class="tm-container" style="max-width:64rem;">
+            <div id="statsGrid" class="js-stats hidden" aria-live="polite">
+                <div class="js-stat"><b id="statTotal">0</b><span>Journeys</span></div>
+                <div class="js-stat"><b id="statBooked">0</b><span>Booked</span></div>
+                <div class="js-stat"><b id="statPlanned">0</b><span>Planned</span></div>
+                <div class="js-stat"><b id="statReplanning">0</b><span>Re-planning</span></div>
+            </div>
+
+            <div id="loading" class="tm-center" style="padding:3.5rem 0;display:grid;gap:1rem;justify-items:center;">
+                <div class="spinner"></div>
+                <p class="tm-sm tm-muted" style="margin:0;">Loading your journeysâ€¦</p>
+            </div>
+
+            <div id="emptyState" class="tm-center hidden" style="padding:3rem 0;">
+                <div style="max-width:34rem;">
+                    <span class="tm-eyebrow">Nothing planned yet</span>
+                    <h2 class="tm-h2">Your first journey starts with one question</h2>
+                    <p class="tm-sm tm-muted">Tell TripMind where you are leaving from, where you want to go and how you like to travel. Ollama builds the day-by-day plan with real distances and fares.</p>
+                    <div style="margin-top:1.5rem;"><a class="tm-btn tm-btn--accent tm-btn--lg" href="planner.html">Plan my first trip</a></div>
+                </div>
+            </div>
+
+            <ul id="tripsList" class="js-list hidden"></ul>
+        </div>
+    </main>
 
     <script src="../js/api.js"></script>
     <script src="../js/utils.js"></script>
-    <script>
-        const navToggle = document.getElementById('navToggle');
-        const navLinks = document.getElementById('navLinks');
-        if (navToggle) navToggle.addEventListener('click', () => {
-            const open = navLinks.classList.toggle('open');
-            navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-        });
-    </script>
     <script>
         async function loadTrips() {
             try {
@@ -89,46 +136,42 @@
                     return;
                 }
                 document.getElementById('statsGrid').classList.remove('hidden');
-                document.getElementById('tripsGrid').classList.remove('hidden');
+                document.getElementById('tripsList').classList.remove('hidden');
 
                 document.getElementById('statTotal').textContent = trips.length;
                 document.getElementById('statBooked').textContent = trips.filter(t => t.status === 'BOOKED').length;
                 document.getElementById('statPlanned').textContent = trips.filter(t => t.status === 'PLANNED').length;
                 document.getElementById('statReplanning').textContent = trips.filter(t => t.status === 'REPLANNING').length;
 
-                const grid = document.getElementById('tripsGrid');
-                grid.innerHTML = trips.map(trip => `
-                    <div class="card trip-card" onclick="window.location='trip.html?id=${trip._id}'">
-                        <div class="card-content">
-                            <div class="flex justify-between items-center">
-                                <div class="trip-route">
-                                    <span>${trip.origin}</span>
-                                    <span class="arrow">→</span>
-                                    <span>${trip.destination}</span>
+                const list = document.getElementById('tripsList');
+                list.innerHTML = trips.map(trip => {
+                    const estimated = trip.totalEstimatedCost
+                        ? formatCurrency(trip.totalEstimatedCost) + ' estimated'
+                        : 'Not estimated yet';
+                    const budget = trip.budgetUnlimited || !trip.budget
+                        ? 'Unlimited budget'
+                        : formatCurrency(trip.budget) + ' budget';
+                    return `<li class="js-row">
+                        <a class="js-row__link" href="trip.html?id=${encodeURIComponent(trip._id)}">
+                            <div>
+                                <div class="js-row__route">${esc(trip.origin || 'Origin')} <span class="arrow" aria-hidden="true">&rarr;</span> ${esc(trip.destination || 'Destination')}</div>
+                                <div class="js-row__meta">
+                                    <span>${formatDate(trip.startDate)} â€“ ${formatDate(trip.endDate)}</span>
+                                    <span>${trip.travelers} traveller${trip.travelers === 1 ? '' : 's'}</span>
+                                    <span>${esc(trip.travelStyle || '')}</span>
+                                    <span>${budget}</span>
                                 </div>
+                            </div>
+                            <div class="js-row__side">
                                 ${getStatusBadge(trip.status)}
+                                <span class="js-row__cost">${estimated}<small>${trip.returnTrip ? 'round trip' : 'one way'}</small></span>
+                                <span class="js-row__go">Open &rarr;</span>
                             </div>
-                            <div class="trip-meta">
-                                <span>${formatDate(trip.startDate)} – ${formatDate(trip.endDate)}</span>
-                                <span>${trip.travelers} traveler${trip.travelers > 1 ? 's' : ''}</span>
-                                <span>${trip.travelStyle}</span>
-                            </div>
-                            <div class="trip-cost">
-                                <div>
-                                    <div class="text-xs text-muted">Budget</div>
-                                    <div class="font-bold">${formatCurrency(trip.budget)}</div>
-                                </div>
-                                ${trip.totalEstimatedCost ? `
-                                <div style="text-align:right;">
-                                    <div class="text-xs text-muted">Estimated</div>
-                                    <div class="font-bold" style="color:var(--emerald);">${formatCurrency(trip.totalEstimatedCost)}</div>
-                                </div>` : ''}
-                            </div>
-                        </div>
-                    </div>
-                `).join('');
+                        </a>
+                    </li>`;
+                }).join('');
             } catch (e) {
-                document.getElementById('loading').innerHTML = `<p class="text-muted">Error loading trips: ${e.message}</p>`;
+                document.getElementById('loading').innerHTML = `<p class="tm-sm" style="color:var(--tm-clay);">Could not load your trips: ${esc(e.message)}</p>`;
             }
         }
 

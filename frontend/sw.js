@@ -8,7 +8,7 @@
  *   - everything else on our origin: network, no cache
  * Bump CACHE_VERSION to ship a new build.
  */
-const CACHE_VERSION = 'tripmind-v3';
+const CACHE_VERSION = 'tripmind-v4';
 const SHELL = [
   '/',
   '/index.html',
@@ -18,15 +18,16 @@ const SHELL = [
   '/pages/planner.html',
   '/pages/dashboard.html',
   '/pages/trip.html',
-  '/pages/mindmap.html',
   '/pages/verify.html',
   '/css/style.css',
+  '/css/theme.css',
   '/js/api.js',
   '/js/utils.js',
   '/js/chat.js',
   '/js/destinations.js',
   '/js/maps.js',
   '/js/pwa.js',
+  '/js/ui.js',
   '/manifest.json',
   '/img/icon-192.png',
   '/img/icon-512.png',

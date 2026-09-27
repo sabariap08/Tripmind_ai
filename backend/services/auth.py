@@ -121,7 +121,16 @@ def register_provider(data, role):
     return user, None
 
 
-def login_user(email, password):
+def login_user(email, password, remember=False):
+    """Sign a user in.
+
+    ``remember`` controls the lifetime of the signed session cookie:
+    True  -> persistent cookie that survives a browser restart
+             (app.permanent_session_lifetime, 7 days).
+    False -> browser-session cookie, discarded when the browser closes.
+    The cookie is always a Flask *signed* cookie holding only the user id,
+    never a password.
+    """
     users = get_collection("users")
     user = users.find_one({"email": (email or "").strip().lower()})
     if not user or not check_password_hash(user.get("passwordHash", ""), password or ""):
@@ -138,8 +147,8 @@ def login_user(email, password):
             reason = user.get("approvalReason") or "no reason provided"
             return None, "Your registration was rejected. Reason: %s" % reason
     session[SESSION_USER_KEY] = str(user["_id"])
-    session.permanent = True
-    session["_permanent"] = True
+    session.permanent = bool(remember)
+    session["_permanent"] = bool(remember)
     return _public_user(user), None
 
 

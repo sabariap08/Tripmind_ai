@@ -1,26 +1,30 @@
 {
-  "name": "TripMind AI - Trip Planner",
+  "name": "TripMind AI — Traveling Uniquely",
   "short_name": "TripMind AI",
-  "description": "AI trip planner with voice input, smart packing lists and a live digital twin of your trip.",
+  "description": "Plan a trip in seconds: Ollama builds the day-by-day itinerary with real distances and fares, plus smart packing, a Digital Trip Twin and an assistant that can change the plan.",
   "start_url": "/",
   "scope": "/",
   "id": "/",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui", "browser"],
-  "orientation": "portrait-primary",
-  "background_color": "#fafaf7",
-  "theme_color": "#f59e0b",
-  "categories": ["travel", "productivity", "lifestyle"],
+  "orientation": "any",
+  "background_color": "#06202b",
+  "theme_color": "#06202b",
+  "categories": ["travel", "lifestyle", "productivity"],
+  "lang": "en",
+  "dir": "ltr",
   "icons": [
     {
       "src": "/img/favicon-32.png",
       "sizes": "32x32",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/img/apple-touch-icon.png",
       "sizes": "180x180",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/img/icon-192.png",
@@ -52,13 +56,7 @@
       "name": "My trips",
       "short_name": "Trips",
       "url": "/pages/dashboard.html",
-      "description": "Open your trips"
-    },
-    {
-      "name": "Route map",
-      "short_name": "Map",
-      "url": "/pages/mindmap.html",
-      "description": "Explore the route mind map"
+      "description": "Open your journeys"
     }
   ]
 }

@@ -20,13 +20,15 @@ FRONTEND = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 
 PAGES = ["/", "/index.html", "/login.html", "/register.html", "/portal.html",
          "/pages/dashboard.html", "/pages/planner.html", "/pages/trip.html",
-         "/pages/mindmap.html", "/pages/verify.html"]
+         "/pages/verify.html"]
 
 ASSETS = [
     ("/manifest.json", "application/json"),
     ("/sw.js", "javascript"),
     ("/js/pwa.js", "javascript"),
+    ("/js/ui.js", "javascript"),
     ("/css/style.css", "text/css"),
+    ("/css/theme.css", "text/css"),
     ("/img/icon-192.png", "image/png"),
     ("/img/icon-512.png", "image/png"),
     ("/img/icon-maskable-512.png", "image/png"),

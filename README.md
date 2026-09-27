@@ -46,10 +46,9 @@ tripmind-ai/
 │   │   ├── chat.js          # AI chat widget
 │   │   └── portal.js        # Portal controller (role panels, dynamic transport forms)
 │   └── pages/
-│       ├── dashboard.html   # Trip dashboard
+│       ├── dashboard.html   # Your journeys
 │       ├── planner.html     # Trip planner
-│       ├── trip.html        # Trip detail + 5 tabs
-│       └── mindmap.html     # Route journey mind map (KPR → Coimbatore → Chennai)
+│       └── trip.html        # Itinerary, cost, packing, twin, assistant, booking
 ├── backend/
 │   ├── app.py               # Flask app entry (registers all blueprints)
 │   ├── config.py            # Configuration (roles, SECRET_KEY, GOOGLE_MAPS_API_KEY, DEV_MODE)
@@ -85,7 +84,7 @@ tripmind-ai/
 │       ├── booking_service.py    # Bookings with capacity/overbooking checks
 │       ├── ratings_service.py    # Ratings data layer + per-service stats
 │       ├── ai_chat.py       # Chat logic
-│       ├── route_mindmap.py # KPR → Coimbatore → Chennai journey flow data
+│       ├── route_mindmap.py # Connected journey flow data (used by the AI chat)
 │       └── ml/              # Pure-Python Machine Learning
 │           ├── registry.py      # Model registry + versioning (/ml/models)
 │           ├── definitions.py   # 17 labelled model specs + P1-P3 priorities
@@ -309,7 +308,7 @@ The cost prediction tunes sub-budget allocation and the timing model tunes itine
 | `/api/trips/:id/replan` | POST | AI replanning |
 | `/api/trips/:id/events` | GET | Get travel events |
 | `/api/ai/chat` | POST | AI chat assistant |
-| `/api/mindmap/flow` | GET | KPR → Coimbatore → Chennai connected journey flow |
+| `/api/mindmap/flow` | GET | Connected journey flow data (used by the AI chat) |
 | `/api/auth/register` | POST | Public user registration (USER role) |
 | `/api/auth/login` | POST | Login (sets session cookie) |
 | `/api/auth/logout` | POST | Logout |
@@ -400,32 +399,15 @@ fallback (`"source": "mock"`).
 cancelled). Each booking can be rated once; ratings feed the ML recommender and
 collaborative filtering, and drive the rating shown on catalogue cards.
 
-## Route Journey Mind Map
+## Route Journey Flow (API only)
 
-Open **Route Map** in the navigation (or `/pages/mindmap.html`) for a single, connected
-travel pathway:
+The standalone **Route Map** page was removed: it showed one hard-coded sample
+route and nothing in the planner produced it. The underlying flow data is still
+served by `GET /api/mindmap/flow`, and the AI chat still uses it when a traveller
+asks for a "travel flow / route / journey" — but nothing in the UI links to a
+static map any more. The live, per-trip route is drawn from the traveller's own
+itinerary on the trip page instead.
 
-```
-KPR → Coimbatore (Two-Wheeler / Car / Bus / Auto / Cab)
-   → Transit Point (Railway Station / Central Bus Stand / Airport CJB)
-   → Bus / Train / Flight (with all classes)
-   → Chennai Arrival (MAA / MAS / MS / Kilambakkam)
-   → Local Transport (Metro / Bus / Auto / Cab / Walk / Cycle)
-   → [ Hotel (by category)   |   Tourist Spot Directly ]
-   → Marina · Kapaleeshwarar · Fort St. George · San Thome · VGP
-     · DakshinaChitra · Mahabalipuram · Guindy National Park
-   → Next Spot (chain several)  →  Return / Continue Journey
-```
-
-- Every stage is connected; selecting an option highlights the full journey path
-  in the sticky summary bar (e.g. KPR → Bus → Coimbatore → Train → Chennai Central
-  → Metro → Hotel → Cab → Marina Beach).
-- Transport methods, distances, durations and reach information are shown for each
-  tourist spot and hotel from each arrival point.
-- Asking the AI chat for the "travel flow / route / journey" returns only the
-  flow content (mind-map output rule).
-- The map is served from `GET /api/mindmap/flow` (backend) so the page stays
-  dynamic and consistent with the rest of the app.
 
 ## Demo Flow
 

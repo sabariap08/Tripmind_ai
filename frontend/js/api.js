@@ -41,7 +41,6 @@ const api = {
     simulateDelay: (id, minutes) => apiRequest(`/api/trips/${id}/simulate-delay`, { method: 'POST', body: { delayMinutes: minutes } }),
     replan: (id, minutes) => apiRequest(`/api/trips/${id}/replan`, { method: 'POST', body: { delayMinutes: minutes } }),
     chat: (message, tripId) => apiRequest('/api/ai/chat', { method: 'POST', body: { message, tripId } }),
-    getMindmapFlow: () => apiRequest('/api/mindmap/flow'),
     tripReviews: (id) => apiRequest(`/api/trips/${id}/reviews`),
     addTripReview: (id, rating, comment) => apiRequest(`/api/trips/${id}/review`, { method: 'POST', body: { rating, comment } }),
     feedbackAnalysis: () => apiRequest('/api/ai/feedback-analysis', { method: 'POST' }),

@@ -3,92 +3,104 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Create Account - TripMind AI</title>
+    <title>Join TripMind AI — Travellers &amp; Providers</title>
+    <meta name="description" content="Create a TripMind AI account. Travellers plan in seconds; hotels, transport, spot, restaurant and guide providers register with the details our admin review needs.">
     <link rel="stylesheet" href="css/style.css">
     <style>
-        .auth-wrap { min-height: calc(100vh - 70px); display: flex; align-items: center; justify-content: center; padding: 3rem 1rem; }
-        .auth-card { width: 100%; max-width: 640px; }
-        .auth-msg { min-height: 1.5rem; }
-        .hint { font-size: .78rem; color: var(--muted,#6b7280); }
-        .hint2 { font-size: .74rem; color: var(--muted,#6b7280); margin-top: .25rem; }
-
-        /* Wizard stepper */
-        .wiz-steps { display: flex; gap: .5rem; margin-bottom: 1.5rem; }
-        .wiz-step { flex: 1; text-align: center; font-size: .72rem; color: var(--muted,#6b7280);
-            padding: .45rem .25rem; border-radius: .5rem; background: var(--slate-100,#f1f5f9); position: relative; }
-        .wiz-step.active { color: var(--primary,#2563eb); background: var(--primary-soft,#dbeafe); font-weight: 600; }
-        .wiz-step.done { color: var(--success,#16a34a); background: var(--success-soft,#dcfce7); }
-
-        /* Account type cards */
-        .role-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .75rem; }
-        .role-card { display: block; width: 100%; text-align: left; padding: 1rem; border-radius: .75rem; cursor: pointer;
-            border: 1.5px solid var(--slate-200,#e2e8f0); background: var(--slate-50,#f8fafc); transition: all .15s ease; }
-        .role-card:hover { border-color: var(--primary,#2563eb); }
-        .role-card.selected { border-color: var(--primary,#2563eb); background: var(--primary-soft,#dbeafe); }
-        .role-card-icon { display: flex; align-items: center; justify-content: center; width: 2.6rem; height: 2.6rem;
-            border-radius: .65rem; background: var(--primary-soft,#dbeafe); color: var(--primary,#2563eb); margin-bottom: .6rem; }
-        .role-card-icon svg { width: 1.4rem; height: 1.4rem; }
-        .role-card-title { font-weight: 600; margin-bottom: .3rem; }
-        .role-card-desc { font-size: .78rem; color: var(--muted,#6b7280); margin-bottom: .5rem; }
-        .role-card-note { font-size: .7rem; font-weight: 600; color: var(--primary,#2563eb); }
-        .reg-section-title { margin: 1.1rem 0 .5rem; font-weight: 700; color: var(--text,#0f172a); }
-        .wiz-sub { font-size: .85rem; color: var(--muted,#6b7280); margin-bottom: 1rem; }
-        .detail-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: .35rem .75rem; }
-        .detail-item { padding: .3rem 0; border-bottom: 1px dashed var(--slate-200,#e2e8f0); font-size: .85rem;
-            display: flex; justify-content: space-between; gap: .5rem; }
-        .detail-item .k { color: var(--muted,#6b7280); }
-        .summary-note { margin-top: .5rem; font-size: .78rem; color: var(--success,#16a34a); }
-        .wiz-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; gap: .5rem; }
+        /* Register shell. The wizard body itself is built by js/register.js,
+           which still emits the legacy .form-* / .role-card class names — those
+           are mapped onto the design system in css/theme.css. */
+        .reg-wrap { min-height: 100vh; min-height: 100dvh; display: grid; grid-template-columns: .9fr 1.1fr; }
+        @media (max-width: 1000px) { .reg-wrap { grid-template-columns: 1fr; } .reg-art { display: none; } }
+        .reg-art { position: relative; isolation: isolate; overflow: hidden; background: var(--tm-ink); color: var(--tm-on-dark); padding: clamp(1.5rem, 4vw, 3rem); display: flex; flex-direction: column; justify-content: space-between; }
+        .reg-art img.bg { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; }
+        .reg-art::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(165deg, rgba(6, 32, 43, .9), rgba(6, 32, 43, .6) 50%, rgba(6, 32, 43, .95)); }
+        .reg-art h2 { color: var(--tm-white); font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2.3rem); max-width: 16ch; }
+        .reg-art ul { list-style: none; padding: 0; margin: var(--tm-s5) 0 0; display: grid; gap: .8rem; }
+        .reg-art li { display: flex; gap: .65rem; align-items: flex-start; font-size: var(--tm-f-sm); color: var(--tm-on-dark-2); }
+        .reg-art li b { color: var(--tm-white); font-weight: 620; display: block; }
+        .reg-main { display: grid; place-items: start center; padding: clamp(1.5rem, 4vw, 3.5rem) clamp(1rem, 4vw, 3rem); background: var(--tm-sand); }
+        .reg-box { width: 100%; max-width: 40rem; }
+        .wiz-steps { display: flex; gap: .35rem; margin-bottom: var(--tm-s5); }
+        .wiz-step { flex: 1; min-width: 0; text-align: center; font-size: var(--tm-f-2xs); letter-spacing: .08em; text-transform: uppercase; font-weight: 650;
+            color: var(--tm-muted); padding: .55rem .3rem; border-radius: var(--tm-pill); background: var(--tm-sand-2); position: relative; transition: all var(--tm-dur-2) var(--tm-ease); }
+        .wiz-step.done { color: var(--tm-jade); background: #e7f4ee; }
+        .wiz-step.active { color: var(--tm-ink); background: var(--tm-white); box-shadow: inset 0 0 0 1.5px var(--tm-ink); }
+        .auth-msg { min-height: 1.5rem; margin-bottom: var(--tm-s3); }
+        .auth-msg .form-error, .auth-msg .error { color: var(--tm-clay); font-size: var(--tm-f-sm); }
+        .auth-msg .form-success, .auth-msg .success { color: var(--tm-jade); font-size: var(--tm-f-sm); }
+        .wiz-actions { display: flex; justify-content: space-between; align-items: center; margin-top: var(--tm-s5); gap: var(--tm-s3); }
+        .hint { font-size: var(--tm-f-2xs); color: var(--tm-muted); }
+        .hint2 { font-size: var(--tm-f-2xs); color: var(--tm-muted); margin-top: .25rem; }
+        .form-row { margin-bottom: var(--tm-s4); }
+        .role-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: .6rem; }
+        .detail-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0 1.25rem; }
+        .summary-note { margin-top: .5rem; font-size: var(--tm-f-xs); color: var(--tm-jade); }
+        .row-table-scroll { overflow-x: auto; }
+        .tm-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
     </style>
-    <meta name="theme-color" content="#f59e0b">
+    <meta name="theme-color" content="#06202b">
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
     <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="TripMind AI">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-1290x2796.jpg">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-1170x2532.jpg">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-828x1792.jpg">
+    <link rel="stylesheet" href="css/theme.css">
+    <script src="js/ui.js"></script>
 </head>
 <body>
-    <nav class="navbar">
-        <div class="container">
-            <a href="/" class="navbar-brand">
-                <span class="brand-mark">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-7-7 18-2.5-7.5L3 11z"></path></svg>
-                </span>
-                TripMind AI
-            </a>
-            <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
-            </button>
-            <div class="navbar-links" id="navLinks">
-                <a href="/">Home</a>
-                <a href="/login.html">Sign In</a>
-            </div>
-        </div>
-    </nav>
+    <a class="skip-link" href="#wizContent">Skip to the form</a>
 
-    <div class="auth-wrap">
-        <div class="card auth-card">
-            <div class="card-header"><div class="card-title" id="wizTitle">Create your account</div></div>
-            <div class="card-content">
-                <div class="wiz-steps" id="wizSteps">
-                    <div class="wiz-step">Account Type</div>
-                    <div class="wiz-step">Basic Details</div>
-                    <div class="wiz-step">Identity &amp; Contact</div>
-                    <div class="wiz-step">Review &amp; Confirm</div>
+    <div class="reg-wrap">
+        <aside class="reg-art">
+            <img class="bg" src="img/pagehead-journey.jpg" alt="" aria-hidden="true" width="2000" height="900">
+            <a href="/" class="tm-brand tm-brand--on-dark" aria-label="TripMind AI home">
+                <span class="tm-brand__mark"><svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                <span class="tm-brand__text">
+                    <span class="tm-brand__name">TripMind AI</span>
+                    <span class="tm-brand__tag">Traveling Uniquely</span>
+                </span>
+            </a>
+            <div class="reg-art__body">
+                <h2>One platform, two ways in</h2>
+                <ul>
+                    <li><svg viewBox="0 0 24 24" fill="none" stroke="var(--tm-gold-soft)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span><b>Travellers</b>Start planning in seconds — name, email, password. No waiting for review.</span></li>
+                    <li><svg viewBox="0 0 24 24" fill="none" stroke="var(--tm-gold-soft)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span><b>Hotels, transport, spots, restaurants, guides</b>Register with the business details, identity proof and pricing our admin review needs before you go live.</span></li>
+                </ul>
+            </div>
+            <p class="tm-2xs" style="color:rgba(255,255,255,.6);margin:0;">Registrations are reviewed by the Main Admin. Nothing is published before approval.</p>
+        </aside>
+
+        <main class="reg-main" id="regMain">
+            <div class="reg-box">
+                <span class="tm-eyebrow">Join TripMind</span>
+                <h1 class="tm-h2" id="wizTitle" style="margin-bottom:.4rem;">Create your account</h1>
+
+                <div class="wiz-steps" id="wizSteps" aria-label="Registration progress">
+                    <div class="wiz-step">Account type</div>
+                    <div class="wiz-step">Basics</div>
+                    <div class="wiz-step">Identity &amp; contact</div>
+                    <div class="wiz-step">Review</div>
                 </div>
-                <div class="auth-msg" id="authMsg"></div>
+
+                <div class="auth-msg" id="authMsg" role="status" aria-live="polite"></div>
                 <div id="wizContent"></div>
+
                 <div class="wiz-actions">
-                    <button class="btn btn-outline" id="wizBack" style="display:none;">Back</button>
-                    <button class="btn btn-primary" id="wizNext">Choose Account Type</button>
+                    <button class="btn btn-outline" id="wizBack" type="button" style="display:none;">Back</button>
+                    <button class="btn btn-primary" id="wizNext" type="button">Choose Account Type</button>
                 </div>
-                <p class="text-muted mt-4" style="text-align:center;">
+
+                <p class="tm-sm tm-muted" style="text-align:center;margin-top:var(--tm-s6);">
                     Already have an account? <a href="/login.html">Sign in</a>
                 </p>
             </div>
-        </div>
+        </main>
     </div>
 
     <script src="js/api.js"></script>

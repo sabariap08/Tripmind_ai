@@ -6,31 +6,34 @@
     <title>Portal · TripMind AI</title>
     <link rel="stylesheet" href="css/style.css">
     <style>
-        /* ============ TripMind AI Portal shell (all roles) ============ */
+        /* ============ TripMind AI Portal shell (all roles) ============
+           The portal keeps its own dense, operational layout (it is a working
+           console, not a marketing page) but now wears the same brand tokens
+           as the traveller-facing pages: deep ink, gold accent, warm sand. */
         :root {
-            --tm-accent: #f59e0b;
-            --tm-accent-dark: #d97706;
-            --tm-accent-soft: #fef3c7;
-            --tm-ink: #0f172a;
-            --tm-body: #64748b;
-            --tm-line: #e2e8f0;
-            --tm-line-soft: #f1f5f9;
+            --tm-accent: #f0a01e;
+            --tm-accent-dark: #b4531f;
+            --tm-accent-soft: #fff4e2;
+            --tm-ink: #06202b;
+            --tm-body: #6b8290;
+            --tm-line: #e6dccd;
+            --tm-line-soft: #f2ece2;
             --tm-surface: #ffffff;
-            --tm-danger: #dc2626;
+            --tm-danger: #b4531f;
             --tm-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
         }
         html, body.portal-page { overflow-x: hidden; }
         body.portal-page {
-            background: #f4f5f7;
+            background: #faf7f2;
             font-family: var(--tm-font);
-            color: var(--slate-800);
+            color: var(--tm-ink);
         }
 
         /* ---------- Top bar (full viewport, always shows hamburger) ---------- */
         .portal-topbar {
             position: sticky; top: 0; z-index: 80;
-            background: #ffffff;
-            border-bottom: 1px solid var(--tm-line);
+            background: var(--tm-ink);
+            border-bottom: 1px solid rgba(255, 255, 255, .1);
             height: 60px;
         }
         .portal-topbar-inner {
@@ -39,34 +42,34 @@
         }
         .portal-menu-btn {
             display: inline-flex; align-items: center; justify-content: center;
-            background: none; border: 1px solid var(--tm-line);
-            border-radius: .55rem; color: var(--slate-700);
+            background: none; border: 1px solid rgba(255, 255, 255, .22);
+            border-radius: .55rem; color: #eef6f9;
             width: 2.45rem; height: 2.45rem; cursor: pointer; flex: 0 0 auto;
             transition: background .15s, border-color .15s;
         }
-        .portal-menu-btn:hover { background: var(--slate-50); border-color: var(--slate-300); }
+        .portal-menu-btn:hover { background: rgba(255, 255, 255, .1); border-color: rgba(255, 255, 255, .4); }
         .portal-menu-btn svg { width: 1.3rem; height: 1.3rem; }
         .portal-brand {
-            display: flex; align-items: center; gap: .55rem; color: var(--slate-900);
+            display: flex; align-items: center; gap: .55rem; color: #fff;
             font-weight: 800; font-size: 1.05rem; text-decoration: none; white-space: nowrap;
         }
         .portal-brand:hover { text-decoration: none; }
         .portal-brand-mark {
             width: 2rem; height: 2rem; border-radius: .5rem; flex: 0 0 auto;
-            background: linear-gradient(135deg, var(--tm-accent), var(--tm-accent-dark));
+            background: linear-gradient(135deg, #f0a01e, #b4531f);
             display: inline-flex; align-items: center; justify-content: center;
         }
         .portal-brand-mark svg { width: 1.15rem; height: 1.15rem; }
         .portal-title {
-            margin-left: .5rem; font-size: .95rem; font-weight: 600; color: var(--slate-600);
+            margin-left: .5rem; font-size: .95rem; font-weight: 600; color: rgba(238, 246, 249, .7);
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-            border-left: 1px solid var(--tm-line); padding-left: 1rem;
+            border-left: 1px solid rgba(255, 255, 255, .16); padding-left: 1rem;
         }
         .portal-topbar-user { margin-left: auto; display: flex; align-items: center; gap: .5rem; }
         .user-chip {
             display: inline-flex; align-items: center; gap: .55rem;
-            background: var(--tm-line-soft); border: 1px solid var(--tm-line);
-            padding: .3rem .8rem; border-radius: 99px; font-size: .82rem; color: var(--slate-700);
+            background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .16);
+            padding: .3rem .8rem; border-radius: 99px; font-size: .82rem; color: #eef6f9;
             max-width: 260px; overflow: hidden;
         }
         .user-chip .user-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -277,14 +280,18 @@
             .portal-main { padding: 1rem .9rem 2.5rem; }
         }
     </style>
-    <meta name="theme-color" content="#f59e0b">
+    <meta name="theme-color" content="#06202b">
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
     <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="TripMind AI">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-1290x2796.jpg">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-1170x2532.jpg">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-828x1792.jpg">
+    <script src="js/ui.js"></script>
 </head>
 <body class="portal-page">
     <header class="portal-topbar">

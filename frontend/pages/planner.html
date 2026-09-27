@@ -3,229 +3,361 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plan Trip - TripMind AI</title>
+    <title>Plan Your Trip â€” TripMind AI</title>
+    <meta name="description" content="Plan a trip with TripMind AI: pick your start on the map, choose a destination, and Ollama builds the day-by-day itinerary with real fares.">
     <link rel="stylesheet" href="../css/style.css">
     <style>
-        .hr-label{font-weight:700;font-size:.9rem;color:var(--slate-600,#475569);margin-top:1rem;padding-top:.9rem;border-top:1px solid var(--slate-100,#e2e8f0);}
-        .spot-grid{display:grid;grid-template-columns:1fr;gap:.9rem;margin-top:1rem;}
-        .spot-card{border:2px solid var(--slate-100,#e2e8f0);border-radius:.8rem;padding:.9rem;cursor:pointer;transition:.15s;position:relative;background:#fff;display:flex;align-items:center;gap:1rem;}
-        .spot-card:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(0,0,0,.08);}
-        .spot-card.picked{border-color:var(--amber,#eab308);background:linear-gradient(180deg,#fffbeb,#fff);}
-        .spot-card img{width:220px;height:132px;flex:none;object-fit:cover;border-radius:.5rem;background:var(--slate-50,#f1f5f9);}
-        .spot-card .spot-main{flex:1;min-width:0;}
-        .spot-card .spot-side{flex:none;text-align:right;}
-        @media (max-width:640px){
-            .spot-card{flex-direction:column;align-items:stretch;text-align:left;}
-            .spot-card img{width:100%;height:150px;}
-            .spot-card .spot-side{text-align:left;}
+        /* Planner-only layout (design system lives in css/theme.css) */
+        .pl-search { display: grid; gap: var(--tm-s5); }
+        .pl-row { display: grid; gap: var(--tm-s4); }
+        @media (min-width: 720px) { .pl-row--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (min-width: 1000px) { .pl-row--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        .pl-group { border-top: 1px solid var(--tm-line); padding-top: var(--tm-s5); }
+        .pl-group:first-child { border-top: 0; padding-top: 0; }
+        .pl-group__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--tm-s3); margin-bottom: var(--tm-s4); flex-wrap: wrap; }
+        .pl-group__t { font-size: var(--tm-f-2xs); font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--tm-ink-soft); }
+        .pl-group__h { font-family: var(--tm-font); font-size: 1.15rem; font-weight: 650; letter-spacing: -.015em; color: var(--tm-ink); margin: 0; }
+        .pl-group__d { font-size: var(--tm-f-xs); color: var(--tm-muted); max-width: 52ch; }
+        .pl-microw { display: flex; gap: var(--tm-s3); align-items: center; flex-wrap: wrap; margin-top: var(--tm-s3); }
+        /* Spot picker: compact rows, not a card wall */
+        .spot-list { display: grid; gap: 1px; background: var(--tm-line); border: 1px solid var(--tm-line); border-radius: var(--tm-r-md); overflow: hidden; margin-top: var(--tm-s4); }
+        .spot-card {
+            display: grid; grid-template-columns: 24px 68px 1fr auto; gap: var(--tm-s3); align-items: center;
+            background: var(--tm-sand); padding: .7rem .9rem; cursor: pointer; min-height: 64px;
+            transition: background-color var(--tm-dur-1) var(--tm-ease);
         }
-        .spot-pick-badge{position:absolute;top:.6rem;right:.6rem;width:26px;height:26px;border-radius:50%;background:var(--amber,#eab308);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:.85rem;box-shadow:0 2px 6px rgba(0,0,0,.2);}
-        .star-mini{color:var(--amber,#eab308);}
-        .rank-chip{font-size:.7rem;font-weight:700;letter-spacing:.04em;padding:.15rem .5rem;border-radius:999px;background:var(--slate-100,#e2e8f0);color:var(--slate-600,#475569);}
-        .chip-p1{background:var(--amber,#eab308);color:#fff;}
-        .chip-p0{background:#ecfdf5;color:#059669;}
-        .ps-menu{position:absolute;top:calc(100% + .3rem);left:0;right:0;background:#fff;border:1px solid var(--slate-200,#e2e8f0);border-radius:.6rem;box-shadow:0 12px 30px rgba(0,0,0,.14);z-index:30;padding:.4rem;display:none;}
-        .ps-menu.open{display:block;}
-        .ps-opt{display:flex;gap:.55rem;align-items:center;padding:.5rem .4rem;font-size:.85rem;cursor:pointer;border-radius:.4rem;}
-        .ps-opt:hover{background:var(--slate-50,#f8fafc);}
-        .ps-opt input{accent-color:var(--amber,#eab308);}
-        .sel-bar{position:sticky;bottom:1rem;background:rgba(255,255,255,.96);border:1px solid var(--slate-200,#e2e8f0);border-radius:.9rem;padding:.8rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem;box-shadow:0 10px 30px rgba(0,0,0,.12);z-index:5;}
-        .sel-bar .n{font-weight:700;color:var(--amber,#b45309);}
+        .spot-card:hover { background: var(--tm-white); }
+        .spot-card.picked { background: var(--tm-white); box-shadow: inset 3px 0 0 var(--tm-gold); }
+        .spot-card__tick {
+            width: 22px; height: 22px; border-radius: 6px; border: 1.5px solid var(--tm-ink-soft);
+            display: grid; place-items: center; font-size: .7rem; font-weight: 800; color: transparent; background: var(--tm-white);
+        }
+        .spot-card.picked .spot-card__tick { background: var(--tm-ink); border-color: var(--tm-ink); color: #fff; }
+        .spot-card img { width: 68px; height: 52px; object-fit: cover; border-radius: 8px; background: var(--tm-sand-3); }
+        .spot-card__n { font-weight: 620; font-size: var(--tm-f-sm); color: var(--tm-ink); }
+        .spot-card__m { font-size: var(--tm-f-2xs); color: var(--tm-muted); }
+        .spot-card__p { text-align: right; font-weight: 650; font-size: var(--tm-f-xs); color: var(--tm-ink); white-space: nowrap; }
+        .spot-card__p small { display: block; font-weight: 500; color: var(--tm-muted); font-size: .68rem; }
+        .star-mini { color: var(--tm-gold); letter-spacing: .06em; }
+        .rank-chip { font-size: .62rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; padding: .1rem .45rem; border-radius: var(--tm-pill); background: var(--tm-sand-2); color: var(--tm-ink-soft); }
+        .chip-p1 { background: #fff4e2; color: #8a4b06; }
+        .chip-p0 { background: #e9f6f0; color: #0a5c42; }
+        .sel-bar {
+            position: sticky; bottom: 0; z-index: 5; margin-top: var(--tm-s4);
+            display: flex; align-items: center; justify-content: space-between; gap: var(--tm-s4); flex-wrap: wrap;
+            padding: var(--tm-s3) var(--tm-s4); border-radius: var(--tm-r-md);
+            background: rgba(255, 255, 255, .94); backdrop-filter: blur(12px);
+            border: 1px solid var(--tm-line); box-shadow: var(--tm-sh-2);
+        }
+        .sel-bar .n { font-weight: 700; color: var(--tm-ink); }
+        @media (max-width: 640px) {
+            .spot-card { grid-template-columns: 22px 1fr auto; }
+            .spot-card img { display: none; }
+            .sel-bar { flex-direction: column; align-items: stretch; }
+        }
+        .map-frame { height: 240px; border: 1px solid var(--tm-line); border-radius: var(--tm-r-sm); overflow: hidden; display: none; margin-top: var(--tm-s3); }
     </style>
-    <meta name="theme-color" content="#f59e0b">
+    <meta name="theme-color" content="#06202b">
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
     <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="TripMind AI">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-1290x2796.jpg">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-1170x2532.jpg">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-828x1792.jpg">
+    <link rel="stylesheet" href="/css/theme.css">
+    <script src="/js/ui.js"></script>
 </head>
 <body>
-    <nav class="navbar">
-        <div class="container">
-            <a href="/" class="navbar-brand">
-                <span class="brand-mark">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-7-7 18-2.5-7.5L3 11z"></path></svg>
+    <a class="skip-link" href="#plMain">Skip to the planner</a>
+
+    <nav class="tm-nav" id="plannerNav">
+        <div class="tm-nav__inner">
+            <a href="/" class="tm-brand" aria-label="TripMind AI home">
+                <span class="tm-brand__mark"><svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                <span class="tm-brand__text">
+                    <span class="tm-brand__name">TripMind AI</span>
+                    <span class="tm-brand__tag">Traveling Uniquely</span>
                 </span>
-                TripMind AI
             </a>
-            <button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
-            </button>
-            <div class="navbar-links" id="navLinks">
-                <a href="/">Home</a>
-                <a href="dashboard.html">Dashboard</a>
-                <a href="planner.html" class="active">Plan Trip</a>
+            <div class="tm-nav__links">
+                <a class="tm-nav__link" href="dashboard.html">My Trips</a>
+                <a class="tm-nav__link" href="/">Explore</a>
             </div>
+            <div class="tm-nav__actions">
+                <a class="tm-btn tm-btn--secondary tm-btn--sm" href="dashboard.html">Dashboard</a>
+            </div>
+            <button class="tm-burger" type="button" data-tm-drawer-open="plDrawer" aria-label="Open menu" aria-expanded="false" aria-controls="plDrawer"><span></span></button>
         </div>
     </nav>
 
-    <div class="container" style="padding-top:2rem;padding-bottom:4rem;max-width:960px;">
-        <!-- STEP 1 : Trip details -->
-        <div id="stepDetails">
-            <h1 style="font-size:1.75rem;font-weight:700;margin-bottom:.5rem;">Plan Your Trip</h1>
-            <p class="text-sm text-muted mb-6">Tell us where you start, where you're going and how you want to travel — the AI builds the itinerary from your choices.</p>
+    <div class="tm-drawer" id="plDrawer" data-open="false" role="dialog" aria-modal="true" aria-label="Menu">
+        <div class="tm-drawer__scrim" data-tm-drawer-close></div>
+        <div class="tm-drawer__panel">
+            <div class="tm-drawer__head">
+                <a href="/" class="tm-brand">
+                    <span class="tm-brand__mark"><svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                    <span class="tm-brand__text"><span class="tm-brand__name">TripMind AI</span><span class="tm-brand__tag">Traveling Uniquely</span></span>
+                </a>
+                <button class="tm-drawer__close" type="button" data-tm-drawer-close aria-label="Close menu">&times;</button>
+            </div>
+            <nav class="tm-drawer__links">
+                <a class="tm-drawer__link" href="dashboard.html">My Trips <span>01</span></a>
+                <a class="tm-drawer__link" href="/">Explore <span>02</span></a>
+            </nav>
+            <div class="tm-drawer__foot">
+                <a class="tm-btn tm-btn--primary tm-btn--block" href="planner.html">Plan a new trip</a>
+            </div>
+        </div>
+    </div>
 
-            <div class="card mb-4">
-                <div class="card-header"><div class="card-title">Trip Details</div></div>
-                <div class="card-content">
-                    <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
-                        <div class="form-group">
-                            <label class="form-label">Origin city</label>
-                            <input id="origin" class="form-input" placeholder="e.g., Coimbatore">
+    <!-- Compact cinematic head -->
+    <section class="tm-pagehead">
+        <div class="tm-pagehead__bg"><img src="../img/pagehead-journey.jpg" alt="" aria-hidden="true" width="2000" height="900"></div>
+        <div class="tm-container">
+            <span class="tm-eyebrow tm-eyebrow--on-dark">AI trip planner</span>
+            <h1 class="tm-h1" style="margin-bottom:.35rem;">Plan your trip</h1>
+            <p style="margin:0;">Tell us where you start, where you're going and how you like to travel. Ollama does the rest â€” with real distances and fares.</p>
+        </div>
+    </section>
+
+    <main class="tm-section" id="plMain">
+        <div class="tm-container" style="max-width:900px;">
+
+            <!-- ============ STEP 1 â€” trip details ============ -->
+            <div id="stepDetails">
+                <div class="pl-search">
+                    <div class="pl-group">
+                        <div class="pl-group__head">
+                            <h2 class="pl-group__h">Where from, where to</h2>
+                            <span class="tm-2xs tm-muted">Origin is the only field that needs the map.</span>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Destination city <span style="color:#dc2626;">*</span></label>
-                            <input id="destination" class="form-input" placeholder="e.g., Chennai">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Start Date</label>
-                            <input id="startDate" type="date" class="form-input">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">End Date</label>
-                            <input id="endDate" type="date" class="form-input">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Travelers</label>
-                            <input id="travelers" type="number" class="form-input" min="1" max="20" value="2">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Budget per Traveler (INR)</label>
-                            <div style="display:flex;gap:.5rem;align-items:center;">
-                                <input id="budget" type="number" class="form-input" min="0" value="50000" style="flex:1;">
-                                <label class="form-label" style="white-space:nowrap;margin:0;">
-                                    <input type="checkbox" id="budgetUnlimited" style="accent-color:var(--amber,#eab308);"> Unlimited
-                                </label>
+                        <div class="pl-row pl-row--2">
+                            <div class="tm-field" style="margin:0;">
+                                <label class="tm-label" for="origin">Where from? <span class="req" aria-hidden="true">*</span></label>
+                                <input id="origin" class="tm-input" placeholder="City you're starting in" autocomplete="address-level2">
+                                <span class="tm-error" aria-live="polite"></span>
+                            </div>
+                            <div class="tm-field" style="margin:0;">
+                                <label class="tm-label" for="destination">Where to? <span class="req" aria-hidden="true">*</span></label>
+                                <input id="destination" class="tm-input" placeholder="Chennai, Ooty, Maduraiâ€¦" list="destList" autocomplete="off">
+                                <datalist id="destList"></datalist>
+                                <span class="tm-error" aria-live="polite"></span>
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Travel Style</label>
-                            <select id="travelStyle" class="form-select">
-                                <option value="BUDGET">Budget</option>
-                                <option value="BALANCED" selected>Balanced</option>
-                                <option value="PREMIUM">Premium</option>
-                            </select>
+                        <div class="tm-field" style="margin-top:var(--tm-s4);">
+                            <label class="tm-label" for="startAddr">Starting point â€” pick it on the map <span class="req" aria-hidden="true">*</span></label>
+                            <div class="grid-side" style="display:grid;grid-template-columns:1fr auto;gap:.5rem;align-items:start;">
+                                <input id="startAddr" class="tm-input" placeholder="Search your starting locationâ€¦">
+                                <button class="tm-btn tm-btn--secondary" type="button" onclick="openStartMap()" style="white-space:nowrap;">Pick on map</button>
+                            </div>
+                            <input id="startLat" type="hidden"><input id="startLng" type="hidden">
+                            <div id="startMap" class="map-frame"></div>
+                            <p class="tm-hint" id="startNote">Origin not selected yet â€” pick your exact starting point on the map.</p>
                         </div>
-                        <div class="form-group" style="position:relative;">
-                            <label class="form-label">Premium Services</label>
-                            <button type="button" id="psToggle" class="form-input"
-                                    style="text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;"
-                                    onclick="togglePremiumMenu()">
-                                <span id="psLabel" style="color:var(--slate-500,#64748b);">Select premium services…</span>
-                                <span style="color:var(--slate-400,#94a3b8);">&#9662;</span>
-                            </button>
-                            <div id="psMenu" class="ps-menu">
-                                <label class="ps-opt"><input type="checkbox" class="ps-cb" value="TRANSPORT"> Comfortable transport upgrade</label>
-                                <label class="ps-opt"><input type="checkbox" class="ps-cb" value="HOTELS"> Better hotels</label>
-                                <label class="ps-opt"><input type="checkbox" class="ps-cb" value="ACTIVITIES"> More activities &amp; tours</label>
-                                <label class="ps-opt"><input type="checkbox" class="ps-cb" value="GUIDE"> Local guide</label>
+                    </div>
+
+                    <div class="pl-group">
+                        <div class="pl-group__head"><h2 class="pl-group__h">When</h2></div>
+                        <div class="pl-row pl-row--3">
+                            <div class="tm-field" style="margin:0;">
+                                <label class="tm-label" for="startDate">Start date <span class="req" aria-hidden="true">*</span></label>
+                                <input id="startDate" type="date" class="tm-input">
+                                <span class="tm-error" aria-live="polite"></span>
+                            </div>
+                            <div class="tm-field" style="margin:0;">
+                                <label class="tm-label" for="endDate">End date <span class="req" aria-hidden="true">*</span></label>
+                                <input id="endDate" type="date" class="tm-input">
+                                <span class="tm-error" aria-live="polite"></span>
+                            </div>
+                            <div class="tm-field" style="margin:0;">
+                                <label class="tm-label" for="travelers">Travellers</label>
+                                <input id="travelers" type="number" class="tm-input" min="1" max="20" value="2" inputmode="numeric">
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label" style="display:flex;gap:.5rem;align-items:center;cursor:pointer;">
-                                <input type="checkbox" id="returnTrip" style="accent-color:var(--amber,#eab308);">
-                                Return trip (round trip back home)
+                    </div>
+
+                    <div class="pl-group">
+                        <div class="pl-group__head"><h2 class="pl-group__h">How you like to travel</h2></div>
+                        <div class="pl-row pl-row--2">
+                            <div class="tm-field" style="margin:0;">
+                                <label class="tm-label" for="travelStyle">Travel style</label>
+                                <select id="travelStyle" class="tm-select">
+                                    <option value="BUDGET">Budget</option>
+                                    <option value="BALANCED" selected>Balanced</option>
+                                    <option value="PREMIUM">Premium</option>
+                                </select>
+                            </div>
+                            <div class="tm-field" style="margin:0;">
+                                <label class="tm-label" for="budget">Budget per traveller (â‚¹)</label>
+                                <div class="grid-side" style="display:flex;gap:.6rem;align-items:center;">
+                                    <input id="budget" type="number" class="tm-input" min="0" value="50000" inputmode="numeric" style="flex:1;">
+                                    <label class="tm-switch" style="margin:0;">
+                                        <input type="checkbox" id="budgetUnlimited">
+                                        <span class="tm-switch__track"></span>
+                                        <span class="tm-switch__text">Unlimited</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tm-field" style="margin-top:var(--tm-s4);max-width:340px;">
+                            <span class="tm-label" id="psLabelId">Premium services</span>
+                            <div class="tm-drop" id="psDrop" data-open="false">
+                                <button type="button" class="tm-drop__trigger" id="psToggle" onclick="togglePremiumMenu(event)" aria-expanded="false" aria-haspopup="true" aria-labelledby="psLabelId">
+                                    <span class="tm-drop__summary">None selected</span>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                                </button>
+                                <div class="tm-drop__panel" id="psMenu" role="group" aria-label="Premium services">
+                                    <label class="tm-check"><input type="checkbox" class="ps-cb" value="TRANSPORT" data-label="Comfortable transport"><span class="tm-check__text">Comfortable transport<small>A smoother, better-equipped vehicle</small></span></label>
+                                    <label class="tm-check"><input type="checkbox" class="ps-cb" value="HOTELS" data-label="Better hotels"><span class="tm-check__text">Better hotels<small>Higher-rated stays where available</small></span></label>
+                                    <label class="tm-check"><input type="checkbox" class="ps-cb" value="ACTIVITIES" data-label="More activities"><span class="tm-check__text">More activities &amp; tours<small>A fuller itinerary</small></span></label>
+                                    <label class="tm-check"><input type="checkbox" class="ps-cb" value="GUIDE" data-label="Local guide"><span class="tm-check__text">Local guide<small>A guide for the cultural spots</small></span></label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top:var(--tm-s4);">
+                            <label class="tm-switch">
+                                <input type="checkbox" id="returnTrip">
+                                <span class="tm-switch__track"></span>
+                                <span class="tm-switch__text">Return trip (round trip back home)</span>
                             </label>
-                            <p class="text-sm text-muted" style="font-size:.75rem;margin:.2rem 0 0;">Adds the return journey on the last day, priced from real distance &amp; fares.</p>
+                            <p class="tm-hint">Adds the return journey on the last day, priced from real distance and fares.</p>
                         </div>
                     </div>
-                    <div class="hr-label">Tell the AI how you'd like to travel <span style="color:#dc2626;">*</span></div>
-                    <p class="text-sm text-muted" style="margin:.35rem 0 .75rem;">Describe your preferences in your own words — the AI plans your trip around them. This is <b>mandatory</b>.</p>
-                    <div class="form-group">
-                        <textarea id="preferences" class="form-input" rows="5"
-                                  placeholder="e.g. I want a relaxed trip with a direct AC train in the morning, a good vegetarian restaurant near the hotel, a guide for the cultural spots, and a rooftop cafe to end the day…"></textarea>
-                    </div>
-                    <!-- VOICE: speak any language -> STT -> detect+translate to
-                         English -> the English text fills this same box, so
-                         voice feeds the existing text planning flow. -->
-                    <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-top:.5rem;">
-                        <button type="button" class="btn btn-outline" id="voiceBtn" onclick="toggleVoice()">🎤 Speak your trip</button>
-                        <select id="voiceLang" class="form-select" style="max-width:210px;">
-                            <option value="en-IN">English (India)</option>
-                            <option value="ta-IN">தமிழ் (Tamil)</option>
-                            <option value="hi-IN">हिन्दी (Hindi)</option>
-                            <option value="ml-IN">മലയാളം (Malayalam)</option>
-                            <option value="te-IN">తెలుగు (Telugu)</option>
-                            <option value="kn-IN">ಕನ್ನಡ (Kannada)</option>
-                        </select>
-                        <span id="voiceStatus" class="text-sm text-muted" style="font-size:.8rem;"></span>
-                    </div>
-                    <div class="hr-label" style="margin-top:1rem;">Starting point (Google Maps) <span style="color:#dc2626;">*</span></div>
-                    <p class="text-sm text-muted" style="margin:.35rem 0 .75rem;">Pick exactly where the trip starts — this is <b>mandatory</b> and the AI uses it for routing.</p>
-                    <div class="grid-side" style="display:grid;grid-template-columns:1fr auto;gap:.5rem;">
-                        <div class="form-group">
-                            <input id="startAddr" class="form-input" placeholder="Search your starting location…">
-                        </div>
-                        <div class="form-group">
-                            <button class="btn btn-outline" type="button" onclick="openStartMap()">Pick on map</button>
-                        </div>
-                    </div>
-                    <input id="startLat" type="hidden"><input id="startLng" type="hidden">
-                    <div id="startMap" style="height:220px;border:1px solid var(--slate-100);border-radius:.6rem;display:none;margin-bottom:1rem;"></div>
-                    <p class="text-sm text-muted" id="startNote" style="font-size:.78rem;color:#dc2626;">Origin not selected yet — you must pick your starting point on the map.</p>
-                    <button class="btn btn-primary btn-lg w-full mt-4" onclick="goToSpots()">Continue — Choose Tourist Spots →</button>
-                </div>
-            </div>
-        </div>
 
-        <!-- STEP 2 : Tourist spot selection (ML-ranked, priority order) -->
-        <div id="stepSpots" class="hidden">
-            <h1 style="font-size:1.75rem;font-weight:700;margin-bottom:.5rem;">Choose Your Tourist Spots</h1>
-            <p class="text-sm text-muted mb-2">Spots are ranked by our recommendation engine. <b>Tap spots in the order you prefer</b> — your click order becomes the priority the optimizer must honor.</p>
-            <p class="text-sm text-muted" style="margin-bottom:1rem;">Tap as many as you like — every approved spot can be selected, and your click order becomes the priority. If you don't care, just use <i>“I Have No Choice”</i>.</p>
-            <div class="flex gap" style="margin-bottom:.5rem;">
-                <button class="btn btn-outline" onclick="pickNone()">I Have No Choice — AI picks</button>
-                <button class="btn btn-outline" onclick="resetPicks()">Reset choices</button>
-            </div>
-            <div id="spotGrid" class="spot-grid">
-                <div class="text-muted">Loading recommendation engine…</div>
-            </div>
-            <div class="sel-bar" id="selBar" style="display:none;">
-                <div><span class="n" id="selCount">0</span> selected in priority order <span class="text-muted" id="selList"></span></div>
-                <div class="flex gap">
-                    <button class="btn btn-outline" onclick="resetPicks()">Reset</button>
-                    <button class="btn btn-primary" onclick="submitTrip()">Generate Travel Plans</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="processingScreen" class="hidden">
-            <div class="card">
-                <div class="card-content">
-                    <h2 style="text-align:center;margin-bottom:1.5rem;">Generating Your Travel Plans</h2>
-                    <div class="processing-steps">
-                        <div class="processing-step" id="step1"><div class="step-dot"></div><span>Matching transport & hotels…</span></div>
-                        <div class="processing-step" id="step2"><div class="step-dot"></div><span>Honouring your spot priorities…</span></div>
-                        <div class="processing-step" id="step3"><div class="step-dot"></div><span>Building the daily itinerary…</span></div>
-                        <div class="processing-step" id="step4"><div class="step-dot"></div><span>Optimizing budget & comfort…</span></div>
-                        <div class="processing-step" id="step5"><div class="step-dot"></div><span>Generating recommendations…</span></div>
+                    <div class="pl-group">
+                        <div class="pl-group__head">
+                            <h2 class="pl-group__h">Your travel style, in your words <span class="req" aria-hidden="true">*</span></h2>
+                        </div>
+                        <p class="pl-group__d" style="margin-bottom:var(--tm-s3);">The AI plans around this. A sentence or two is plenty â€” the more specific, the better the itinerary.</p>
+                        <div class="tm-field" style="margin:0;">
+                            <label class="tm-sr" for="preferences">Describe how you would like to travel</label>
+                            <textarea id="preferences" class="tm-textarea" rows="4"
+                                      placeholder="e.g. A relaxed trip with a morning AC train, a good vegetarian restaurant near the hotel, a guide for the cultural spots and a rooftop cafÃ© to end the dayâ€¦"></textarea>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                        <!-- Voice: STT -> language detect + translate -> the same box -->
+                        <div class="pl-microw">
+                            <button type="button" class="tm-btn tm-btn--secondary" id="voiceBtn" onclick="toggleVoice()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg>
+                                <span id="voiceBtnLabel">Speak your trip</span>
+                            </button>
+                            <label class="tm-sr" for="voiceLang">Voice input language</label>
+                            <select id="voiceLang" class="tm-select" style="max-width:230px;">
+                                <option value="en-IN">English (India)</option>
+                                <option value="ta-IN">à®¤à®®à®¿à®´à¯ (Tamil)</option>
+                                <option value="hi-IN">à¤¹à¤¿à¤¨à¥à¤¦à¥€ (Hindi)</option>
+                                <option value="ml-IN">à´®à´²à´¯à´¾à´³à´‚ (Malayalam)</option>
+                                <option value="te-IN">à°¤à±†à°²à±à°—à± (Telugu)</option>
+                                <option value="kn-IN">à²•à²¨à³à²¨à²¡ (Kannada)</option>
+                            </select>
+                            <div class="tm-voicestrip" id="voiceStatus" data-state="idle" style="flex:1 1 14rem;">
+                                <span class="tm-voicestrip__wave" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+                                <span id="voiceStatusText">Speak or type your preferences.</span>
+                            </div>
+                        </div>
                     </div>
-                    <p id="genStatus" class="text-sm text-muted text-center" style="margin-top:1.25rem;min-height:1.2rem;"></p>
+
+                    <div class="pl-group">
+                        <div class="pl-group__head">
+                            <h2 class="pl-group__h">Choice of spots</h2>
+                            <span class="tm-2xs tm-muted">Next step</span>
+                        </div>
+                        <p class="pl-group__d">Next, TripMind ranks the approved spots for your destination. You can choose them in your own priority order, pick as many as you like, or simply let the AI decide.</p>
+                        <button class="tm-btn tm-btn--accent tm-btn--lg" type="button" onclick="goToSpots()" id="planBtn">Plan My Trip</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ STEP 2 â€” spot selection ============ -->
+            <div id="stepSpots" class="hidden">
+                <div class="tm-row tm-row--between" style="margin-bottom:var(--tm-s4);">
+                    <div>
+                        <span class="tm-eyebrow">Choice of spots</span>
+                        <h2 class="tm-h2" style="margin-bottom:.2rem;">Choose your spots</h2>
+                    </div>
+                    <button class="tm-btn tm-btn--ghost" type="button" onclick="backToDetails()">&larr; Back to trip details</button>
+                </div>
+                <p class="tm-lead" id="spotIntro">Tap spots in the order you prefer â€” your click order becomes the priority the optimizer must honour. Choose as many as you like, or let the AI decide.</p>
+
+                <div class="tm-toolbar" style="margin-top:var(--tm-s5);">
+                    <div class="tm-toolbar__search">
+                        <label class="tm-sr" for="spotFilter">Filter spots</label>
+                        <input id="spotFilter" class="tm-input" placeholder="Filter by name, city or categoryâ€¦" oninput="applySpotFilter()">
+                    </div>
+                    <button class="tm-btn tm-btn--secondary tm-btn--sm" type="button" onclick="selectAllSpots()">Select all</button>
+                    <button class="tm-btn tm-btn--secondary tm-btn--sm" type="button" onclick="resetPicks()">Clear all</button>
+                    <button class="tm-btn tm-btn--ghost tm-btn--sm" type="button" onclick="pickNone()">I have no choice â€” AI picks</button>
+                </div>
+
+                <div class="spot-list" id="spotGrid">
+                    <div class="tm-empty"><div class="spinner"></div><p>Querying the recommendation engineâ€¦</p></div>
+                </div>
+
+                <div class="sel-bar" id="selBar" style="display:none;">
+                    <div>
+                        <span class="n" id="selCount">0</span> selected in priority order
+                        <span class="tm-xs tm-muted" id="selList"></span>
+                    </div>
+                    <div class="tm-row" style="gap:.5rem;">
+                        <button class="tm-btn tm-btn--secondary tm-btn--sm" type="button" onclick="resetPicks()">Reset</button>
+                        <button class="tm-btn tm-btn--primary" type="button" onclick="submitTrip()">Generate Travel Plans</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ Honest AI planning progress ============ -->
+            <div id="processingScreen" class="hidden">
+                <div class="tm-panel tm-center" style="max-width:34rem;margin-inline:auto;">
+                    <div id="planProgress" class="tm-progress" style="text-align:left;">
+                        <div class="tm-progress__steps">
+                            <div class="tm-pstep" data-state="idle">
+                                <span class="tm-pstep__ico"></span>
+                                <span class="tm-pstep__t">Saving your trip<span class="tm-pstep__s">Origin, dates, travellers, preferences</span></span>
+                            </div>
+                            <div class="tm-pstep" data-state="idle">
+                                <span class="tm-pstep__ico"></span>
+                                <span class="tm-pstep__t">AI is building your itinerary<span class="tm-pstep__s">Ollama on your own infrastructure â€” usually 20â€“40 seconds</span></span>
+                            </div>
+                            <div class="tm-pstep" data-state="idle">
+                                <span class="tm-pstep__ico"></span>
+                                <span class="tm-pstep__t">Finalising your journey<span class="tm-pstep__s">Fares, timeline and booking readiness</span></span>
+                            </div>
+                        </div>
+                        <div class="tm-progress__bar"><i style="width:6%"></i></div>
+                    </div>
+                    <p id="genStatus" class="tm-sm tm-muted" style="margin-top:var(--tm-s5);min-height:1.4rem;" role="status" aria-live="polite"></p>
+                    <p class="tm-2xs tm-muted" style="margin-top:var(--tm-s3);">Keep this tab open. Each step only turns green when it has actually finished.</p>
                 </div>
             </div>
         </div>
+    </main>
+
+    <!-- Sticky mobile CTA -->
+    <div class="tm-actionbar" id="planActionBar" data-show="false">
+        <div class="tm-actionbar__label">
+            <b id="actionTitle">Plan my trip</b>
+            <span id="actionSub">Origin, dates, description</span>
+        </div>
+        <button class="tm-btn tm-btn--accent" type="button" style="flex:1;" onclick="goToSpots()">Continue</button>
     </div>
 
     <script src="../js/api.js"></script>
     <script src="../js/utils.js"></script>
     <script src="../js/maps.js"></script>
     <script>
-        const navToggle = document.getElementById('navToggle');
-        const navLinks = document.getElementById('navLinks');
-        if (navToggle) navToggle.addEventListener('click', () => {
-            const open = navLinks.classList.toggle('open');
-            navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-        });
-
         const params = new URLSearchParams(window.location.search);
-        const picked = [];   // ordered spot ids (priority = position)
+        const picked = [];          // ordered spot ids â€” position = priority
+        let allSpots = [];          // ranking result, used by search / select-all
 
         (async () => { await guardLogin(); })();
 
-        /* Origin + destination are both user-entered; the starting point is
-           picked on the Google Maps picker for routing. */
+        /* ---------------------------------------------------------- budget */
         const budgetInput = document.getElementById('budget');
         const budgetUnlimited = document.getElementById('budgetUnlimited');
         budgetUnlimited.addEventListener('change', () => {
@@ -234,56 +366,82 @@
             else if (!budgetInput.value) { budgetInput.value = '50000'; }
         });
 
-        /* Premium Services: dropdown opened by the button, checkboxes inside. */
-        const psLabels = {
-            TRANSPORT: 'Comfortable transport',
-            HOTELS: 'Better hotels',
-            ACTIVITIES: 'More activities & tours',
-            GUIDE: 'Local guide',
-        };
+        /* ------------------------------------------------- premium services */
+        const psLabels = { TRANSPORT: 'Comfortable transport', HOTELS: 'Better hotels', ACTIVITIES: 'More activities & tours', GUIDE: 'Local guide' };
         function selectedPremiumServices() {
             return Array.from(document.querySelectorAll('.ps-cb:checked')).map(c => c.value);
         }
         function updatePsLabel() {
             const sel = selectedPremiumServices();
-            const label = document.getElementById('psLabel');
-            label.textContent = sel.length ? sel.map(s => psLabels[s] || s).join(', ')
-                                           : 'Select premium services…';
-            label.style.color = sel.length ? '' : 'var(--slate-500,#64748b)';
+            const summary = document.querySelector('#psDrop .tm-drop__summary');
+            if (summary) {
+                summary.textContent = sel.length
+                    ? sel.length + ' selected Â· ' + sel.map(s => psLabels[s] || s).join(', ')
+                    : 'None selected';
+            }
         }
-        function togglePremiumMenu() {
-            document.getElementById('psMenu').classList.toggle('open');
+        function togglePremiumMenu(e) {
+            if (e) e.stopPropagation();
+            const drop = document.getElementById('psDrop');
+            const open = drop.getAttribute('data-open') === 'true';
+            drop.setAttribute('data-open', open ? 'false' : 'true');
+            document.getElementById('psToggle').setAttribute('aria-expanded', open ? 'false' : 'true');
         }
-        document.querySelectorAll('.ps-cb').forEach(cb =>
-            cb.addEventListener('change', updatePsLabel));
+        document.querySelectorAll('.ps-cb').forEach(cb => cb.addEventListener('change', updatePsLabel));
+        updatePsLabel();
         document.addEventListener('click', (e) => {
-            const menu = document.getElementById('psMenu');
-            if (!menu.classList.contains('open')) return;
-            if (!menu.contains(e.target) && e.target.id !== 'psToggle' &&
-                    !document.getElementById('psToggle').contains(e.target)) {
-                menu.classList.remove('open');
+            const drop = document.getElementById('psDrop');
+            if (drop.getAttribute('data-open') === 'true' && !e.target.closest('#psDrop')) {
+                drop.setAttribute('data-open', 'false');
+                document.getElementById('psToggle').setAttribute('aria-expanded', 'false');
             }
         });
 
+        /* -------------------------------------------------- destination list */
         const originInput = document.getElementById('origin');
         if (params.get('origin') || params.get('from')) {
             originInput.value = (params.get('origin') || params.get('from') || '').trim();
         }
+        (async () => {
+            const dl = document.getElementById('destList');
+            const prefill = params.get('destination');
+            if (prefill) document.getElementById('destination').value = prefill;
+            try {
+                const res = await api.mlRecommendSpots({ limit: 100 });
+                const cities = Array.from(new Set(((res.result && res.result.spots) || [])
+                    .map(s => s.city).filter(Boolean))).sort();
+                dl.innerHTML = cities.map(c => '<option value="' + esc(c) + '"></option>').join('');
+            } catch (e) { /* suggestions are optional */ }
+        })();
 
-        /* VOICE INPUT — browser speech-to-text, then the backend detects the
-           language and translates to English. The English text fills the
-           description box, so voice feeds the existing text -> Ollama flow
-           (no separate planning system). */
+        /* ------------------------------------------------------ date sanity */
+        const startDate = document.getElementById('startDate');
+        const endDate = document.getElementById('endDate');
+        startDate.addEventListener('change', () => {
+            endDate.min = startDate.value;
+            if (endDate.value && endDate.value < startDate.value) endDate.value = startDate.value;
+        });
+
+        /* ------------------------------------------------------------- voice */
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
         let rec = null;
         let voiceMeta = null;
-        function voiceStatus(msg) {
-            const el = document.getElementById('voiceStatus');
-            if (el) el.textContent = msg || '';
+        function voiceStatus(msg, state) {
+            const box = document.getElementById('voiceStatus');
+            const text = document.getElementById('voiceStatusText');
+            if (text) text.textContent = msg || '';
+            if (box) box.setAttribute('data-state', state || 'idle');
+        }
+        function setVoiceButton(listening) {
+            const btn = document.getElementById('voiceBtn');
+            const label = document.getElementById('voiceBtnLabel');
+            btn.setAttribute('data-state', listening ? 'listening' : 'idle');
+            if (label) label.textContent = listening ? 'Stop listening' : 'Speak your trip';
         }
         function toggleVoice() {
             if (!SR) {
-                alert('Voice input is not supported in this browser — please use Chrome or Edge, or type your description instead.');
+                voiceStatus('This browser has no speech recognition â€” Chrome or Edge support it. You can type instead.', 'error');
+                TM.toast('Voice input needs Chrome, Edge or Safari. Typing works everywhere.', 'error');
                 return;
             }
             if (rec) { rec.stop(); return; }
@@ -291,36 +449,33 @@
             rec.lang = document.getElementById('voiceLang').value;
             rec.interimResults = false;
             rec.maxAlternatives = 1;
-            document.getElementById('voiceBtn').textContent = '⏹ Stop listening';
-            voiceStatus('Listening… speak now…');
+            setVoiceButton(true);
+            voiceStatus('Listeningâ€¦ speak now.', 'listening');
             rec.onresult = async (e) => {
                 const transcript = (e.results[0][0].transcript || '').trim();
-                voiceStatus('Heard "' + transcript + '" — detecting language…');
+                voiceStatus('Heard: â€œ' + transcript + 'â€ â€” detecting languageâ€¦', 'working');
                 try {
                     const res = await api.voiceNormalize(transcript);
                     document.getElementById('preferences').value = res.english;
                     voiceMeta = { language: res.language, original: res.original };
-                    voiceStatus('✓ ' + res.language + ' → English inserted into your description.');
+                    voiceStatus('âœ“ ' + res.language + ' â†’ English added to your description.', 'done');
                 } catch (err) {
                     voiceMeta = null;
-                    voiceStatus('');
-                    alert('Voice translation failed: ' + err.message);
+                    voiceStatus('Translation failed: ' + err.message, 'error');
                 }
             };
             rec.onerror = (e) => {
-                voiceStatus('');
                 if (e.error !== 'aborted' && e.error !== 'no-speech') {
-                    alert('Voice input error: ' + e.error +
-                        (e.error === 'not-allowed' ? ' (microphone permission denied)' : ''));
+                    voiceStatus('Voice error: ' + e.error + (e.error === 'not-allowed' ? ' â€” microphone permission denied.' : '.'), 'error');
+                } else {
+                    voiceStatus('Nothing picked up. Try again, or type your description.', 'error');
                 }
             };
-            rec.onend = () => {
-                rec = null;
-                document.getElementById('voiceBtn').textContent = '🎤 Speak your trip';
-            };
-            try { rec.start(); } catch (err) { rec = null; voiceStatus(''); }
+            rec.onend = () => { rec = null; setVoiceButton(false); };
+            try { rec.start(); } catch (err) { rec = null; setVoiceButton(false); voiceStatus('Could not start the microphone.', 'error'); }
         }
 
+        /* --------------------------------------------------------- map picker */
         let TM_start = null;
         async function openStartMap() {
             const mapDiv = document.getElementById('startMap');
@@ -329,9 +484,13 @@
                 TM_start = window.TM_MAPS.initLocationPicker({
                     addressId: 'startAddr', latId: 'startLat', lngId: 'startLng', mapId: 'startMap', required: true,
                 });
-                document.getElementById('startNote').textContent = 'Click the map or drag the marker to set your exact starting point.';
+                mapDiv.scrollIntoView({ behavior: TM.reducedMotion() ? 'auto' : 'smooth', block: 'nearest' });
+                const note = document.getElementById('startNote');
+                note.className = 'tm-hint';
+                note.textContent = 'Click the map or drag the marker to set your exact starting point.';
             } else if (!TM_start) {
-                alert('Google Maps is not configured. Please type the starting address manually.');
+                voiceStatus('Google Maps is not configured here â€” type your starting address instead.', 'error');
+                TM.toast('Google Maps is not configured on this deployment. Type your starting address.', 'error');
             }
         }
         function readStartLocation() {
@@ -342,95 +501,145 @@
             return TM_start ? { lat: parseFloat(lat), lng: parseFloat(lng), address: address || `(${lat},${lng})` } : null;
         }
 
-        function goToSpots() {
-            const required = ['origin', 'destination', 'startDate', 'endDate'];
-            for (const id of required) {
-                if (!document.getElementById(id).value.trim()) {
-                    alert('Please fill in all required fields (origin, destination and dates).');
-                    document.getElementById(id).focus();
-                    return;
-                }
-            }
-            if (!document.getElementById('preferences').value.trim() ||
-                    document.getElementById('preferences').value.trim().length < 10) {
-                alert('Please describe how you\'d like to travel (at least a sentence) — the AI plans around your preferences.');
-                document.getElementById('preferences').focus();
-                return;
-            }
-            if (!readStartLocation()) {
-                alert('Please pick your exact starting point on the map — Origin is required.');
-                openStartMap();
-                return;
-            }
-            document.getElementById('stepDetails').classList.add('hidden');
-            document.getElementById('stepSpots').classList.remove('hidden');
-            loadSpotRanking();
+        /* ------------------------------------- inline validation (no alerts) */
+        function markField(id, message) {
+            const input = document.getElementById(id);
+            const wrap = input.closest('.tm-field') || input.parentNode;
+            const box = wrap ? wrap.querySelector('.tm-error') : null;
+            if (input) input.setAttribute('aria-invalid', message ? 'true' : 'false');
+            if (box) { box.textContent = message || ''; box.setAttribute('data-show', message ? 'true' : 'false'); }
+            if (message && input) input.focus();
+            return !message;
+        }
+        function markStartNote(message) {
+            const note = document.getElementById('startNote');
+            note.className = message ? 'tm-hint' : 'tm-hint';
+            note.style.color = message ? 'var(--tm-danger)' : '';
+            note.textContent = message || 'Origin selected.';
+            return !message;
         }
 
+        function validateDetails() {
+            let firstBad = null;
+            const need = (id, msg) => { if (!markField(id, msg) && !firstBad) firstBad = id; };
+            need('origin', document.getElementById('origin').value.trim() ? '' : 'Enter the city you are starting from.');
+            need('destination', document.getElementById('destination').value.trim() ? '' : 'Where are you going?');
+            need('startDate', startDate.value ? '' : 'Pick a start date.');
+            need('endDate', endDate.value ? '' : 'Pick an end date.');
+            if (startDate.value && endDate.value && endDate.value < startDate.value) need('endDate', 'The end date cannot be before the start date.');
+            const prefs = document.getElementById('preferences').value.trim();
+            need('preferences', prefs.length >= 10 ? '' : 'Describe how you would like to travel (at least a sentence).');
+            const okStart = markStartNote(readStartLocation() ? '' : 'Pick your exact starting point on the map â€” origin is required.');
+            if (!okStart && !firstBad) firstBad = 'startAddr';
+            if (firstBad) {
+                const el = document.getElementById(firstBad);
+                if (el && el.scrollIntoView) el.scrollIntoView({ behavior: TM.reducedMotion() ? 'auto' : 'smooth', block: 'center' });
+                TM.toast('Please complete the highlighted fields.', 'error');
+                return false;
+            }
+            return true;
+        }
+
+        function goToSpots() {
+            if (!validateDetails()) return;
+            document.getElementById('stepDetails').classList.add('hidden');
+            document.getElementById('stepSpots').classList.remove('hidden');
+            document.getElementById('planActionBar').dataset.show = 'false';
+            window.scrollTo({ top: 0, behavior: TM.reducedMotion() ? 'auto' : 'smooth' });
+            loadSpotRanking();
+        }
+        function backToDetails() {
+            document.getElementById('stepSpots').classList.add('hidden');
+            document.getElementById('stepDetails').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: TM.reducedMotion() ? 'auto' : 'smooth' });
+        }
+
+        /* ------------------------------------------------- spot rank + pick */
         async function loadSpotRanking() {
             const grid = document.getElementById('spotGrid');
-            grid.innerHTML = '<div class="text-muted">Querying recommendation engine…</div>';
+            grid.innerHTML = '<div class="tm-empty"><div class="spinner"></div><p>Querying the recommendation engineâ€¦</p></div>';
             let resp;
             try {
                 resp = await api.mlRecommendSpots({ limit: 100 });
             } catch (e) {
-                grid.innerHTML = `<div class="text-muted">${esc(e.message)}</div>`;
+                grid.innerHTML = `<div class="tm-empty"><h3>Could not load spots</h3><p>${esc(e.message)}</p></div>`;
                 return;
             }
-            const spots = (resp.result && resp.result.spots) || [];
-            if (!spots.length) { grid.innerHTML = '<div class="text-muted">No approved tourist spots are available yet — the Admin must approve spot content first.</div>'; return; }
-            const statusBadge = resp.status === 'COLD_START' || resp.status === 'INITIAL'
-                ? '<span class="rank-chip chip-p0">Cold start · ranked by popularity</span>'
-                : '<span class="rank-chip chip-p1">ML ranked</span>';
-            grid.innerHTML = spots.map(s => `
-                <div class="spot-card" data-id="${esc(s.id)}" data-name="${esc(s.name)}">
-                    ${esc(resp.status) === 'COLD_START' || resp.status === 'INITIAL'
-                        ? '<span class="rank-chip chip-p0" style="position:absolute;top:.6rem;left:.6rem;">cold-start</span>'
-                        : '<span class="rank-chip chip-p1" style="position:absolute;top:.6rem;left:.6rem;">AI pick</span>'}
-                    <div class="spot-pick-badge" style="display:none;"></div>
-                    <img src="${s.image || ''}" alt="${esc(s.name)}" onerror="this.style.display='none'">
-                    <div class="spot-main">
-                        <div style="font-weight:700;font-size:1.05rem;">${esc(s.name)}</div>
-                        <div class="text-muted" style="font-size:.8rem;margin-top:.15rem;">${esc(s.city || '')}${s.category ? ' · ' + esc(s.category) : ''}</div>
-                        <div class="star-mini" style="margin-top:.35rem;">${'★'.repeat(Math.round(s.rating || 0)) || '—'}</div>
-                    </div>
-                    <div class="spot-side">
-                        <div style="font-weight:700;font-size:.95rem;">${s.entryFee === 0 ? 'Free' : '₹' + Number(s.entryFee || 0).toLocaleString('en-IN')}</div>
-                        <div style="font-size:.72rem;margin-top:.25rem;color:var(--slate-500,#64748b);">${esc(s.category || '')}</div>
-                    </div>
-                </div>`).join('');
-            grid.querySelectorAll('.spot-card').forEach(c => c.addEventListener('click', () => togglePick(c)));
-            const h = document.querySelector('#stepSpots h1');
-            if (h) h.insertAdjacentHTML('beforeend', ' ' + statusBadge);
+            allSpots = (resp.result && resp.result.spots) || [];
+            if (!allSpots.length) {
+                grid.innerHTML = '<div class="tm-empty"><h3>No spots available yet</h3><p>No approved tourist spots are available for now â€” the platform admin must approve spot content first. You can still let the AI plan the trip.</p><div style="margin-top:1rem;"><button class="tm-btn tm-btn--primary" type="button" onclick="pickNone()">Let the AI plan it</button></div></div>';
+                return;
+            }
+            const cold = resp.status === 'COLD_START' || resp.status === 'INITIAL';
+            document.getElementById('spotIntro').insertAdjacentHTML('beforeend',
+                ' ' + `<span class="rank-chip ${cold ? 'chip-p0' : 'chip-p1'}">${cold ? 'Cold start Â· ranked by popularity' : 'ML ranked'}</span>`);
+            renderSpotList();
             updateSelBar();
         }
+
+        function renderSpotList() {
+            const grid = document.getElementById('spotGrid');
+            const q = (document.getElementById('spotFilter').value || '').trim().toLowerCase();
+            const rows = allSpots.filter(s => !q || [s.name, s.city, s.category].filter(Boolean).join(' ').toLowerCase().includes(q));
+            if (!rows.length) {
+                grid.innerHTML = '<div class="tm-empty"><h3>No matches</h3><p>Nothing matches that filter. Clear it to see all ' + allSpots.length + ' spots.</p></div>';
+                return;
+            }
+            grid.innerHTML = rows.map(s => {
+                const i = picked.indexOf(s.id);
+                return `<div class="spot-card${i >= 0 ? ' picked' : ''}" data-id="${esc(s.id)}" data-name="${esc(s.name)}" role="checkbox" tabindex="0"
+                             aria-checked="${i >= 0 ? 'true' : 'false'}" aria-label="${esc(s.name)}">
+                    <span class="spot-card__tick" aria-hidden="true">${i >= 0 ? (i + 1) : ''}</span>
+                    <img src="${s.image || ''}" alt="" loading="lazy" decoding="async" onerror="this.style.display='none'">
+                    <div>
+                        <div class="spot-card__n">${esc(s.name)}</div>
+                        <div class="spot-card__m">${esc(s.city || '')}${s.category ? ' Â· ' + esc(s.category) : ''} <span class="star-mini">${'â˜…'.repeat(Math.round(s.rating || 0)) || ''}</span></div>
+                    </div>
+                    <div class="spot-card__p">${s.entryFee === 0 ? 'Free' : 'â‚¹' + Number(s.entryFee || 0).toLocaleString('en-IN')}<small>entry</small></div>
+                </div>`;
+            }).join('');
+            grid.querySelectorAll('.spot-card').forEach(c => {
+                c.addEventListener('click', () => togglePick(c));
+                c.addEventListener('keydown', (e) => {
+                    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); togglePick(c); }
+                });
+            });
+        }
+
+        function applySpotFilter() { renderSpotList(); }
 
         function togglePick(card) {
             const id = card.dataset.id;
             const idx = picked.indexOf(id);
-            if (idx >= 0) { picked.splice(idx, 1); }
-            else { picked.push(id); }
+            if (idx >= 0) { picked.splice(idx, 1); } else { picked.push(id); }
             renderPicks();
         }
         function renderPicks() {
             document.querySelectorAll('.spot-card').forEach(c => {
                 const i = picked.indexOf(c.dataset.id);
                 c.classList.toggle('picked', i >= 0);
-                const badge = c.querySelector('.spot-pick-badge');
-                badge.style.display = i >= 0 ? 'flex' : 'none';
-                badge.textContent = i >= 0 ? '#' + (i + 1) : '';
+                c.setAttribute('aria-checked', i >= 0 ? 'true' : 'false');
+                const tick = c.querySelector('.spot-card__tick');
+                if (tick) tick.textContent = i >= 0 ? String(i + 1) : '';
             });
             updateSelBar();
         }
-        function updateSelBar() {
-            document.getElementById('selBar').style.display = 'flex';
-            document.getElementById('selCount').textContent = picked.length + (picked.length === 1 ? ' spot' : ' spots');
-            const names = [];
-            picked.forEach(id => {
-                const c = document.querySelector(`.spot-card[data-id="${id}"]`);
-                if (c) names.push(c.dataset.name || id);
+        function selectAllSpots() {
+            document.querySelectorAll('.spot-card').forEach(c => {
+                if (picked.indexOf(c.dataset.id) === -1) picked.push(c.dataset.id);
             });
-            document.getElementById('selList').textContent = names.length ? '→ ' + names.join(' → ') : '';
+            renderPicks();
+        }
+        function updateSelBar() {
+            const bar = document.getElementById('selBar');
+            bar.style.display = 'flex';
+            document.getElementById('selCount').textContent = picked.length + (picked.length === 1 ? ' spot' : ' spots');
+            const names = picked.map(id => {
+                const c = document.querySelector('.spot-card[data-id="' + id + '"]');
+                return c ? c.dataset.name : id;
+            });
+            document.getElementById('selList').textContent = names.length ? 'â†’ ' + names.join(' â†’ ') : '';
+            document.querySelector('#actionTitle').textContent = picked.length ? picked.length + ' spots chosen' : 'Choose your spots';
         }
         function resetPicks() { picked.length = 0; renderPicks(); }
         function pickNone() {
@@ -439,18 +648,21 @@
             submitTrip();
         }
 
+        /* ------------------------------------------------------------ submit */
+        let progress = null;
         async function submitTrip() {
             const startLocation = readStartLocation();
-            const unlimited = document.getElementById('budgetUnlimited').checked;
+            if (!startLocation) { backToDetails(); validateDetails(); return; }
+            const unlimited = budgetUnlimited.checked;
             const prefs = document.getElementById('preferences').value.trim();
-            if (!prefs) { alert('Please describe your travel preferences.'); return; }
+            if (!prefs) { backToDetails(); validateDetails(); return; }
             const data = {
-                origin: document.getElementById('origin').value || startLocation?.address || '',
+                origin: document.getElementById('origin').value || startLocation.address || '',
                 destination: document.getElementById('destination').value.trim(),
-                startDate: document.getElementById('startDate').value,
-                endDate: document.getElementById('endDate').value,
-                travelers: parseInt(document.getElementById('travelers').value),
-                budget: unlimited ? 0 : (parseInt(document.getElementById('budget').value) || 0),
+                startDate: startDate.value,
+                endDate: endDate.value,
+                travelers: parseInt(document.getElementById('travelers').value, 10) || 1,
+                budget: unlimited ? 0 : (parseInt(budgetInput.value, 10) || 0),
                 budgetUnlimited: unlimited,
                 travelStyle: document.getElementById('travelStyle').value,
                 returnTrip: document.getElementById('returnTrip').checked,
@@ -460,29 +672,31 @@
                 voiceLanguage: voiceMeta ? voiceMeta.language : '',
                 voiceOriginal: voiceMeta ? voiceMeta.original : '',
             };
-            if (startLocation) data.startLocation = startLocation;
+            data.startLocation = startLocation;
 
             document.getElementById('stepDetails').classList.add('hidden');
             document.getElementById('stepSpots').classList.add('hidden');
             document.getElementById('processingScreen').classList.remove('hidden');
+            document.getElementById('planActionBar').dataset.show = 'false';
+            window.scrollTo({ top: 0, behavior: 'auto' });
+
+            const status = document.getElementById('genStatus');
+            progress = TM.progress(document.getElementById('planProgress'));
+            progress.start();   // step 0 = saving (real work below)
+            status.textContent = 'Saving your tripâ€¦';
 
             try {
-                const steps = ['step1','step2','step3','step4','step5'];
-                for (let i = 0; i < steps.length; i++) {
-                    document.getElementById(steps[i]).classList.add('active');
-                    await new Promise(r => setTimeout(r, 550));
-                    document.getElementById(steps[i]).classList.remove('active');
-                    document.getElementById(steps[i]).classList.add('done');
-                }
-                const status = document.getElementById('genStatus');
-                status.textContent = 'Saving your trip…';
                 const result = await api.createTrip(data);
+                progress.set(0, 'done');
+                progress.set(1, 'active');
+                status.textContent = 'Trip saved. Ollama is building your itinerary â€” usually 20â€“40 seconds.';
+
                 let secs = 0;
-                status.textContent = 'The AI is generating your itinerary (usually 20–40 seconds)…';
                 const tick = setInterval(() => {
                     secs += 5;
-                    status.textContent = `The AI is generating your itinerary — ${secs}s elapsed (usually 20–40 seconds).`;
+                    status.textContent = 'Ollama is writing your itinerary â€” ' + secs + 's elapsed (usually 20â€“40 seconds).';
                 }, 5000);
+
                 let gen;
                 try {
                     gen = await api.generatePlans(result.tripId);
@@ -493,16 +707,32 @@
                     throw new Error((gen && (gen.message || gen.aiExplanation)) ||
                         'The AI planner did not return a plan. Please try again.');
                 }
-                status.textContent = 'Done — opening your itinerary…';
-                window.location = `trip.html?id=${result.tripId}`;
+                progress.set(1, 'done');
+                progress.set(2, 'active');
+                progress.finish();
+                status.textContent = 'Done â€” opening your itineraryâ€¦';
+                window.location = 'trip.html?id=' + result.tripId;
             } catch (e) {
                 document.getElementById('genStatus').textContent = '';
-                alert('Error: ' + e.message);
+                document.getElementById('processingScreen').classList.add('hidden');
                 document.getElementById('stepDetails').classList.remove('hidden');
                 document.getElementById('stepSpots').classList.remove('hidden');
-                document.getElementById('processingScreen').classList.add('hidden');
+                TM.toast(e.message, 'error');
             }
         }
+
+        /* Sticky mobile CTA mirrors the primary action of the visible step. */
+        (function () {
+            const bar = document.getElementById('planActionBar');
+            const details = document.getElementById('stepDetails');
+            const spots = document.getElementById('stepSpots');
+            if (!('IntersectionObserver' in window)) return;
+            new IntersectionObserver(function () {
+                const onSpots = !spots.classList.contains('hidden');
+                bar.dataset.show = (onSpots || !details.classList.contains('hidden')) ? 'true' : 'false';
+                document.getElementById('actionSub').textContent = onSpots ? 'Review your selection' : 'Origin, dates, description';
+            }, { threshold: 0 }).observe(document.getElementById('plMain'));
+        })();
     </script>
     <script src="/js/pwa.js" defer></script>
 </body>

@@ -150,7 +150,7 @@ def _local_intent(message, user, trip_id=None):
         if not opts:
             return {"reply": "No registered, approved alternative transports are available for %s -> %s."
                             % (target.get("origin"), target.get("destination")),
-                    "tool": None, "suggestions": ["Show route map", "Show my trips"]}
+                    "tool": None, "suggestions": ["Show my trips", "Plan a trip"]}
         reply = ("I can switch the transport on trip %s (%s -> %s). Options currently registered:\n"
                  % (target.get("reference"), target.get("origin"), target.get("destination")))
         for o in opts[:5]:
