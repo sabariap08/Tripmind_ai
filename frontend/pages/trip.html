@@ -845,7 +845,8 @@
                     const link = byId[e.target.id];
                     if (link) {
                         link.setAttribute('aria-current', 'true');
-                        link.scrollIntoView({ behavior: TM.reducedMotion() ? 'auto' : 'smooth', block: 'nearest', inline: 'center' });
+                        // Only scroll the rail link horizontally into view, never vertically
+                        link.scrollIntoView({ behavior: TM.reducedMotion() ? 'auto' : 'smooth', block: 'nearest', inline: 'center', preventScroll: true });
                     }
                 });
             }, { rootMargin: '-45% 0px -50% 0px' });

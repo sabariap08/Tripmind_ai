@@ -364,7 +364,7 @@ def _catalogue_brief(db_data):
 # Prompt + parsing
 # ---------------------------------------------------------------------------
 
-def _build_prompt(parsed, brief):
+def _build_prompt(parsed, brief, clarifications=None):
     budget_line = ("an unlimited budget (premium eligible)"
                    if parsed.get("budgetUnlimited")
                    else "a budget of ₹%d per person" % parsed.get("budget", 0))
@@ -381,6 +381,18 @@ def _build_prompt(parsed, brief):
     food_line = parsed.get("foodPreference") or "no specific food preference"
     spot_pref = ", ".join(str(s) for s in (parsed.get("prioritizedSpotIds") or [])
                           ) or "none — choose the best-fitting spots"
+    
+    # Include clarifications if provided
+    clarification_lines = []
+    if clarifications:
+        for key, value in clarifications.items():
+            if value:
+                clarification_lines.append("%s: %s" % (key, value))
+    
+    clar_text = "\n".join(["Clarification answers (follow these):"] + clarification_lines) if clarification_lines else ""
+    if clar_text:
+        clar_text = clar_text + "\n\n"
+    
     return (
         "Design the trip itinerary entirely from the available inventory below. "
         "Exactly 3 different plans must be returned — one for each style: "
@@ -399,6 +411,7 @@ def _build_prompt(parsed, brief):
            style_line, mode_line, food_line, premium_line,
            return_line, spot_pref,
            parsed.get("preferences", ""))
+        + clar_text
         + "Available inventory (only these ids are valid; use ONLY them):\n"
         + json.dumps(brief, indent=2, default=str)
         + ("\n\nReply with ONLY a JSON object matching this schema (no markdown):\n"
@@ -1006,7 +1019,7 @@ def _normalize_request(parsed):
     return out
 
 
-def generate_ai_plans(parsed, db_data, verbose=True):
+def generate_ai_plans(parsed, db_data, clarifications=None, verbose=True):
     """Generate 3 AI plans (BUDGET/BALANCED/PREMIUM) exclusively via AI.
 
     Raises AIPlanError when the AI backend is unavailable or returns an
@@ -1023,7 +1036,7 @@ def generate_ai_plans(parsed, db_data, verbose=True):
     if not brief["transports"] and not brief["spots"]:
         raise AIPlanError("No registered inventory available for this route.")
 
-    prompt = _build_prompt(parsed, brief)
+    prompt = _build_prompt(parsed, brief, clarifications)
     print("[TripMind AI] LLM request: %d chars prompt, waiting for provider ..."
           % len(prompt))
     t0 = time.time()

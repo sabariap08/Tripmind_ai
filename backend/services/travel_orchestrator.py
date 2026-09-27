@@ -71,7 +71,163 @@ def _ai_failure_hint(err):
             "the exact reason, then try again.")
 
 
-def generate_travel_plans(request_data, db_data=None):
+def generate_clarifying_questions(request_data, db_data=None):
+    """Generate clarifying questions from the AI before plan generation.
+    
+    Returns a list of structured questions that the user must answer
+    before the final plan is generated.
+    """
+    from services.ai_plan_builder import AIPlanError, call_ai, is_ai_available
+    
+    if not is_ai_available():
+        # Return default questions if AI is not available
+        return _default_clarifying_questions(request_data)
+    
+    parsed = parse_trip_request(request_data)
+    
+    # Build a prompt for generating clarifying questions
+    prompt = _build_clarification_prompt(parsed, request_data)
+    
+    try:
+        raw = call_ai(prompt, _CLARIFICATION_SYSTEM, max_tokens=2000, temperature=0.3)
+        if not raw:
+            return _default_clarifying_questions(request_data)
+        
+        # Parse the AI response as JSON
+        import json
+        try:
+            questions = json.loads(raw)
+            if isinstance(questions, dict) and "questions" in questions:
+                return questions["questions"]
+            elif isinstance(questions, list):
+                return questions
+        except json.JSONDecodeError:
+            pass
+        
+        return _default_clarifying_questions(request_data)
+    except Exception as e:
+        print("[TripMind AI] Clarification generation failed: %s" % e)
+        return _default_clarifying_questions(request_data)
+
+
+def _default_clarifying_questions(request_data):
+    """Fallback clarifying questions when AI is unavailable."""
+    questions = []
+    
+    # Always ask about pace
+    questions.append({
+        "id": "pace",
+        "type": "radio",
+        "label": "What pace do you prefer for this trip?",
+        "required": True,
+        "options": [
+            {"value": "relaxed", "label": "Relaxed — fewer activities, more downtime"},
+            {"value": "balanced", "label": "Balanced — mix of activities and rest"},
+            {"value": "packed", "label": "Packed — maximize every day"}
+        ]
+    })
+    
+    # Ask about transport preference if not specified
+    if not request_data.get("transportType"):
+        questions.append({
+            "id": "transport_preference",
+            "type": "radio",
+            "label": "How do you prefer to travel between cities?",
+            "required": True,
+            "options": [
+                {"value": "train", "label": "Train — scenic, comfortable"},
+                {"value": "bus", "label": "Bus — economical, flexible"},
+                {"value": "flight", "label": "Flight — fastest"},
+                {"value": "cab", "label": "Private cab — door to door"},
+                {"value": "mixed", "label": "AI decides based on route"}
+            ]
+        })
+    
+    # Ask about food preferences
+    questions.append({
+        "id": "food_style",
+        "type": "checkbox",
+        "label": "Any food preferences or restrictions?",
+        "required": False,
+        "options": [
+            {"value": "vegetarian", "label": "Vegetarian only"},
+            {"value": "vegan", "label": "Vegan"},
+            {"value": "halal", "label": "Halal"},
+            {"value": "no_spicy", "label": "No spicy food"},
+            {"value": "local", "label": "Local specialties only"},
+            {"value": "no_restrictions", "label": "No restrictions — I'll try anything"}
+        ]
+    })
+    
+    # Ask about activity types
+    questions.append({
+        "id": "activity_types",
+        "type": "checkbox",
+        "label": "What types of activities interest you?",
+        "required": True,
+        "options": [
+            {"value": "heritage", "label": "Heritage sites, temples, museums"},
+            {"value": "nature", "label": "Nature, parks, wildlife"},
+            {"value": "adventure", "label": "Adventure, trekking, water sports"},
+            {"value": "food", "label": "Food tours, cooking classes"},
+            {"value": "shopping", "label": "Shopping, markets"},
+            {"value": "wellness", "label": "Wellness, yoga, spa"},
+            {"value": "photography", "label": "Photography spots"},
+            {"value": "nightlife", "label": "Nightlife, bars, entertainment"}
+        ]
+    })
+    
+    # Ask about accommodation style
+    questions.append({
+        "id": "accommodation_style",
+        "type": "radio",
+        "label": "What type of accommodation do you prefer?",
+        "required": True,
+        "options": [
+            {"value": "budget", "label": "Budget-friendly — hostels, guesthouses"},
+            {"value": "mid", "label": "Mid-range — 3-star hotels, homestays"},
+            {"value": "luxury", "label": "Luxury — 4-5 star hotels, resorts"},
+            {"value": "mixed", "label": "Mix — AI decides per location"}
+        ]
+    })
+    
+    # Open text for special requests
+    questions.append({
+        "id": "special_requests",
+        "type": "textarea",
+        "label": "Any special requests, accessibility needs, or must-see places?",
+        "required": False,
+        "placeholder": "e.g., wheelchair accessible, traveling with infant, must visit specific temple..."
+    })
+    
+    return questions
+
+
+_CLARIFICATION_SYSTEM = """You are TripMind AI, a travel planning assistant. Your task is to generate clarifying questions that will help create a personalized travel itinerary.
+
+Given the user's trip inputs, generate 4-6 structured questions that will resolve ambiguity and help create a better plan. Return ONLY a JSON array of questions.
+
+Each question must have:
+- "id": unique string identifier (snake_case)
+- "type": "radio" | "checkbox" | "textarea" | "select"
+- "label": human-readable question text
+- "required": boolean
+- "options": array of {"value": "...", "label": "..."} (for radio, checkbox, select)
+- "placeholder": string (for textarea)
+- "required": boolean
+
+Focus on ambiguities in:
+1. Trip pace (relaxed/balanced/packed)
+2. Transport preferences between cities
+3. Food restrictions/preferences
+4. Activity interests
+5. Accommodation style
+6. Special needs/accessibility
+
+Output ONLY the JSON array, no extra text."""
+
+
+def generate_travel_plans(request_data, db_data=None, clarifications=None):
     parsed = parse_trip_request(request_data)
     request_data = parsed
 
@@ -96,7 +252,7 @@ def generate_travel_plans(request_data, db_data=None):
     # loudly instead of producing code-rule plans.
     from services.ai_plan_builder import AIPlanError, generate_ai_plans
     try:
-        plans = generate_ai_plans(parsed, db_data)
+        plans = generate_ai_plans(parsed, db_data, clarifications)
     except AIPlanError as e:
         # Surface the real LLM cause in the server console — never silent.
         print("[TripMind AI] AI planner failed: %s" % e)

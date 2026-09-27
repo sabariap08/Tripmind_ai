@@ -17,7 +17,7 @@ var TM_PARTNER = (function () {
      * transport: the role comes from the signed-in session and drives the nav,
      * the dashboard and which management pages exist. */
     var PARTNER_ROLES = ['TRANSPORT_ADMIN', 'HOTEL_ADMIN', 'RESTAURANT_ADMIN',
-                         'TOURIST_SPOT_ADMIN', 'GUIDE'];
+                         'TOURIST_SPOT_ADMIN', 'GUIDE', 'RAILWAY_ADMIN'];
 
     var ROLE_META = {
         TRANSPORT_ADMIN: { label: 'Transport partner', short: 'Transport', entity: 'service' },

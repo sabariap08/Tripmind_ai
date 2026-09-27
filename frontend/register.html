@@ -38,8 +38,8 @@
         .summary-note { margin-top: .5rem; font-size: var(--tm-f-xs); color: var(--tm-jade); }
         .row-table-scroll { overflow-x: auto; }
         .tm-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-        /* Passenger-first: the account-type step only exists on the explicit
-           provider deep link (?provider=1), so it is hidden by default. */
+        /* Passenger-first: single flow for traveller accounts.
+            Provider applications go through the TripMind Partner Hub (/tripmind-partner/register). */
         body[data-reg-flow="passenger"] .wiz-step--provider { display: none; }
         body[data-reg-flow="provider"] .reg-passenger-note { display: none; }
         .reg-alt { margin-top: var(--tm-s6); padding-top: var(--tm-s5); border-top: 1px solid var(--tm-line); display: grid; gap: .6rem; }
@@ -90,10 +90,9 @@
                 <span class="tm-eyebrow">Join TripMind</span>
                 <h1 class="tm-h2" id="wizTitle" style="margin-bottom:.4rem;">Create your account</h1>
 
-                <div class="wiz-steps" id="wizSteps" aria-label="Registration progress">
-                    <div class="wiz-step wiz-step--provider">Account type</div>
+<div class="wiz-steps" id="wizSteps" aria-label="Registration progress">
                     <div class="wiz-step">Basics</div>
-                    <div class="wiz-step">Identity &amp; contact</div>
+                    <div class="wiz-step">Identity & contact</div>
                     <div class="wiz-step">Review</div>
                 </div>
 

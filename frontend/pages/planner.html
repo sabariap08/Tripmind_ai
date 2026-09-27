@@ -685,21 +685,36 @@
             progress.start();   // step 0 = saving (real work below)
             status.textContent = 'Saving your tripâ€¦';
 
-            try {
+try {
                 const result = await api.createTrip(data);
                 progress.set(0, 'done');
                 progress.set(1, 'active');
-                status.textContent = 'Trip saved. Ollama is building your itinerary â€” usually 20â€“40 seconds.';
+                status.textContent = 'Trip saved. Generating clarifying questions…';
+
+                // Step 1: Get clarifying questions
+                let clarifications = {};
+                try {
+                    const clarifyRes = await apiRequest('/api/trips/' + result.tripId + '/clarify', { method: 'POST' });
+                    if (clarifyRes && clarifyRes.questions && clarifyRes.questions.length) {
+                        clarifications = await showClarificationQuestions(clarifyRes.questions);
+                    }
+                } catch (e) {
+                    console.warn('Could not fetch clarifying questions:', e);
+                }
+
+                progress.set(1, 'done');
+                progress.set(2, 'active');
+                status.textContent = 'Ollama is building your itinerary — usually 20–40 seconds.';
 
                 let secs = 0;
                 const tick = setInterval(() => {
                     secs += 5;
-                    status.textContent = 'Ollama is writing your itinerary â€” ' + secs + 's elapsed (usually 20â€“40 seconds).';
+                    status.textContent = 'Ollama is writing your itinerary — ' + secs + 's elapsed (usually 20–40 seconds).';
                 }, 5000);
 
                 let gen;
                 try {
-                    gen = await api.generatePlans(result.tripId);
+                    gen = await api.generatePlans(result.tripId, clarifications);
                 } finally {
                     clearInterval(tick);
                 }
@@ -707,10 +722,10 @@
                     throw new Error((gen && (gen.message || gen.aiExplanation)) ||
                         'The AI planner did not return a plan. Please try again.');
                 }
-                progress.set(1, 'done');
-                progress.set(2, 'active');
+                progress.set(2, 'done');
+                progress.set(3, 'active');
                 progress.finish();
-                status.textContent = 'Done â€” opening your itineraryâ€¦';
+                status.textContent = 'Done — opening your itinerary…';
                 window.location = 'trip.html?id=' + result.tripId;
             } catch (e) {
                 document.getElementById('genStatus').textContent = '';
@@ -719,6 +734,77 @@
                 document.getElementById('stepSpots').classList.remove('hidden');
                 TM.toast(e.message, 'error');
             }
+        }
+
+        /* Show clarification questions modal and return user answers. */
+        function showClarificationQuestions(questions) {
+            return new Promise(function (resolve) {
+                const modal = document.createElement('div');
+                modal.className = 'modal-overlay active';
+                modal.innerHTML = '<div class="modal modal-lg">' +
+                    '<h2 style="margin:0 0 1rem;">TripMind needs a little more detail</h2>' +
+                    '<p class="text-muted" style="margin:0 0 1.5rem;">Answer a few quick questions so the AI can build the perfect plan for you.</p>' +
+                    '<form id="clarifyForm" style="display:grid;gap:1rem;max-height:60vh;overflow:auto;">' +
+                    questions.map(function (q, i) {
+                        var required = q.required ? ' required' : '';
+                        var id = 'clarify_' + q.id;
+                        var fieldHtml = '';
+                        if (q.type === 'radio') {
+                            fieldHtml = q.options.map(function (opt) {
+                                return '<label class="radio-opt" style="display:flex;align-items:center;gap:.5rem;padding:.5rem;border:1px solid var(--slate-200);border-radius:.5rem;cursor:pointer;">' +
+                                    '<input type="radio" name="' + id + '" value="' + opt.value + '"' + required + '>' +
+                                    '<span>' + opt.label + '</span></label>';
+                            }).join('');
+                        } else if (q.type === 'checkbox') {
+                            fieldHtml = q.options.map(function (opt) {
+                                return '<label class="checkbox-opt" style="display:flex;align-items:center;gap:.5rem;padding:.5rem;border:1px solid var(--slate-200);border-radius:.5rem;cursor:pointer;">' +
+                                    '<input type="checkbox" name="' + id + '" value="' + opt.value + '">' +
+                                    '<span>' + opt.label + '</span></label>';
+                            }).join('');
+                        } else if (q.type === 'textarea') {
+                            fieldHtml = '<textarea id="' + id + '" name="' + q.id + '" rows="3" class="form-input" placeholder="' + (q.placeholder || '') + '"' + required + '></textarea>';
+                        } else if (q.type === 'select') {
+                            fieldHtml = '<select id="' + id + '" name="' + q.id + '" class="form-input"' + required + '>' +
+                                '<option value="">Select…</option>' +
+                                q.options.map(function (opt) { return '<option value="' + opt.value + '">' + opt.label + '</option>'; }).join('') +
+                                '</select>';
+                        }
+                        return '<div class="clarify-field" style="display:grid;gap:.5rem;">' +
+                            '<label class="form-label" style="font-weight:600;">' + q.label + (q.required ? ' <span class="req">*</span>' : '') + '</label>' +
+                            '<div style="display:grid;gap:.5rem;">' + fieldHtml + '</div>' +
+                            '</div>';
+                    }).join('') +
+                    '</form>' +
+                    '<div class="flex end gap" style="margin-top:1.5rem;">' +
+                    '<button class="btn btn-primary" type="button" id="clarifySubmit">Continue to Plan</button>' +
+                    '</div>' +
+                    '</div>';
+                document.body.appendChild(modal);
+
+                modal.querySelector('#clarifyForm').addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    var formData = new FormData(this);
+                    var answers = {};
+                    for (var pair of formData.entries()) {
+                        var key = pair[0];
+                        var value = pair[1];
+                        if (key in answers) {
+                            if (!Array.isArray(answers[key])) answers[key] = [answers[key]];
+                            answers[key].push(value);
+                        } else {
+                            answers[key] = value;
+                        }
+                    }
+                    // Convert checkbox arrays
+                    questions.forEach(function (q) {
+                        if (q.type === 'checkbox' && q.id in answers && !Array.isArray(answers[q.id])) {
+                            answers[q.id] = [answers[q.id]];
+                        }
+                    });
+                    document.body.removeChild(modal);
+                    resolve(answers);
+                });
+            });
         }
 
         /* Sticky mobile CTA mirrors the primary action of the visible step. */

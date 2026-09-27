@@ -32,7 +32,7 @@ const api = {
     adminTrips: () => apiRequest('/api/admin/trips'),
     createTrip: (data) => apiRequest('/api/trips', { method: 'POST', body: data }),
     getTrip: (id) => apiRequest(`/api/trips/${id}`),
-    generatePlans: (id) => apiRequest(`/api/trips/${id}/generate`, { method: 'POST' }),
+    generatePlans: (id, clarifications = {}) => apiRequest(`/api/trips/${id}/generate`, { method: 'POST', body: { clarifications } }),
     bookTrip: (id) => apiRequest(`/api/trips/${id}/book`, { method: 'POST' }),
     confirmBookTrip: (id, payFromWallet) => apiRequest(`/api/trips/${id}/confirm-book`, { method: 'POST', body: { payFromWallet }}),
     getEvents: (id) => apiRequest(`/api/trips/${id}/events`),

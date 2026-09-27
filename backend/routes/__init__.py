@@ -252,6 +252,61 @@ def get_trip(trip_id):
     return jsonify(trip)
 
 
+return jsonify({
+        "selectedPlan": selected,
+        "plans": result["plans"],
+        "aiExplanation": result["aiExplanation"],
+        "ml": result.get("ml", {}),
+        "source": result.get("source", "mock"),
+    })
+
+
+@trips_bp.route("/api/trips/<trip_id>/clarify", methods=["POST"])
+@require_login
+def clarify_trip(trip_id):
+    """Generate clarifying questions for a trip before AI plan generation.
+    
+    The AI analyzes the trip inputs and returns structured questions
+    (checkboxes, radio, text) that the user must answer before
+    the final plan is generated.
+    """
+    trip = _owned_trip(trip_id, request.current_user.get("id"))
+    if not trip:
+        return jsonify({"error": "Trip not found"}), 404
+
+    # Build the same request_data as generate_plans
+    request_data = {
+        "origin": trip["origin"],
+        "destination": trip["destination"],
+        "startDate": trip["startDate"],
+        "endDate": trip["endDate"],
+        "travelers": trip["travelers"],
+        "budget": trip["budget"],
+        "budgetUnlimited": bool(trip.get("budgetUnlimited")),
+        "currency": trip.get("currency", "INR"),
+        "travelStyle": trip.get("travelStyle", "BALANCED"),
+        "foodPreference": trip.get("foodPreference"),
+        "transportType": trip.get("transportType"),
+        "servicePreference": trip.get("servicePreference"),
+        "preferences": trip.get("preferences") or "",
+        "prioritizedSpotIds": trip.get("prioritizedSpotIds") or [],
+        "startLocation": trip.get("startLocation"),
+        "returnTrip": bool(trip.get("returnTrip")),
+        "premiumServices": trip.get("premiumServices") or [],
+    }
+
+    db_data = _gather_db_data(trip)
+
+    # Generate clarifying questions using the AI
+    from services.travel_orchestrator import generate_clarifying_questions
+    questions = generate_clarifying_questions(request_data, db_data)
+
+    return jsonify({
+        "questions": questions,
+        "tripId": trip_id,
+    })
+
+
 @trips_bp.route("/api/trips/<trip_id>/generate", methods=["POST"])
 @require_login
 def generate_plans(trip_id):

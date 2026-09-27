@@ -111,14 +111,16 @@
                         var user = res.user || {};
                         var next = TM_PARTNER.safeNext();
                         var partnerRoles = TM_PARTNER.PARTNER_ROLES || ['TRANSPORT_ADMIN'];
-                        if (partnerRoles.indexOf(user.role) > -1) {
-                            location.href = next || '/tripmind-partner/dashboard';
-                            return;
-                        }
-                        if (user.role === 'ADMIN') {
-                            say('Administrator accounts use the TripMind provider console.', 'warn');
+                        if (user.role === 'ADMIN' || user.role === 'RAILWAY_ADMIN') {
+                            say(user.role === 'ADMIN'
+                                ? 'Administrator accounts use the TripMind provider console.'
+                                : 'Railway accounts use the TripMind provider console.', 'warn');
                             TM.button(btn, false);
                             setTimeout(function () { location.href = '/portal.html'; }, 1400);
+                            return;
+                        }
+                        if (partnerRoles.indexOf(user.role) > -1) {
+                            location.href = next || '/tripmind-partner/dashboard';
                             return;
                         }
                         if (user.role === 'USER') {
