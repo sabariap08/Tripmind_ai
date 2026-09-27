@@ -1223,6 +1223,8 @@ a:hover { text-decoration: underline; }
   position: relative; display: block; overflow: hidden; border-radius: 1rem;
   aspect-ratio: 4 / 3; text-decoration: none; isolation: isolate;
   box-shadow: var(--shadow-md);
+  content-visibility: auto;
+  contain-intrinsic-size: 400px 300px;
 }
 .dest-tile:hover { text-decoration: none; }
 .dest-img {

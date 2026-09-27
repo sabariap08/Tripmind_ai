@@ -416,3 +416,5 @@ var TM_PARTNER = (function () {
         renderUser: renderUser
     };
 })();
+
+window.TM_PARTNER = TM_PARTNER;

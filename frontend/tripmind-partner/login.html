@@ -110,7 +110,8 @@
                         });
                         var user = res.user || {};
                         var next = TM_PARTNER.safeNext();
-                        if (user.role === TM_PARTNER.PARTNER_ROLE) {
+                        var partnerRoles = TM_PARTNER.PARTNER_ROLES || ['TRANSPORT_ADMIN'];
+                        if (partnerRoles.indexOf(user.role) > -1) {
                             location.href = next || '/tripmind-partner/dashboard';
                             return;
                         }
@@ -121,7 +122,7 @@
                             return;
                         }
                         if (user.role === 'USER') {
-                            say('That is a traveller account. The Partner Hub is only for transport partners.', 'warn');
+                            say('That is a traveller account. The Partner Hub is for transport, hotel, restaurant, spot and guide partners.', 'warn');
                             TM.button(btn, false);
                             return;
                         }
