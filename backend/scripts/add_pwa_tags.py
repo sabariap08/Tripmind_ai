@@ -37,12 +37,20 @@ HEAD_SPLASH = """    <link rel="apple-touch-startup-image" href="/img/splash/spl
 """
 
 pages = []
-for folder in (FRONTEND, os.path.join(FRONTEND, "pages")):
+# (folder, asset prefix from that folder back to the frontend root)
+folders = [
+    (FRONTEND, ""),
+    (os.path.join(FRONTEND, "pages"), "../"),
+    (os.path.join(FRONTEND, "tripmind-partner"), "../"),
+]
+for folder, _prefix in folders:
+    if not os.path.isdir(folder):
+        continue
     for name in sorted(os.listdir(folder)):
         if name.endswith(".html"):
-            pages.append(os.path.join(folder, name))
+            pages.append((os.path.join(folder, name), _prefix))
 
-for path in pages:
+for path, prefix in pages:
     with io.open(path, "r", encoding="utf-8", newline="") as fh:
         src = fh.read()
     original = src
@@ -82,15 +90,14 @@ for path in pages:
     # tm-* components, so the traveller design system is not injected there.
     own_design_system = os.path.basename(path) == "portal.html"
     if "css/theme.css" not in src and not own_design_system:
-        src = src.replace("</head>", '    <link rel="stylesheet" href="%s">\n</head>' % (
-            "/css/theme.css" if os.path.basename(os.path.dirname(path)) == "pages" else "css/theme.css"), 1)
+        src = src.replace("</head>", '    <link rel="stylesheet" href="%scss/theme.css">\n</head>' % prefix, 1)
         changed.append("theme")
 
     # The shared runtime must be available to the page's own inline scripts, so
     # it is loaded synchronously in <head> (ui.js is an IIFE that defers its
-    # DOM hooks to DOMContentLoaded).  Earlier runs added it with `defer` at
-    # the end of <body>, which left TM undefined for inline page scripts.
-    ui_src = "/js/ui.js" if os.path.basename(os.path.dirname(path)) == "pages" else "js/ui.js"
+    # DOM hooks to DOMContentLoaded).  Earlier runs added it with `defer` at the
+    # end of <body>, which left TM undefined for inline page scripts.
+    ui_src = "%sjs/ui.js" % prefix
     src, n_removed = RE_DEFERRED_UI.subn("", src)
     if n_removed:
         changed.append("ui.js->head")

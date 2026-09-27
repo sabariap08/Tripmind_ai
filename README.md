@@ -37,20 +37,33 @@ tripmind-ai/
 ├── frontend/
 │   ├── index.html           # Landing page
 │   ├── login.html           # Sign in (all roles)
-│   ├── register.html        # Public account creation
+│   ├── register.html        # Public traveller account creation (provider wizard: ?provider=1)
 │   ├── portal.html          # Role-aware portal dashboard (ADMIN/TRANSPORT/TOURIST/GUIDE/USER)
 │   ├── css/style.css        # Global styles
 │   ├── js/
 │   │   ├── api.js           # API helper
 │   │   ├── utils.js         # Utility functions
 │   │   ├── chat.js          # AI chat widget
+│   │   ├── maps.js          # Google Maps loader + location picker
 │   │   └── portal.js        # Portal controller (role panels, dynamic transport forms)
+│   ├── tripmind-partner/    # TripMind Partner Hub (transport only, /tripmind-partner)
+│   │   ├── index.html       # Operator landing (public)
+│   │   ├── login.html       # Partner sign in (public)
+│   │   ├── register.html    # Transport application (public, admin reviewed)
+│   │   ├── forbidden.html   # Signed-in non-partner refusal
+│   │   ├── dashboard.html   # Fleet, seat and revenue stats
+│   │   ├── buses.html       # Services (add / edit) and pricing
+│   │   ├── boarding-points.html  # Board & drop coordinates
+│   │   ├── bookings.html    # Bookings on your own services
+│   │   ├── profile.html     # Service profile + application status
+│   │   ├── css/partner.css  # Hub-only design layer
+│   │   └── js/partner.js    # Hub shell, session guard, nav, formatters
 │   └── pages/
 │       ├── dashboard.html   # Your journeys
 │       ├── planner.html     # Trip planner
 │       └── trip.html        # Itinerary, cost, packing, twin, assistant, booking
 ├── backend/
-│   ├── app.py               # Flask app entry (registers all blueprints)
+│   ├── app.py               # Flask app entry (registers all blueprints + Partner Hub routes)
 │   ├── config.py            # Configuration (roles, SECRET_KEY, GOOGLE_MAPS_API_KEY, DEV_MODE)
 │   ├── requirements.txt     # Python dependencies
 │   ├── routes/
@@ -107,6 +120,8 @@ tripmind-ai/
 ├── scripts/
 │   ├── seed_ml_data.py     # Seed synthetic historical data
 │   ├── seed_dev.py         # Seed test accounts + sample transport/spots/guides
+│   ├── add_pwa_tags.py     # Inject PWA tags + shared runtime into every page
+│   ├── check_pwa_serving.py  # Verify pages, assets, manifest and SW are really served
 │   └── clean_dev.py        # Clear test bookings/trips, keep seeded catalogue
 ├── .env                     # Environment variables (gitignored)
 ├── .env.example             # Environment template
@@ -237,6 +252,59 @@ flight, cab & auto, 4 Chennai tourist spots, and authorized guide locations
 Guides can only be assigned locations added by a tourist spot admin
 (`guide_locations` collection). Setting availability for an unauthorized
 location is rejected server-side.
+
+## TripMind Partner Hub (transport)
+
+Transport providers get their own product surface at **`/tripmind-partner`**,
+separate from the passenger site and from the shared provider console
+(`/portal.html`, still used by hotel, restaurant, spot, guide and rail
+providers).
+
+| URL | Access | Purpose |
+|-----|--------|---------|
+| `/tripmind-partner` | public | Operator landing |
+| `/tripmind-partner/login` | public | Partner sign in (transport only) |
+| `/tripmind-partner/register` | public | Transport application, reviewed by Admin |
+| `/tripmind-partner/dashboard` | partner | Live stats: fleet, seats, revenue, bookings |
+| `/tripmind-partner/buses` | partner | Add / edit services and their pricing |
+| `/tripmind-partner/boarding-points` | partner | Pin board & drop coordinates, merge duplicates |
+| `/tripmind-partner/bookings` | partner | Bookings on your own services only |
+| `/tripmind-partner/profile` | partner | Service profile + application status |
+
+Access control is server side in `backend/app.py`, never a client redirect:
+
+- a signed-out visitor asking for any partner page is redirected to
+  `/tripmind-partner/login?next=…` (`next` is only honoured when it points back
+  inside the hub);
+- a signed-in non-partner (e.g. a passenger) gets `forbidden.html` instead of the
+  console;
+- every hub API call is independently gated by `services/auth.py`
+  (`require_partner` / `require_approved_provider`), so a revoked approval loses
+  data access even while a session cookie is alive;
+- the hub's own `css/partner.css` and `js/*.js` are served by the same route
+  from `frontend/tripmind-partner/`, and every page loads shared
+  `../css/theme.css`, `../js/api.js` and `../js/ui.js`.
+
+The hub reuses the existing transport and booking endpoints
+(`/api/provider/stats`, `/api/transport/list`, `/api/transport/services`,
+`/api/transport/<tid>`, `/api/provider/bookings?type=TRANSPORT`), so it shows
+real data only — no seeded or placeholder metrics. Editing a service also
+preserves `bookedSeats`, so an admin price or timing change can never release
+seats that are already sold.
+
+Passenger registration stays passenger-first: `/register.html` creates a
+traveller account immediately with no role chooser, and the business wizard is
+only reachable through the explicit deep links `/register.html?provider=1` (and
+`/register.html?role=HOTEL_ADMIN`). Transport applications never use it — they
+use `/tripmind-partner/register`, which posts the transport-specific payload
+(company, GSTIN, PAN, licence, service categories) and stores the choice as
+`registration.partnerType` on the provider document.
+
+The service worker precaches only the hub's public entry points
+(`/tripmind-partner`, `/login`, `/register`) plus `css/partner.css` and
+`js/partner.js`. The signed-in partner pages are never precached; they load
+network-first like the rest of the app, so an authenticated console is not
+served from a cache.
 
 ## Machine Learning
 

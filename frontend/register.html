@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Join TripMind AI — Travellers &amp; Providers</title>
-    <meta name="description" content="Create a TripMind AI account. Travellers plan in seconds; hotels, transport, spot, restaurant and guide providers register with the details our admin review needs.">
+    <title>Create your TripMind account</title>
+    <meta name="description" content="Create your TripMind AI traveller account and start planning trips in seconds. Running a travel service? Use the TripMind Partner Hub.">
     <link rel="stylesheet" href="css/style.css">
     <style>
         /* Register shell. The wizard body itself is built by js/register.js,
@@ -38,6 +38,14 @@
         .summary-note { margin-top: .5rem; font-size: var(--tm-f-xs); color: var(--tm-jade); }
         .row-table-scroll { overflow-x: auto; }
         .tm-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+        /* Passenger-first: the account-type step only exists on the explicit
+           provider deep link (?provider=1), so it is hidden by default. */
+        body[data-reg-flow="passenger"] .wiz-step--provider { display: none; }
+        body[data-reg-flow="provider"] .reg-passenger-note { display: none; }
+        .reg-alt { margin-top: var(--tm-s6); padding-top: var(--tm-s5); border-top: 1px solid var(--tm-line); display: grid; gap: .6rem; }
+        .reg-alt__link { display: flex; flex-wrap: wrap; align-items: baseline; gap: .45rem; font-size: var(--tm-f-xs); color: var(--tm-muted); text-decoration: none; }
+        .reg-alt__link:hover { color: var(--tm-ink); }
+        .reg-alt__link b { color: var(--tm-ink-soft); font-weight: 620; text-decoration: underline; text-underline-offset: 3px; }
     </style>
     <meta name="theme-color" content="#06202b">
     <link rel="manifest" href="/manifest.json">
@@ -67,13 +75,14 @@
                 </span>
             </a>
             <div class="reg-art__body">
-                <h2>One platform, two ways in</h2>
+                <h2>Start planning in seconds</h2>
                 <ul>
-                    <li><svg viewBox="0 0 24 24" fill="none" stroke="var(--tm-gold-soft)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span><b>Travellers</b>Start planning in seconds — name, email, password. No waiting for review.</span></li>
-                    <li><svg viewBox="0 0 24 24" fill="none" stroke="var(--tm-gold-soft)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span><b>Hotels, transport, spots, restaurants, guides</b>Register with the business details, identity proof and pricing our admin review needs before you go live.</span></li>
+                    <li><svg viewBox="0 0 24 24" fill="none" stroke="var(--tm-gold-soft)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span><b>Your account is live immediately</b>No review, no waiting — create it and start planning.</span></li>
+                    <li><svg viewBox="0 0 24 24" fill="none" stroke="var(--tm-gold-soft)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span><b>Every trip in one place</b>AI itineraries, live transport, stays, food and experiences.</span></li>
+                    <li class="reg-passenger-note" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="var(--tm-gold-soft)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span><b>Running a travel service?</b>The TripMind Partner Hub is the operator side — buses, vehicles, boarding points and bookings.</span></li>
                 </ul>
             </div>
-            <p class="tm-2xs" style="color:rgba(255,255,255,.6);margin:0;">Registrations are reviewed by the Main Admin. Nothing is published before approval.</p>
+            <p class="tm-2xs" style="color:rgba(255,255,255,.6);margin:0;">Traveling Uniquely. You can change your details any time.</p>
         </aside>
 
         <main class="reg-main" id="regMain">
@@ -82,7 +91,7 @@
                 <h1 class="tm-h2" id="wizTitle" style="margin-bottom:.4rem;">Create your account</h1>
 
                 <div class="wiz-steps" id="wizSteps" aria-label="Registration progress">
-                    <div class="wiz-step">Account type</div>
+                    <div class="wiz-step wiz-step--provider">Account type</div>
                     <div class="wiz-step">Basics</div>
                     <div class="wiz-step">Identity &amp; contact</div>
                     <div class="wiz-step">Review</div>
@@ -93,12 +102,21 @@
 
                 <div class="wiz-actions">
                     <button class="btn btn-outline" id="wizBack" type="button" style="display:none;">Back</button>
-                    <button class="btn btn-primary" id="wizNext" type="button">Choose Account Type</button>
+                    <button class="btn btn-primary" id="wizNext" type="button">Continue</button>
                 </div>
 
                 <p class="tm-sm tm-muted" style="text-align:center;margin-top:var(--tm-s6);">
                     Already have an account? <a href="/login.html">Sign in</a>
                 </p>
+
+                <div class="reg-alt">
+                    <a class="reg-alt__link" href="/tripmind-partner"><b>For Travel Partners</b>
+                        <span>Run buses or vehicles on TripMind.</span></a>
+                    <a class="reg-alt__link" href="/tripmind-partner/register"><b>Continue with the TripMind Partner Hub</b>
+                        <span>Operator registration, boarding points and bookings.</span></a>
+                    <a class="reg-alt__link" href="/register.html?provider=1"><b>Hotel, restaurant, tour, guide or rail provider?</b>
+                        <span>Use the business application.</span></a>
+                </div>
             </div>
         </main>
     </div>

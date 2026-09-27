@@ -1363,3 +1363,60 @@ h1, h2, h3, h4 { font-family: var(--tm-font); color: var(--tm-ink); }
 .user-chip-name { font-weight: 640; color: var(--tm-ink); }
 .role-badge { font-size: .62rem; letter-spacing: .1em; text-transform: uppercase; color: var(--tm-ink-soft); font-weight: 700; }
 
+/* ==========================================================================
+   Install / download app banner (built by js/pwa.js)
+   Lives in the shared layer on purpose: every page loads css/theme.css,
+   including the TripMind Partner Hub, which does not load css/style.css.
+   ========================================================================== */
+.pwa-install {
+  position: fixed;
+  left: var(--tm-s3, .75rem);
+  right: var(--tm-s3, .75rem);
+  bottom: calc(var(--tm-s3, .75rem) + env(safe-area-inset-bottom));
+  z-index: 9999;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .6rem;
+  padding: .7rem .8rem;
+  background: var(--tm-white, #fff);
+  border: 1px solid var(--tm-line, rgba(6, 32, 43, .12));
+  border-radius: var(--tm-r-md, .9rem);
+  box-shadow: 0 18px 40px rgba(6, 32, 43, .22);
+  font-family: var(--tm-font, inherit);
+  font-size: var(--tm-f-sm, .85rem);
+  color: var(--tm-ink, #06202b);
+  animation: pwa-install-in .25s var(--tm-ease, ease-out);
+}
+.pwa-install-body { display: flex; align-items: center; gap: .6rem; flex: 1 1 190px; min-width: 0; }
+.pwa-install-icon { flex: none; display: inline-flex; }
+.pwa-install-icon img { border-radius: .45rem; display: block; }
+.pwa-install-text { display: flex; flex-direction: column; min-width: 0; }
+.pwa-install-text strong { font-size: var(--tm-f-sm, .88rem); font-weight: 650; }
+.pwa-install-text span { color: var(--tm-muted, #6b8290); font-size: var(--tm-f-xs, .78rem); }
+.pwa-install-actions { display: flex; gap: .4rem; flex: none; }
+.pwa-install-btn {
+  font-family: inherit;
+  font-size: var(--tm-f-xs, .78rem);
+  font-weight: 640;
+  min-height: 40px;
+  padding: .45rem .9rem;
+  border-radius: var(--tm-pill, 999px);
+  border: 1px solid var(--tm-line, rgba(6, 32, 43, .12));
+  background: var(--tm-white, #fff);
+  color: var(--tm-ink, #06202b);
+  cursor: pointer;
+  transition: all var(--tm-dur-2, .2s) var(--tm-ease, ease);
+}
+.pwa-install-btn:hover { border-color: var(--tm-ink-soft, #1d5c74); }
+.pwa-install-btn--primary { background: var(--tm-ink, #06202b); border-color: var(--tm-ink, #06202b); color: #fff; }
+.pwa-install-btn--primary:hover { background: var(--tm-ink-soft, #1d5c74); border-color: var(--tm-ink-soft, #1d5c74); color: #fff; }
+.pwa-install .pwa-install-no { color: var(--tm-muted, #6b8290); }
+@keyframes pwa-install-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pwa-install { animation: none; }
+}
+

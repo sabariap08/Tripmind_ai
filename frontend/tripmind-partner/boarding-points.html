@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Boarding points — TripMind Partner Hub</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#06202b">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="../css/theme.css">
+    <link rel="stylesheet" href="css/partner.css">
+</head>
+<body>
+    <a class="ph-skip" href="#phMain">Skip to content</a>
+
+    <header class="ph-topbar">
+        <div class="ph-topbar__inner">
+            <button class="ph-burger" type="button" data-ph-burger aria-expanded="false" aria-controls="phDrawer" aria-label="Open menu"><span></span></button>
+            <a class="ph-wordmark" href="/tripmind-partner/dashboard">
+                <span class="ph-wordmark__mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="#06202b"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                <span class="ph-wordmark__text">
+                    <span class="ph-wordmark__name" data-ph-role-note>TripMind AI</span>
+                    <span class="ph-wordmark__hub">Partner Hub</span>
+                </span>
+            </a>
+            <div class="ph-topbar__spacer"></div>
+            <span class="ph-user">
+                <span class="ph-user__avatar" data-ph-user-avatar aria-hidden="true">P</span>
+                <span class="ph-user__name" data-ph-user-name>Partner</span>
+            </span>
+            <button class="tm-btn tm-btn--on-dark-ghost tm-btn--sm" type="button" data-ph-signout>Sign out</button>
+        </div>
+    </header>
+
+    <div class="ph-drawer" data-ph-drawer id="phDrawer" hidden>
+        <div class="ph-drawer__scrim" data-ph-drawer-scrim></div>
+        <div class="ph-drawer__panel" role="dialog" aria-modal="true" aria-label="Partner Hub menu">
+            <div class="ph-drawer__head">
+                <span class="ph-wordmark" style="color:var(--tm-ink)">
+                    <span class="ph-wordmark__mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="#06202b"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                    <span class="ph-wordmark__text">
+                        <span class="ph-wordmark__name">TripMind AI</span>
+                        <span class="ph-wordmark__hub" style="color:var(--tm-clay)">Partner Hub</span>
+                    </span>
+                </span>
+                <button class="ph-drawer__close" type="button" data-ph-drawer-close aria-label="Close menu">&times;</button>
+            </div>
+            <p class="ph-drawer__group">Operating</p>
+            <ul class="ph-drawer__links" data-ph-nav></ul>
+            <div class="ph-drawer__foot">
+                <span class="tm-2xs tm-muted">Signed in as <b data-ph-partner-type>travel partner</b></span>
+                <a href="/portal.html">Open the provider console</a>
+                <a href="/">Traveller site</a>
+                <button class="tm-btn tm-btn--ghost tm-btn--sm" type="button" data-ph-signout style="margin-top:.5rem">Sign out</button>
+            </div>
+        </div>
+    </div>
+
+    <main class="ph-main" id="phMain">
+        <div class="ph-head">
+            <div>
+                <p class="tm-eyebrow">Map control</p>
+                <h1>Boarding points</h1>
+                <p>Where each service picks travellers up. These exact coordinates are what travellers see on the
+                    TripMind map and what distance-based fares are worked out from.</p>
+            </div>
+            <div class="ph-head__actions">
+                <a class="tm-btn tm-btn--ghost" href="/tripmind-partner/buses">My services</a>
+            </div>
+        </div>
+
+        <div class="ph-note" style="margin-bottom:1.75rem">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z"/></svg>
+            <div>Pick the depot, stand or landmark travellers actually board at — a bus station rather than a city
+                centre gives them a much better pickup. You can fine-tune the pin by dragging it.</div>
+        </div>
+
+        <section class="ph-panel">
+            <div class="ph-panel__head">
+                <div>
+                    <h2>Pickup points per service</h2>
+                    <p>One boarding point per service, saved straight to the live document.</p>
+                </div>
+            </div>
+            <div class="ph-panel__body ph-panel__body--flush" id="phPoints"></div>
+        </section>
+
+        <section class="ph-panel" id="phEditor" hidden>
+            <div class="ph-panel__head">
+                <div>
+                    <h2 id="phEditorTitle">Edit boarding point</h2>
+                    <p>Saving keeps the service's approval status and every booking already taken.</p>
+                </div>
+            </div>
+            <div class="ph-panel__body">
+                <form id="phPointForm" novalidate class="ph-form">
+                    <div class="tm-field">
+                        <label class="tm-label" for="ptName">Boarding point name <span class="req">*</span></label>
+                        <input class="tm-input" type="text" id="ptName" name="name" maxlength="120"
+                               placeholder="e.g. Coimbatore New Bus Stand" required>
+                        <span class="tm-hint">Use the name locals would recognise — it is the search text travellers
+                            type.</span>
+                        <span class="tm-error" aria-live="polite"></span>
+                    </div>
+                    <div class="tm-field">
+                        <label class="tm-label" for="ptAddress">Pick on the map</label>
+                        <input class="tm-input" type="text" id="ptAddress" name="address" maxlength="120"
+                               placeholder="Search a stand, bus stop or landmark">
+                        <div class="ph-map" id="ptMap" data-ready="false" aria-label="Boarding point picker map"></div>
+                        <div class="ph-coords" id="ptCoords"></div>
+                        <span class="tm-hint">If Maps is unavailable, type the coordinates in the two boxes below.</span>
+                        <span class="tm-error" aria-live="polite"></span>
+                    </div>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="ptLat">Latitude</label>
+                            <input class="tm-input" type="text" id="ptLat" name="lat" inputmode="decimal" placeholder="11.0168">
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="ptLng">Longitude</label>
+                            <input class="tm-input" type="text" id="ptLng" name="lng" inputmode="decimal" placeholder="76.9558">
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                    </div>
+                    <div class="ph-actions">
+                        <button class="tm-btn tm-btn--primary" type="submit" id="ptSubmit">Save boarding point</button>
+                        <button class="tm-btn tm-btn--ghost" type="button" id="ptCancel">Cancel</button>
+                        <p class="ph-actions__note">Coordinates are optional, but a pinned point gives travellers a
+                            accurate pickup and fairer distance-based fares.</p>
+                    </div>
+                    <p class="tm-formnote" id="ptNote" data-show="false" role="status"></p>
+                </form>
+            </div>
+        </section>
+    </main>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/ui.js"></script>
+    <script src="js/partner.js"></script>
+    <script src="js/maps.js"></script>
+    <script src="js/boarding.js"></script>
+    <script src="/js/pwa.js" defer></script>
+</body>
+</html>

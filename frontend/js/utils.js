@@ -119,7 +119,11 @@ function redirectToLogin() {
     return null;
 }
 
+/* Where a freshly signed-in account belongs. Transport partners have their own
+ * hub; every other provider category keeps the existing provider console. */
 function roleLanding(user) {
+    const role = user && user.role;
+    if (role === 'TRANSPORT_ADMIN') return '/tripmind-partner/dashboard';
     return '/portal.html';
 }
 

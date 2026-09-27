@@ -79,6 +79,7 @@ const api = {
         return apiRequest(`/api/transport/search${qs ? `?${qs}` : ''}`);
     },
     transportService: () => apiRequest('/api/transport/services'),
+    saveTransportService: (data) => apiRequest('/api/transport/services', { method: 'POST', body: data }),
     transportTypes: () => apiRequest('/api/transport/types'),
 
     // Tourist spots

@@ -159,7 +159,39 @@ the wallet was never debited at book time. Fixed end-to-end:
 - **Status: script written and syntax-compiled; full green run not yet executed** (deferred by
   request). Command: `cd backend && python scripts/e2e_test.py`.
 
-## 16. Verification Status & Next Steps
+## 16. TripMind Partner Hub (transport, `/tripmind-partner`)
+- Separate operator surface for `TRANSPORT_ADMIN`; every other provider category
+  keeps `/portal.html`. Public entry: landing, `login`, `register`; authenticated:
+  `dashboard`, `buses`, `boarding-points`, `bookings`, `profile`.
+- Access control is in the Flask app, not the client: signed-out → redirect to
+  `/tripmind-partner/login?next=…` (`next` honoured only inside the hub),
+  signed-in non-partner → `forbidden.html`. API access is independently gated by
+  `require_partner` / `require_approved_provider`, so a revoked approval loses
+  data even with a live session.
+- The hub route also serves its own `css/partner.css` and `js/*.js` out of
+  `frontend/tripmind-partner/`, so no protected page is ever reachable by
+  weakening the guard.
+- Real data only: `/api/provider/stats`, `/api/transport/list`,
+  `/api/transport/services`, `/api/transport/<tid>` (PUT),
+  `/api/provider/bookings?type=TRANSPORT`, `/api/auth/me`. No seeded or
+  placeholder metrics.
+- `transport_service.update_transport` now carries `bookedSeats` through the
+  rebuild, so editing timings/prices can no longer release already-sold seats.
+- Registration posts the transport payload (company, GSTIN, PAN, licence,
+  service categories), normalises a 10-digit mobile and checks GSTIN duplicates
+  before insert; the category is stored as `registration.partnerType`.
+- Passenger registration is now passenger-first: `/register.html` creates a
+  `USER` immediately (Basics → Identity → Review, no role chooser); the business
+  wizard only appears on the explicit `/register.html?provider=1` (or
+  `?role=…`) deep link, and `roleLanding()` sends a `TRANSPORT_ADMIN` who signs
+  in to the hub instead of the shared portal.
+- PWA: `sw.js` precaches only the hub's public entry points plus
+  `css/partner.css` / `js/partner.js` (authenticated pages stay network-first);
+  `add_pwa_tags.py` now scans `frontend/tripmind-partner/` with `../`-prefixed
+  shared assets, and `check_pwa_serving.py` covers the hub pages, its assets and
+  the signed-out redirect.
+
+## 17. Verification Status & Next Steps
 - Syntax: 0 errors across all 42 `.py` files.
 - Imports: 42/42 backend modules import cleanly in one process (incl. ML facade consumers).
 - Frontend: `node --check` clean for portal.js, chat.js, api.js.

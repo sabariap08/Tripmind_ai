@@ -1,9 +1,20 @@
 /* TripMind AI — account-type-first registration wizard (Phase 2/3).
 
- * Workflow: Account Type -> Basic Details -> Identity & Contact -> Review.
- * Every role-specific provider detail is collected here (nothing is deferred
- * to a "create profile" page inside the dashboard), and duplicate data is
- * rejected live via /api/auth/check-availability before submission.
+ * Workflow: Basic Details -> Identity & Contact -> Review.
+ *
+ * Passenger-first: this page IS the traveller account form. It opens straight on
+ * the traveller details, creates a USER account immediately and never asks a
+ * visitor to pick an account type.
+ *
+ * Provider applications are a separate experience. Transport partners use the
+ * TripMind Partner Hub (/tripmind-partner/register); the other provider
+ * categories (rail, hotel, restaurant, tourist spot, guide) keep the full
+ * business wizard below, reachable only through an explicit ?provider=1 /
+ * ?role=<ROLE> deep link. Nobody on the default passenger journey ever sees a
+ * provider option.
+ *
+ * Duplicate data is rejected live via /api/auth/check-availability before
+ * submission, exactly as before.
  */
 (function () {
     const $ = (id) => document.getElementById(id);
@@ -12,10 +23,15 @@
         AADHAAR: 'Aadhaar', PAN: 'PAN', PASSPORT: 'Passport',
         DRIVING_LICENCE: 'Driving Licence', VOTER_ID: 'Voter ID', OTHER: 'Other',
     };
+    /* Roles the legacy business wizard can still register. Transport partners
+     * are onboarded through the Partner Hub instead. */
+    const PROVIDER_ROLES = ['RAILWAY_ADMIN', 'HOTEL_ADMIN', 'RESTAURANT_ADMIN',
+        'TOURIST_SPOT_ADMIN', 'GUIDE'];
 
     const state = {
-        step: 'type',
-        role: '',                 // selected account type
+        providerFlow: false,      // true only on an explicit ?provider deep link
+        step: 'basic',
+        role: 'USER',             // passenger, unless a provider flow is requested
         values: {},               // collected field -> value (canonical)
         regRoleFields: [],        // provider-specific registration fields
         regValues: {},            // provider registration label -> value
@@ -25,7 +41,13 @@
         images: [],               // data: URIs
     };
 
-    const steps = ['type', 'basic', 'identity', 'summary'];
+    /* The traveller journey never includes an account-type step; the provider
+       deep link keeps it so a partner can still choose their category. */
+    function steps() {
+        return state.providerFlow
+            ? ['type', 'basic', 'identity', 'summary']
+            : ['basic', 'identity', 'summary'];
+    }
     const STEP_TITLES = {
         type: 'Account Type', basic: 'Basic Details',
         identity: 'Identity & Contact', summary: 'Review & Confirm',
@@ -106,7 +128,10 @@
     /* ---- step rendering ---------------------------------------------------- */
 
     function renderType() {
-        const cards = ['USER', 'RAILWAY_ADMIN', 'TRANSPORT_ADMIN', 'HOTEL_ADMIN', 'RESTAURANT_ADMIN', 'GUIDE'].map(r => {
+        /* Only reached through the ?provider deep link. Transport partners are
+         * onboarded in the Partner Hub, so they are pointed there instead of
+         * being listed here. */
+        const cards = PROVIDER_ROLES.map(r => {
                 const info = roleInfo[r] || {};
                 return `<button type="button" class="role-card ${state.role === r ? 'selected' : ''}" data-role="${r}">
                     <span class="role-card-icon">${info.icon || ''}</span>
@@ -114,7 +139,11 @@
                     <div class="role-card-desc">${esc(info.desc || '')}</div>
                 </button>`;
             }).join('');
-        $('wizContent').innerHTML = `<div class="role-grid">${cards}</div>`;
+        $('wizContent').innerHTML = `<div class="role-grid">${cards}</div>
+            <div class="reg-section-title">Running buses, cabs or autos?</div>
+            <p class="hint">Transport partners apply in the TripMind Partner Hub, which sets up the whole
+                operator account in one pass.</p>
+            <p style="margin:.5rem 0 0"><a class="btn btn-primary" href="/tripmind-partner/register">Go to the Partner Hub</a></p>`;
         document.querySelectorAll('.role-card').forEach(btn => btn.addEventListener('click', () => {
             document.querySelectorAll('.role-card').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
@@ -366,7 +395,6 @@
         const rows = [];
         const push = (k, v) => { if (v !== undefined && v !== null && String(v).trim() !== '') rows.push([k, v]); };
 
-        push('Account type', roleInfo[state.role]?.title || state.role);
         push('Full name', state.values.name);
         push('Email', state.values.email);
         push('Mobile', state.values.mobile);
@@ -508,9 +536,10 @@
             if (images && images.files && images.files.length) state.images = await Promise.all(Array.from(images.files).map(fileToDataUrl));
         }
         if (!validate()) return;
-        const idx = steps.indexOf(state.step);
-        if (idx >= steps.length - 1) { submit(); return; }
-        state.step = steps[idx + 1];
+        const list = steps();
+        const idx = list.indexOf(state.step);
+        if (idx >= list.length - 1) { submit(); return; }
+        state.step = list[idx + 1];
         renderStep();
     }
 
@@ -519,8 +548,14 @@
         if (state.step === 'type') renderType(); else if (state.step === 'basic') renderBasic();
         else if (state.step === 'identity') renderIdentity(); else renderSummary();
 
-        const idx = steps.indexOf(state.step);
-        document.querySelectorAll('.wiz-step').forEach((el, i) => {
+        const list = steps();
+        const idx = list.indexOf(state.step);
+        // The progress strip still holds the account-type node; it is only
+        // hidden (CSS) in the passenger flow, so highlight by visible index.
+        const strip = Array.prototype.filter.call(
+            document.querySelectorAll('.wiz-step'),
+            (el) => !(el.classList.contains('wiz-step--provider') && !state.providerFlow));
+        strip.forEach((el, i) => {
             el.classList.toggle('active', i === idx);
             el.classList.toggle('done', i < idx);
         });
@@ -530,23 +565,40 @@
         const nextBtn = $('wizNext');
         if (backBtn) backBtn.style.display = idx === 0 ? 'none' : '';
         if (nextBtn) {
-            nextBtn.textContent = idx >= steps.length - 1 ? 'Create Account' : 'Continue';
+            nextBtn.textContent = idx >= list.length - 1 ? 'Create Account' : 'Continue';
             nextBtn.disabled = state.step === 'type' && !state.role;
         }
-        $('wizContent').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        $('wizContent').scrollIntoView({
+            behavior: (TM.reducedMotion && TM.reducedMotion()) ? 'auto' : 'smooth', block: 'start',
+        });
     }
 
     function init() {
         const start = () => {
-            state.step = 'type';
+            /* Passenger flow (the default) opens on the traveller form.
+             * The business wizard is only reachable by asking for it. */
+            const q = new URLSearchParams(location.search);
+            const wanted = (q.get('role') || '').toUpperCase();
+            const provider = q.get('provider') === '1' || PROVIDER_ROLES.indexOf(wanted) >= 0;
+            state.providerFlow = provider;
+            if (provider) {
+                state.role = wanted && PROVIDER_ROLES.indexOf(wanted) >= 0 ? wanted : '';
+                state.step = 'type';
+                if (state.role) loadRegFields(state.role);
+                document.body.setAttribute('data-reg-flow', 'provider');
+            } else {
+                state.role = 'USER';
+                state.step = 'basic';
+                document.body.setAttribute('data-reg-flow', 'passenger');
+            }
             renderStep();
         };
-        /* account type grid interaction — the role select is the first step */
         const next = $('wizNext'); if (next) next.addEventListener('click', handleNext);
         const back = $('wizBack');
         if (back) back.addEventListener('click', () => {
-            const idx = steps.indexOf(state.step);
-            if (idx > 0) { state.step = steps[idx - 1]; renderStep(); }
+            const list = steps();
+            const idx = list.indexOf(state.step);
+            if (idx > 0) { state.step = list[idx - 1]; renderStep(); }
         });
         start();
     }

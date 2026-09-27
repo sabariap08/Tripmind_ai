@@ -8,7 +8,7 @@
  *   - everything else on our origin: network, no cache
  * Bump CACHE_VERSION to ship a new build.
  */
-const CACHE_VERSION = 'tripmind-v4';
+const CACHE_VERSION = 'tripmind-v5';
 const SHELL = [
   '/',
   '/index.html',
@@ -19,6 +19,14 @@ const SHELL = [
   '/pages/dashboard.html',
   '/pages/trip.html',
   '/pages/verify.html',
+  // TripMind Partner Hub — public entry points only. The signed-in partner
+  // pages are deliberately NOT precached: they are authenticated screens, and
+  // they keep working through the network-first navigation rule above.
+  '/tripmind-partner',
+  '/tripmind-partner/login',
+  '/tripmind-partner/register',
+  '/tripmind-partner/css/partner.css',
+  '/tripmind-partner/js/partner.js',
   '/css/style.css',
   '/css/theme.css',
   '/js/api.js',

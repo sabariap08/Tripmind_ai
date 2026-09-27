@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Dashboard — TripMind Partner Hub</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#06202b">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="../css/theme.css">
+    <link rel="stylesheet" href="css/partner.css">
+</head>
+<body>
+    <a class="ph-skip" href="#phMain">Skip to content</a>
+
+    <header class="ph-topbar">
+        <div class="ph-topbar__inner">
+            <button class="ph-burger" type="button" data-ph-burger aria-expanded="false" aria-controls="phDrawer" aria-label="Open menu"><span></span></button>
+            <a class="ph-wordmark" href="/tripmind-partner/dashboard">
+                <span class="ph-wordmark__mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="#06202b"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                <span class="ph-wordmark__text">
+                    <span class="ph-wordmark__name" data-ph-role-note>TripMind AI</span>
+                    <span class="ph-wordmark__hub">Partner Hub</span>
+                </span>
+            </a>
+            <div class="ph-topbar__spacer"></div>
+            <span class="ph-user">
+                <span class="ph-user__avatar" data-ph-user-avatar aria-hidden="true">P</span>
+                <span class="ph-user__name" data-ph-user-name>Partner</span>
+            </span>
+            <button class="tm-btn tm-btn--on-dark-ghost tm-btn--sm" type="button" data-ph-signout>Sign out</button>
+        </div>
+    </header>
+
+    <div class="ph-drawer" data-ph-drawer id="phDrawer" hidden>
+        <div class="ph-drawer__scrim" data-ph-drawer-scrim></div>
+        <div class="ph-drawer__panel" role="dialog" aria-modal="true" aria-label="Partner Hub menu">
+            <div class="ph-drawer__head">
+                <span class="ph-wordmark" style="color:var(--tm-ink)">
+                    <span class="ph-wordmark__mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="#06202b"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                    <span class="ph-wordmark__text">
+                        <span class="ph-wordmark__name">TripMind AI</span>
+                        <span class="ph-wordmark__hub" style="color:var(--tm-clay)">Partner Hub</span>
+                    </span>
+                </span>
+                <button class="ph-drawer__close" type="button" data-ph-drawer-close aria-label="Close menu">&times;</button>
+            </div>
+            <p class="ph-drawer__group">Operating</p>
+            <ul class="ph-drawer__links" data-ph-nav></ul>
+            <div class="ph-drawer__foot">
+                <span class="tm-2xs tm-muted">Signed in as <b data-ph-partner-type>travel partner</b></span>
+                <a href="/portal.html">Open the provider console</a>
+                <a href="/">Traveller site</a>
+                <button class="tm-btn tm-btn--ghost tm-btn--sm" type="button" data-ph-signout style="margin-top:.5rem">Sign out</button>
+            </div>
+        </div>
+    </div>
+
+    <main class="ph-main" id="phMain">
+        <div class="ph-head">
+            <div>
+                <p class="tm-eyebrow">Overview</p>
+                <h1>Good to see you, <span data-ph-firstname>partner</span>.</h1>
+                <p>Everything below is counted from your own services and bookings on TripMind.</p>
+            </div>
+            <div class="ph-head__actions">
+                <a class="tm-btn tm-btn--ghost" href="/tripmind-partner/buses">Manage services</a>
+                <a class="tm-btn tm-btn--primary" href="/tripmind-partner/buses#add">Add a bus</a>
+            </div>
+        </div>
+
+        <div class="ph-stats" id="phStats" aria-live="polite">
+            <div class="ph-stat"><b>—</b><span>Loading</span></div>
+        </div>
+
+        <div class="ph-note ph-note--wait" id="phPendingNote" hidden style="margin-bottom:1.5rem">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15h-2v-2h2v2Zm0-4h-2V7h2v6Z"/></svg>
+            <div><b>Some services are still under review.</b> The TripMind team checks every new service before
+                travellers can see it, so these do not appear in the planner yet.</div>
+        </div>
+
+        <div class="tm-grid tm-grid-2" style="align-items:start">
+            <section class="ph-panel">
+                <div class="ph-panel__head">
+                    <div>
+                        <h2>Revenue from confirmed bookings</h2>
+                        <p>The exact total travellers have paid for your services.</p>
+                    </div>
+                </div>
+                <div class="ph-panel__body">
+                    <p class="tm-display" style="margin:0" id="phRevenue">—</p>
+                    <p class="tm-2xs tm-muted" style="margin:.5rem 0 0">Counted from confirmed bookings only. Pending
+                        payments are not included.</p>
+                </div>
+            </section>
+
+            <section class="ph-panel">
+                <div class="ph-panel__head">
+                    <div>
+                        <h2>Next scheduled departures</h2>
+                        <p>Straight from the schedules you entered.</p>
+                    </div>
+                </div>
+                <div class="ph-panel__body ph-panel__body--flush" id="phNext"></div>
+            </section>
+        </div>
+
+        <div class="tm-grid tm-grid-2" style="align-items:start">
+            <section class="ph-panel">
+                <div class="ph-panel__head">
+                    <div>
+                        <h2>Your services</h2>
+                        <p>What travellers can see from you right now.</p>
+                    </div>
+                    <a class="tm-btn tm-btn--ghost tm-btn--sm" href="/tripmind-partner/buses">See all</a>
+                </div>
+                <div class="ph-panel__body ph-panel__body--flush" id="phFleet"></div>
+            </section>
+
+            <section class="ph-panel">
+                <div class="ph-panel__head">
+                    <div>
+                        <h2>Latest bookings</h2>
+                        <p>Confirmed and pending passengers on your services.</p>
+                    </div>
+                    <a class="tm-btn tm-btn--ghost tm-btn--sm" href="/tripmind-partner/bookings">See all</a>
+                </div>
+                <div class="ph-panel__body ph-panel__body--flush" id="phBookings"></div>
+            </section>
+        </div>
+    </main>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/ui.js"></script>
+    <script src="js/partner.js"></script>
+    <script>
+        (function () {
+            var P = TM_PARTNER;
+
+            P.boot({
+                view: function (state) {
+                    var first = String((state.user && state.user.name) || '').trim().split(/\s+/)[0];
+                    P.qa('[data-ph-firstname]').forEach(function (n) { n.textContent = first || 'partner'; });
+
+                    return Promise.all([api.providerStats(), api.getTransports(), api.providerBookings('TRANSPORT')])
+                        .then(function (res) {
+                            var stats = res[0] || {};
+                            var fleet = (res[1] && res[1].transports) || [];
+                            var bookings = (res[2] && res[2].bookings) || [];
+                            renderStats(stats);
+                            renderFleet(fleet);
+                            renderNext(fleet);
+                            renderBookings(bookings);
+                        })
+                        .catch(function (e) { P.toast(e.message, 'error'); });
+                }
+            });
+
+            function renderStats(s) {
+                var tiles = [
+                    { n: s.fleet || 0, k: 'Services listed' },
+                    { n: s.approvedFleet || 0, k: 'Live for travellers' },
+                    { n: s.pendingFleet || 0, k: 'Awaiting review' },
+                    { n: s.bookings || 0, k: 'All bookings' },
+                    { n: s.confirmedBookings || 0, k: 'Confirmed' },
+                    { n: s.upcomingBookings || 0, k: 'Upcoming' },
+                    { n: s.seatsBooked || 0, k: 'Seats sold' },
+                    { n: s.fleetCapacity || 0, k: 'Total capacity' }
+                ];
+                P.q('#phStats').innerHTML = tiles.map(function (t) {
+                    return '<div class="ph-stat"><b>' + P.esc(String(t.n)) + '</b><span>' + P.esc(t.k) + '</span></div>';
+                }).join('');
+
+                /* Revenue is a real sum of confirmed bookings — never an estimate. */
+                var revenue = document.getElementById('phRevenue');
+                if (revenue) {
+                    revenue.textContent = P.money(s.revenue || 0);
+                }
+                var pendingNote = document.getElementById('phPendingNote');
+                if (pendingNote) {
+                    pendingNote.hidden = !(s.pendingFleet > 0);
+                }
+            }
+
+            function renderFleet(views) {
+                var host = P.q('#phFleet');
+                if (!views.length) {
+                    host.innerHTML = P.empty('No services yet',
+                        'Add your first bus or vehicle and it will appear here as soon as the TripMind team approves it.',
+                        '<a class="tm-btn tm-btn--primary" href="/tripmind-partner/buses#add">Add a bus</a>');
+                    return;
+                }
+                host.innerHTML = '<ul class="ph-rows">' + views.slice(0, 6).map(function (v) {
+                    var d = v.details || {};
+                    var cap = P.capacityOf(d);
+                    return '<li class="ph-row"><div class="ph-row__main">' +
+                        '<div class="ph-row__title">' + P.esc(P.numberOf(d)) + ' ' + P.pill(v.status) + '</div>' +
+                        '<p class="ph-row__meta">' + P.esc(P.typeLabelOf(d)) + ' · ' + P.esc(P.routeLabel(d)) + '</p>' +
+                        '</div><div class="ph-row__side"><span class="tm-2xs tm-muted">' +
+                        (cap ? P.esc(cap) + ' seats' : 'Capacity not set') + '</span>' +
+                        '<a class="tm-btn tm-btn--ghost tm-btn--sm" href="/tripmind-partner/buses">Edit</a></div></li>';
+                }).join('') + '</ul>';
+            }
+
+            function renderNext(views) {
+                var host = P.q('#phNext');
+                var live = views.filter(function (v) { return v.status === 'APPROVED'; });
+                if (!live.length) {
+                    host.innerHTML = P.empty('Nothing scheduled yet',
+                        'Once a service is approved, its boarding day, time and stop show up here.');
+                    return;
+                }
+                host.innerHTML = '<ul class="ph-rows">' + live.slice(0, 5).map(function (v) {
+                    var d = v.details || {};
+                    return '<li class="ph-row"><div class="ph-row__main">' +
+                        '<div class="ph-row__title">' + P.esc(P.numberOf(d)) + '</div>' +
+                        '<p class="ph-row__meta">' + P.esc(P.fmtDayTime(d)) + ' · from ' +
+                        P.esc(d.boardingPoint || d.baseLocation || '—') + '</p></div>' +
+                        '<div class="ph-row__side"><span class="tm-2xs tm-muted">' +
+                        P.esc(P.typeLabelOf(d)) + '</span></div></li>';
+                }).join('') + '</ul>';
+            }
+
+            function renderBookings(rows) {
+                var host = P.q('#phBookings');
+                if (!rows.length) {
+                    host.innerHTML = P.empty('No bookings yet',
+                        'When a traveller books one of your services it shows up here with their name and date.');
+                    return;
+                }
+                host.innerHTML = '<ul class="ph-rows">' + rows.slice(0, 6).map(function (b) {
+                    var who = (b.customer && b.customer.name) || 'Traveller';
+                    return '<li class="ph-row"><div class="ph-row__main">' +
+                        '<div class="ph-row__title">' + P.esc(who) + ' ' + P.pill(b.status) + '</div>' +
+                        '<p class="ph-row__meta">' + P.esc(b.transportId || 'Service') + ' · ' +
+                        P.esc(P.fmtDate(b.date)) + (b.qty ? ' · ' + P.esc(b.qty) + ' seat' + (Number(b.qty) > 1 ? 's' : '') : '') +
+                        '</p></div><div class="ph-row__side"><span class="tm-sm">' + P.esc(P.money(b.total)) + '</span></div></li>';
+                }).join('') + '</ul>';
+            }
+        })();
+    </script>
+    <script src="/js/pwa.js" defer></script>
+</body>
+</html>

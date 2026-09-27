@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Bookings — TripMind Partner Hub</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#06202b">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="../css/theme.css">
+    <link rel="stylesheet" href="css/partner.css">
+</head>
+<body>
+    <a class="ph-skip" href="#phMain">Skip to content</a>
+
+    <header class="ph-topbar">
+        <div class="ph-topbar__inner">
+            <button class="ph-burger" type="button" data-ph-burger aria-expanded="false" aria-controls="phDrawer" aria-label="Open menu"><span></span></button>
+            <a class="ph-wordmark" href="/tripmind-partner/dashboard">
+                <span class="ph-wordmark__mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="#06202b"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                <span class="ph-wordmark__text">
+                    <span class="ph-wordmark__name" data-ph-role-note>TripMind AI</span>
+                    <span class="ph-wordmark__hub">Partner Hub</span>
+                </span>
+            </a>
+            <div class="ph-topbar__spacer"></div>
+            <span class="ph-user">
+                <span class="ph-user__avatar" data-ph-user-avatar aria-hidden="true">P</span>
+                <span class="ph-user__name" data-ph-user-name>Partner</span>
+            </span>
+            <button class="tm-btn tm-btn--on-dark-ghost tm-btn--sm" type="button" data-ph-signout>Sign out</button>
+        </div>
+    </header>
+
+    <div class="ph-drawer" data-ph-drawer id="phDrawer" hidden>
+        <div class="ph-drawer__scrim" data-ph-drawer-scrim></div>
+        <div class="ph-drawer__panel" role="dialog" aria-modal="true" aria-label="Partner Hub menu">
+            <div class="ph-drawer__head">
+                <span class="ph-wordmark" style="color:var(--tm-ink)">
+                    <span class="ph-wordmark__mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="#06202b"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                    <span class="ph-wordmark__text">
+                        <span class="ph-wordmark__name">TripMind AI</span>
+                        <span class="ph-wordmark__hub" style="color:var(--tm-clay)">Partner Hub</span>
+                    </span>
+                </span>
+                <button class="ph-drawer__close" type="button" data-ph-drawer-close aria-label="Close menu">&times;</button>
+            </div>
+            <p class="ph-drawer__group">Operating</p>
+            <ul class="ph-drawer__links" data-ph-nav></ul>
+            <div class="ph-drawer__foot">
+                <span class="tm-2xs tm-muted">Signed in as <b data-ph-partner-type>travel partner</b></span>
+                <a href="/portal.html">Open the provider console</a>
+                <a href="/">Traveller site</a>
+                <button class="tm-btn tm-btn--ghost tm-btn--sm" type="button" data-ph-signout style="margin-top:.5rem">Sign out</button>
+            </div>
+        </div>
+    </div>
+
+    <main class="ph-main" id="phMain">
+        <div class="ph-head">
+            <div>
+                <p class="tm-eyebrow">Passengers</p>
+                <h1>Bookings</h1>
+                <p>Every booking taken on your own services, newest first.</p>
+            </div>
+            <div class="ph-head__actions">
+                <a class="tm-btn tm-btn--ghost" href="/tripmind-partner/dashboard">Dashboard</a>
+            </div>
+        </div>
+
+        <div class="ph-stats" id="phBookStats">
+            <div class="ph-stat"><b>—</b><span>Loading</span></div>
+        </div>
+
+        <section class="ph-panel">
+            <div class="ph-panel__head">
+                <div>
+                    <h2>All bookings</h2>
+                    <p>Filter by status to see who is still to travel and who has paid.</p>
+                </div>
+                <div class="ph-row" style="gap:.4rem" role="group" aria-label="Filter bookings by status">
+                    <button class="tm-btn tm-btn--secondary tm-btn--sm" type="button" data-ph-filter="" aria-pressed="true">All</button>
+                    <button class="tm-btn tm-btn--ghost tm-btn--sm" type="button" data-ph-filter="CONFIRMED" aria-pressed="false">Confirmed</button>
+                    <button class="tm-btn tm-btn--ghost tm-btn--sm" type="button" data-ph-filter="PENDING" aria-pressed="false">Pending</button>
+                    <button class="tm-btn tm-btn--ghost tm-btn--sm" type="button" data-ph-filter="CANCELLED" aria-pressed="false">Cancelled</button>
+                </div>
+            </div>
+            <div class="ph-panel__body ph-panel__body--flush" id="phBookList"></div>
+        </section>
+    </main>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/ui.js"></script>
+    <script src="js/partner.js"></script>
+    <script src="js/bookings.js"></script>
+    <script src="/js/pwa.js" defer></script>
+</body>
+</html>

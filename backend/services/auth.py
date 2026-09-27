@@ -12,7 +12,7 @@ from bson.objectid import ObjectId
 from pymongo.errors import DuplicateKeyError
 from services.mongodb import get_collection
 from services import duplicate
-from config import ROLES, PROVIDER_ROLES, APPROVAL_STATUSES
+from config import ROLES, PROVIDER_ROLES, PARTNER_ROLES, APPROVAL_STATUSES
 
 SESSION_USER_KEY = "tripmind_user"
 
@@ -234,6 +234,13 @@ def require_roles(*roles):
 
 def is_admin(user):
     return bool(user) and user["role"] == ROLES["ADMIN"]
+
+
+def is_partner(user):
+    """TripMind Partner Hub membership (transport providers: bus operators,
+    drivers/vehicle owners, travel operators). A plain passenger is never a
+    partner, which is what keeps the two experiences apart."""
+    return bool(user) and user.get("role") in PARTNER_ROLES
 
 
 def resource_status(owner_id):

@@ -60,6 +60,22 @@ PROVIDER_ROLES = {ROLES["RAILWAY_ADMIN"], ROLES["TRANSPORT_ADMIN"], ROLES["TOURI
                   ROLES["HOTEL_ADMIN"], ROLES["RESTAURANT_ADMIN"],
                   ROLES["GUIDE"]}
 
+# TripMind Partner Hub (/tripmind-partner) — the provider-facing experience for
+# transport services: bus operators, drivers/vehicle owners and travel
+# operators. These accounts reuse the TRANSPORT_ADMIN role (so the existing
+# approval flow, fleet documents and booking pipeline are untouched) and are the
+# only roles allowed inside the Partner Hub. Every other provider role keeps
+# using the provider portal (portal.html).
+PARTNER_ROLES = {ROLES["TRANSPORT_ADMIN"]}
+
+# URL prefix of the Partner Hub. Every Partner Hub page lives under it and the
+# Flask app serves them from frontend/tripmind-partner/.
+PARTNER_HUB_PREFIX = "/tripmind-partner"
+PARTNER_HUB_DIR = "tripmind-partner"
+
+# Partner Hub pages that may be opened without a signed-in partner account.
+PARTNER_PUBLIC_PAGES = {"index.html", "login.html", "register.html", "forbidden.html"}
+
 # Approval states for provider accounts / services.
 APPROVAL_STATUSES = ("PENDING", "APPROVED", "REJECTED", "SUSPENDED")
 ACCOUNT_STATUSES = ("ACTIVE", "INACTIVE")

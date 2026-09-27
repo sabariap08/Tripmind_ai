@@ -20,15 +20,28 @@ FRONTEND = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 
 PAGES = ["/", "/index.html", "/login.html", "/register.html", "/portal.html",
          "/pages/dashboard.html", "/pages/planner.html", "/pages/trip.html",
-         "/pages/verify.html"]
+         "/pages/verify.html",
+         # TripMind Partner Hub public pages (the signed-in ones are guarded and
+         # are covered by the partner access checks instead).
+         "/tripmind-partner", "/tripmind-partner/", "/tripmind-partner/login",
+         "/tripmind-partner/register"]
+
+# Partner Hub pages that must never be served to a signed-out visitor: the app
+# redirects them to the partner login instead of leaking the console.
+GUARDED_PAGES = ["/tripmind-partner/dashboard", "/tripmind-partner/buses",
+                 "/tripmind-partner/boarding-points", "/tripmind-partner/bookings",
+                 "/tripmind-partner/profile"]
 
 ASSETS = [
     ("/manifest.json", "application/json"),
     ("/sw.js", "javascript"),
     ("/js/pwa.js", "javascript"),
     ("/js/ui.js", "javascript"),
+    ("/js/maps.js", "javascript"),
     ("/css/style.css", "text/css"),
     ("/css/theme.css", "text/css"),
+    ("/tripmind-partner/css/partner.css", "text/css"),
+    ("/tripmind-partner/js/partner.js", "javascript"),
     ("/img/icon-192.png", "image/png"),
     ("/img/icon-512.png", "image/png"),
     ("/img/icon-maskable-512.png", "image/png"),
@@ -57,6 +70,14 @@ def main():
         check("  %s loads pwa.js" % path, "/js/pwa.js" in body, "")
         check("  %s has theme-color" % path, 'name="theme-color"' in body, "")
         check("  %s has apple-touch-icon" % path, "apple-touch-icon" in body, "")
+
+    # Signed-out visitors must be sent to the partner login, never the console.
+    for path in GUARDED_PAGES:
+        r = c.get(path)
+        loc = r.headers.get("Location") or ""
+        check("guarded %s redirects" % path,
+              r.status_code in (301, 302) and "/tripmind-partner/login" in loc,
+              "status=%s loc=%s" % (r.status_code, loc))
 
     for path, ctype in ASSETS:
         r = c.get(path)

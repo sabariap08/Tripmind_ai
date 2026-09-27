@@ -278,6 +278,10 @@ def update_transport(ttype, data, owner_id):
     new["_id"] = doc["_id"]
     new["status"] = doc.get("status", "PENDING")  # keep approval state on edit
     new["createdAt"] = doc["createdAt"]
+    # Seats already sold are live booking state, not form input: an edit (a new
+    # fare, a corrected boarding point) must never release them back to the
+    # pool, or a live bus would oversell.
+    new["bookedSeats"] = int(doc.get("bookedSeats") or 0)
     new["updatedAt"] = datetime.utcnow().isoformat()
     if doc.get("rejectionReason"):
         new["rejectionReason"] = doc["rejectionReason"]
