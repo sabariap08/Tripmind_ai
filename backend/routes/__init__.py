@@ -252,13 +252,6 @@ def get_trip(trip_id):
     return jsonify(trip)
 
 
-return jsonify({
-        "selectedPlan": selected,
-        "plans": result["plans"],
-        "aiExplanation": result["aiExplanation"],
-        "ml": result.get("ml", {}),
-        "source": result.get("source", "mock"),
-    })
 
 
 @trips_bp.route("/api/trips/<trip_id>/clarify", methods=["POST"])
