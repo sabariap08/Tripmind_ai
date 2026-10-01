@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TripMind AI &#8212; Journey Demo</title>
+<link rel="stylesheet" href="/css/theme.css">
+<style>
+  body { background: var(--tm-sand-1, #f7f4ee); color: var(--tm-ink, #0b1a21); }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 1.2rem; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .brand { font-weight: 800; letter-spacing: -.02em; font-size: 1.15rem; }
+  .brand small { display: block; font-weight: 500; color: var(--tm-muted, #5c7179); font-size: .7rem; letter-spacing: .18em; text-transform: uppercase; }
+  .pill { border: 1px solid var(--tm-line, #e3ddd2); border-radius: 999px; padding: .3rem .8rem; font-size: .72rem; background: #fff; }
+  .pill.warn { color: var(--tm-clay, #c05621); border-color: var(--tm-clay, #c05621); }
+  .pill.ok { color: #1f7a4d; border-color: #1f7a4d; }
+  .grid { display: grid; gap: 1rem; grid-template-columns: 300px 1fr; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  .rail { display: flex; flex-direction: column; gap: .4rem; }
+  .step { display: flex; gap: .65rem; align-items: center; border-radius: var(--tm-r-md, 12px); padding: .55rem .7rem; border: 1px solid var(--tm-line, #e3ddd2); background: #fff; cursor: pointer; text-align: left; transition: all .15s; }
+  .step:hover { border-color: var(--tm-ink, #0b1a21); }
+  .step.active { border-color: var(--tm-ink, #0b1a21); box-shadow: 0 4px 14px rgba(11,26,33,.08); }
+  .step.done { border-color: #b7dcc9; background: #f0faf4; }
+  .step .n { width: 26px; height: 26px; border-radius: 50%; background: var(--tm-sand-2, #efeade); display: grid; place-items: center; font-size: .7rem; font-weight: 700; flex: none; }
+  .step.done .n { background: #1f7a4d; color: #fff; }
+  .step .t { font-size: .8rem; font-weight: 650; line-height: 1.15; }
+  .step .d { font-size: .63rem; color: var(--tm-muted, #5c7179); }
+  .panel { border: 1px solid var(--tm-line, #e3ddd2); border-radius: var(--tm-r-lg, 16px); background: #fff; padding: 1.1rem; min-height: 460px; }
+  .panel h2 { margin: 0 0 .3rem; font-size: 1.15rem; }
+  .panel .sub { color: var(--tm-muted, #5c7179); font-size: .78rem; margin-bottom: 1rem; }
+  .btnrow { display: flex; gap: .6rem; flex-wrap: wrap; margin: .8rem 0 1rem; }
+  .btn { border: 1px solid var(--tm-ink, #0b1a21); background: var(--tm-ink, #0b1a21); color: #fff; border-radius: var(--tm-r-sm, 9px); padding: .55rem 1rem; font-size: .8rem; font-weight: 650; cursor: pointer; }
+  .btn.ghost { background: #fff; color: var(--tm-ink, #0b1a21); }
+  .btn.small { padding: .35rem .7rem; font-size: .72rem; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .out { border-top: 1px dashed var(--tm-line, #e3ddd2); padding-top: .8rem; font-size: .78rem; }
+  .out pre { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .72rem; background: #f5f8f7; border-radius: 8px; padding: .6rem; margin: .4rem 0; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: .15rem .9rem; font-size: .78rem; }
+  .kv .k { color: var(--tm-muted, #5c7179); }
+  .item { display: grid; grid-template-columns: 52px 1fr auto; gap: .3rem .7rem; padding: .5rem 0; border-bottom: 1px solid var(--tm-line, #e3ddd2); font-size: .78rem; align-items: start; }
+  .item .tm { font-weight: 650; }
+  .item .st { padding: .1rem .5rem; border-radius: 999px; font-size: .62rem; font-weight: 700; letter-spacing: .06em; }
+  .st.PLANNED, .st.SELECTED { background: #eef2f5; color: #43566b; }
+  .st.BOOKED { background: #e3f0ff; color: #1a5cbb; }
+  .st.DELAYED { background: #fdeee7; color: #c05621; }
+  .st.AFFECTED { background: #fdeee7; color: #c05621; }
+  .st.RESCHEDULED { background: #fdf3d7; color: #9a6b00; }
+  .tag { display: inline-block; background: var(--tm-sand-2, #efeade); border-radius: 6px; padding: .1rem .45rem; font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-right: .3rem; }
+  .muted { color: var(--tm-muted, #5c7179); }
+  .good { color: #1f7a4d; font-weight: 700; }
+  .chatline { border-left: 3px solid var(--tm-clay, #c05621); padding-left: .6rem; margin: .4rem 0; }
+  .mapframe { width: 100%; height: 320px; border: 0; border-radius: 12px; }
+  .diff { display: grid; grid-template-columns: 1fr auto 1fr; gap: .4rem; align-items: start; }
+  .diff .arrow { align-self: center; font-weight: 800; }
+  .statrow { display: flex; gap: .8rem; flex-wrap: wrap; margin: .5rem 0; }
+  .stat { border: 1px solid var(--tm-line, #e3ddd2); border-radius: 12px; padding: .6rem .85rem; font-size: .75rem; }
+  .stat b { display: block; font-size: 1rem; }
+  input[type=text] { width: 100%; max-width: 460px; border: 1px solid var(--tm-line, #e3ddd2); border-radius: 9px; padding: .5rem .7rem; font-size: .8rem; }
+  .err { color: #b42318; background: #fdecea; border: 1px solid #f5c6c1; border-radius: 9px; padding: .5rem .7rem; font-size: .75rem; }
+  .ok { color: #1f7a4d; background: #eefaf3; border: 1px solid #b7dcc9; border-radius: 9px; padding: .5rem .7rem; font-size: .75rem; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #ccc; border-top-color: var(--tm-ink, #0b1a21); border-radius: 50%; animation: sp .7s linear infinite; vertical-align: -2px; margin-right: .4rem; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+</style>
+<script src="/js/ui.js"></script>
+<script src="/js/api.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">TripMind AI<small>Journey Demo &#8212; Plan &#183; Edit &#183; Book &#183; Replan</small></div>
+    <div id="userbar" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;"></div>
+  </div>
+  <div class="grid">
+    <aside class="rail" id="rail"></aside>
+    <main class="panel" id="panel"></main>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var steps = [
+    { id: "login", t: "Login", d: "Sign in to your TripMind account" },
+    { id: "plan", t: "Plan trip", d: "Build your Coimbatore \u2192 Chennai journey" },
+    { id: "edit", t: "AI chat editing", d: "Move / add / remove items by chat" },
+    { id: "book", t: "Confirm & pay", d: "Book all services from your wallet" },
+    { id: "qr", t: "Journey QR pass", d: "Carry the whole trip on one QR" },
+    { id: "wx", t: "Weather", d: "Live forecast for your travel dates" },
+    { id: "map", t: "Route map", d: "See your planned route" },
+    { id: "sim", t: "Travel simulation", d: "Run the journey, event by event" },
+    { id: "disrupt", t: "Disruption", d: "Simulate a 3-hour transport delay" },
+    { id: "replan", t: "Auto replan", d: "Before / after impact & replan" }
+  ];
+
+  var state = { user: null, trip: null, tripId: null, plans: [], action: null, beforeItems: null, simIdx: 0, stepIdx: 0 };
+  var MAXSTEPS = steps.length - 1;
+
+  var rail = document.getElementById("rail");
+  var panel = document.getElementById("panel");
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function btn(label, fn, kind, disabled) {
+    var b = document.createElement("button");
+    b.className = "btn " + (kind || "");
+    b.textContent = label;
+    if (disabled) b.disabled = true;
+    if (fn) b.addEventListener("click", fn);
+    return b;
+  }
+  function money(n) { return "\u20B9" + Number(n || 0).toLocaleString("en-IN"); }
+  function time(iso) { return iso ? String(iso).slice(11, 16) : "\u2013"; }
+
+  function setStep(i, extra) {
+    state.stepIdx = i;
+    renderRail();
+    renderPanel(i, extra);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function nextStep(extra) { setStep(Math.min(state.stepIdx + 1, MAXSTEPS), extra); }
+
+  function renderRail() {
+    rail.innerHTML = "";
+    steps.forEach(function (s, i) {
+      var el = document.createElement("div");
+      el.className = "step" + (i === state.stepIdx ? " active" : "") + (i < state.stepIdx ? " done" : "");
+      el.innerHTML = '<span class="n">' + (i < state.stepIdx ? "\u2713" : String(i + 1).padStart(2, "0")) + '</span>' +
+        '<span class="t">' + esc(s.t) + '</span><span class="d">' + esc(s.d) + "</span>";
+      el.addEventListener("click", function () { setStep(i); });
+      rail.appendChild(el);
+    });
+  }
+
+  function spin(container, msg) {
+    container.innerHTML = '<span class="spinner"></span>' + esc(msg);
+  }
+  async function apiRaw(path, opts) {
+    var r = await fetch(path, Object.assign({ credentials: "same-origin" }, opts || {}));
+    var ct = (r.headers.get("content-type") || "").toLowerCase();
+    if (ct.indexOf("json") >= 0) { var j = await r.json(); if (!r.ok && j && j.error) throw new Error(j.error); return j; }
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r;
+  }
+
+  function renderUserbar() {
+    var ub = document.getElementById("userbar");
+    ub.innerHTML = "";
+    if (!state.user) return;
+    ub.appendChild((function () {
+      var s = document.createElement("span"); s.className = "pill"; s.textContent = state.user.name + " \u00b7 " + state.user.email; return s;
+    })());
+    var a = document.createElement("a"); a.className = "btn ghost small"; a.href = "/portal.html"; a.textContent = "Open portal";
+    ub.appendChild(a);
+    if (state.tripId) {
+      var l = document.createElement("a"); l.className = "btn ghost small"; l.href = "/pages/trip.html?id=" + encodeURIComponent(state.tripId); l.textContent = "Open planner page";
+      ub.appendChild(l);
+    }
+    var l2 = document.createElement("a"); l2.className = "btn ghost small"; l2.href = "/login.html"; l2.textContent = "Sign out / switch";
+    ub.appendChild(l2);
+  }
+
+  async function loadUser() {
+    try { state.user = await api.me(); return state.user; }
+    catch (e) { state.user = null; return null; }
+  }
+
+  /* ------------------------------------------------------------------ Step 0 \u2014 Login */
+  function renderLogin() {
+    panel.innerHTML = "<h2>Step 1 \u2014 Login</h2><div class='sub'>Sign in so TripMind AI can plan your journey.</div>";
+    panel.innerHTML += '<div id="loginout"></div>';
+    var out = document.getElementById("loginout");
+    if (state.user) {
+      out.innerHTML = '<div class="ok">Signed in as <b>' + esc(state.user.email) + "</b></div>";
+      out.appendChild(btn("Continue to next step", function () { nextStep(); }));
+      return;
+    }
+    out.innerHTML = "<p class='muted'>Use the seeded demo traveller account (all seeded demo credentials use password <code>password</code>):</p>";
+    out.appendChild(btn("Sign in with demo.judge@tripmind.com", async function () {
+      spin(out, "Signing in\u2026");
+      try {
+        await api.login({ email: "demo.judge@tripmind.com", password: "password" });
+        state.user = await api.me();
+        renderUserbar();
+        nextStep();
+      } catch (e) { out.innerHTML = '<div class="err">' + esc(e.message) + "</div>"; }
+    }));
+  }
+
+  /* ------------------------------------------------------------------ Step 1 \u2014 Plan */
+  async function ensureTrip(forceNew) {
+    if (forceNew) state.tripId = null;
+    if (state.tripId) {
+      try { state.trip = await api.getTrip(state.tripId); return state.trip; } catch (e) {}
+    }
+    var trips = await api.getTrips();
+    var usable = (trips || []).filter(function (t) {
+      return t.origin === "Coimbatore" && t.destination === "Chennai" &&
+        t.status !== "DRAFT" && t.status !== "CANCELLED" && t.status !== "COMPLETED";
+    });
+    if (!forceNew && usable.length) {
+      state.trip = usable.sort(function (a, b) { return String(a.updatedAt || a.createdAt).localeCompare(String(b.updatedAt || b.createdAt)); }).pop();
+      state.tripId = state.trip._id;
+      return state.trip;
+    }
+    var d = new Date(); var fmt = function (x) { return x.toISOString().slice(0, 10); };
+    var start = new Date(d); start.setDate(start.getDate() + 3);
+    var end = new Date(d); end.setDate(end.getDate() + 5);
+    var created = await api.createTrip({
+      origin: "Coimbatore", destination: "Chennai",
+      startDate: fmt(start), endDate: fmt(end),
+      travelers: 2, budget: 50000, transportType: "TRAIN",
+      travelStyle: "BALANCED", currency: "INR", returnTrip: false,
+      preferences: "Food, Culture, Beach and Shopping. 3 day trip, train travel."
+    });
+    state.tripId = created.tripId || created.trip?._id || created._id;
+    state.trip = await api.getTrip(state.tripId);
+    return state.trip;
+  }
+
+  function renderPlan() {
+    panel.innerHTML = "<h2>Step 2 \u2014 Plan your trip</h2><div class='sub'>Generate an AI-built day-by-day itinerary with real fares.</div>";
+    panel.innerHTML += '<div id="planout"></div>';
+    var out = document.getElementById("planout");
+    out.appendChild(btn("Create demo trip + Generate itinerary", async function (ev) {
+      ev.target.disabled = true;
+      spin(out, "Building your itinerary\u2026 (AI planner)");
+      try {
+        await ensureTrip(true);
+        var g = await apiRaw("/api/trips/" + state.tripId + "/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+        state.plans = g.plans || [];
+        var html = ['<div class="ok">Trip <b>' + esc(state.trip.origin) + " \u2192 " + esc(state.trip.destination) + "</b> ready \u2014 source: " + esc(g.source || "?") + ", " + state.plans.length + " plan(s).</div>"];
+        html.push("<div class='statrow'>" +
+          '<div class="stat"><b>' + esc(state.trip.origin) + " \u2192 " + esc(state.trip.destination) + "</b>Route</div>" +
+          '<div class="stat"><b>' + esc((state.trip.startDate || "").slice(0, 10)) + "</b>Start</div>" +
+          '<div class="stat"><b>' + state.trip.travelers + "</b>Travellers</div>" +
+          '<div class="stat"><b>' + (state.trip.budgetUnlimited ? "Unlimited" : money(state.trip.budget)) + "</b>Budget</div>" +
+          '<div class="stat"><b>' + esc(state.trip.transportType || "") + "</b>Transport</div></div>");
+        html.push('<div class="out">');
+        state.plans.forEach(function (p, i) {
+          html.push("<div class='chatline'><b>Plan " + (i + 1) + "</b> \u2014 " + esc(p.title || "") + " \u00b7 \u20b9" + (p.totalCost || 0).toLocaleString("en-IN") +
+            " \u00b7 " + (p.days || (p.items || []).length ? ((p.items || []).length) + " activities" : "") + "</div>");
+        });
+        html.push("</div>");
+        out.innerHTML = html.join("");
+        out.appendChild(btn("Continue \u2014 chat AI to edit", function () { nextStep(); }));
+      } catch (e) {
+        out.innerHTML = '<div class="err">Generate failed: ' + esc(e.message) + "</div>";
+        out.appendChild(btn("Retry", function () { renderPlan(); }));
+      }
+    }));
+  }
+
+  /* ------------------------------------------------------------------ Step 2 \u2014 AI chat editing */
+  async function collectedItems() {
+    var its = await api.getItinerary(state.tripId);
+    return its.slice().sort(function (a, b) { return (b.version || 0) - (a.version || 0); })[0] || { items: [] };
+  }
+  function itemsDays(items) { var m = {}; items.forEach(function (i) { m[i.day] = (m[i.day] || 0) + 1; }); return m; }
+
+  function renderEdit() {
+    panel.innerHTML = "<h2>Step 3 \u2014 AI chat editing</h2><div class='sub'>Type an instruction \u2014 TripMind AI proposes an edit you approve. Presets below run the exact same flow.</div>";
+    panel.innerHTML += '<div id="editout"></div>';
+    var out = document.getElementById("editout");
+    out.innerHTML = "<p class='muted'>Try: <i>\u201cMove the Fort St. George visit to Day 2\u201d</i>, <i>\u201cAdd Marina Beach to Day 2\u201d</i>, <i>\u201cRemove the food activity on Day 1\u201d</i></p>";
+
+    var row = document.createElement("div"); row.className = "btnrow";
+    row.appendChild(btn("Move Fort St. George \u2192 Day 2", function () { runEdit("Move the Fort St. George visit to day 2."); }));
+    row.appendChild(btn("Add Marina Beach \u2192 Day 2", function () { runEdit("Add Marina Beach activity to Day 2."); }));
+    row.appendChild(btn("Remove food activity Day 1", function () { runEdit("Remove the food activity on Day 1."); }));
+    out.appendChild(row);
+
+    var chatrow = document.createElement("div"); chatrow.className = "btnrow";
+    var input = document.createElement("input"); input.type = "text"; input.placeholder = "Or type your own instruction\u2026"; input.style.maxWidth = "300px";
+    chatrow.appendChild(input);
+    chatrow.appendChild(btn("Ask & approve", function () {
+      if (input.value.trim()) runEdit(input.value.trim());
+    }));
+    out.appendChild(chatrow);
+    out.appendChild(document.createElement("div")).id = "editlog";
+
+    (async function () {
+      try {
+        var cur = await collectedItems();
+        state.beforeItems = cur.items;
+        var m = itemsDays(cur.items);
+        var html = ['<div class="out"><div class="kv">'];
+        Object.keys(m).sort(function (a, b) { return a - b; }).forEach(function (k) {
+          html.push('<span class="k">Day ' + k + "</span><span>" + m[k] + " item(s)</span>");
+        });
+        html.push("</div><pre>" + esc(JSON.stringify(cur.items.map(function (i) { return { day: i.day, t: i.startTime ? i.startTime.slice(11, 16) : null, type: i.type, title: i.title, status: i.status }; }), null, 1)) + "</pre></div>");
+        out.insertAdjacentHTML("beforeend", html.join(""));
+      } catch (e) { out.insertAdjacentHTML("beforeend", '<div class="err">' + esc(e.message) + "</div>"); }
+    })();
+
+    async function runEdit(msg) {
+      var logEl = document.getElementById("editlog");
+      logEl.innerHTML = '<span class="spinner"></span>Thinking\u2026';
+      try {
+        var res = await api.assistantChat(msg, state.tripId);
+        var html = ['<div class="chatline"><b>Assistant:</b> ' + esc(res.reply || "") + "</div>"];
+        if (res.action) {
+          html.push('<div class="ok">Proposed action: <b>' + esc(res.action.type) + "</b></div>");
+          html.push('<pre>' + esc(JSON.stringify(res.action.params || {}, null, 1)) + "</pre>");
+          logEl.innerHTML = html.join("");
+          var approve = document.createElement("div"); approve.className = "btnrow";
+          approve.appendChild(btn("Approve & apply", async function (ev) {
+            ev.target.disabled = true;
+            spin(approve, "Applying edit\u2026");
+            try {
+              var applied = await api.assistantAction(res.action.type, res.action.params);
+              logEl.innerHTML = '<div class="ok">Applied \u2014 ' + esc(applied.done || applied.message || JSON.stringify(applied)) + "</div>";
+              setTimeout(function () { nextStep(); }, 1800);
+            } catch (e) {
+              logEl.insertAdjacentHTML("beforeend", '<div class="err">' + esc(e.message) + "</div>");
+            }
+          }));
+          logEl.appendChild(approve);
+        } else {
+          html.push("</div>");
+          logEl.innerHTML = html.join("");
+        }
+      } catch (e) {
+        logEl.innerHTML = '<div class="err">' + esc(e.message) + "</div>";
+      }
+    }
+  }
+
+  /* ------------------------------------------------------------------ Step 3 \u2014 Book & pay */
+  function renderBook() {
+    panel.innerHTML = "<h2>Step 4 \u2014 Confirm & book</h2><div class='sub'>Validates live availability, books every itinerary item and pays from your wallet in one step.</div>";
+    panel.innerHTML += '<div id="bookout"></div>';
+    var out = document.getElementById("bookout");
+    out.appendChild(btn("Check wallet & top up", async function (ev) {
+      ev.target.disabled = true;
+      spin(out, "Checking wallet\u2026");
+      try {
+        var w = await apiRaw("/api/wallet");
+        var bal = w.balance || 0;
+        if (bal < 60000) {
+          await apiRaw("/api/wallet/deposit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ amount: 60000 }) });
+          w = await apiRaw("/api/wallet");
+        }
+        out.innerHTML = '<div class="ok">Wallet balance: <b>' + money(w.balance) + "</b></div>";
+        out.appendChild(btn("Confirm & Book (pay from wallet)", async function (ev2) {
+          ev2.target.disabled = true;
+          spin(out, "Booking all services & paying\u2026");
+          try {
+            var r = await api.confirmBookTrip(state.tripId, true);
+            var html = ['<div class="ok">' + esc(r.message || "") + " \u00b7 payment: " + esc(r.paymentStatus || r.walletStatus ? (r.paymentStatus || "PENDING") : "?") + "</div>"];
+            html.push('<div class="statrow">' +
+              '<div class="stat"><b>' + money(r.totalCost) + "</b>Total cost</div>" +
+              '<div class="stat"><b>' + (r.bookings || []).length + "</b>Services booked</div>" +
+              '<div class="stat"><b>' + esc(r.paymentStatus || "") + "</b>Payment</div></div>");
+            html.push('<div class="out"><div class="kv">');
+            (r.bookings || []).forEach(function (b) {
+              html.push('<span class="k">' + esc(b.provider || b.title || "") + "</span><span>" + money(b.price) + " \u00b7 " + esc(b.bookingReference || "") + " \u00b7 " + esc(b.status || "") + "</span>");
+            });
+            html.push("</div></div>");
+            out.innerHTML = html.join("");
+            out.appendChild(btn("Continue \u2014 journey QR pass", function () { nextStep(); }));
+          } catch (e) {
+            out.innerHTML = '<div class="err">' + esc(e.message) + "</div>";
+            out.appendChild(btn("Retry", function () { renderBook(); }));
+          }
+        }));
+      } catch (e) {
+        out.innerHTML = '<div class="err">' + esc(e.message) + "</div>";
+      }
+    }));
+  }
+
+  /* ------------------------------------------------------------------ Step 4 \u2014 QR */
+  function renderQR() {
+    panel.innerHTML = "<h2>Step 5 \u2014 Journey QR pass</h2><div class='sub'>One ticket for the whole journey \u2014 scanner-verifiable.</div>";
+    panel.innerHTML += '<div id="qrout"></div>';
+    var out = document.getElementById("qrout");
+    out.appendChild(btn("Issue journey pass (QR)", async function (ev) {
+      ev.target.disabled = true;
+      spin(out, "Issuing token\u2026");
+      try {
+        var t = await apiRaw("/api/trips/" + state.tripId + "/token");
+        var token = t.token || t.tripToken;
+        out.innerHTML = '<div class="ok">Journey token issued: <code>' + esc(token) + "</code></div>" +
+          '<div class="btnrow">' +
+          '<a class="btn" target="_blank" href="/pages/verify.html?token=' + encodeURIComponent(token) + '#trip">Scan / verify QR</a>' +
+          "</div>";
+        out.appendChild(btn("Download PDF ticket", async function () {
+          try { await api.downloadTripTicket(state.tripId); } catch (e) { out.insertAdjacentHTML("beforeend", '<div class="err">' + esc(e.message) + "</div>"); }
+        }, "ghost"));
+        out.appendChild(btn("Continue \u2014 weather", function () {
+          state.simIdx = 0; nextStep();
+        }));
+      } catch (e) {
+        out.innerHTML = '<div class="err">' + esc(e.message) + "</div>";
+        out.appendChild(btn("Retry", function () { renderQR(); }));
+      }
+    }));
+  }
+
+  /* ------------------------------------------------------------------ Step 5 \u2014 Weather */
+  function renderWeather() {
+    panel.innerHTML = "<h2>Step 6 \u2014 Weather</h2><div class='sub'>Live weather from WeatherAPI for your destination and travel dates.</div>";
+    panel.innerHTML += '<div id="wxout"></div>';
+    var out = document.getElementById("wxout");
+    out.appendChild(btn("Load live weather + smart packing", async function (ev) {
+      ev.target.disabled = true;
+      spin(out, "Fetching weather\u2026");
+      try {
+        var p = await api.tripPacking(state.tripId, false);
+        var w = p.weather || p.basis?.weather || p.twin?.weather || {};
+        var html = ['<div class="statrow">'];
+        if (w.available) {
+          html.push('<div class="stat"><b>' + esc(w.summary || (w.current && w.current.condition ? w.current.condition.text : "\u2014")) + "</b>Now \u2014 " + esc(w.destination || state.trip.destination) + "</div>");
+          if (w.current) {
+            html.push('<div class="stat"><b>' + (w.current.temp_c != null ? w.current.temp_c + "\u00b0C" : "\u2014") + "</b>Temperature</div>");
+            html.push('<div class="stat"><b>' + (w.current.humidity != null ? w.current.humidity + "%" : "\u2014") + "</b>Humidity</div>");
+            html.push('<div class="stat"><b>' + (w.current.wind_kph != null ? w.current.wind_kph + " km/h" : "\u2014") + "</b>Wind</div>");
+          }
+        } else {
+          html.push('<div class="stat"><b>Unavailable</b>' + esc(w.reason || "weather service offline \u2014 set WEATHER_API_KEY") + "</div>");
+        }
+        html.push("</div>");
+        if (p.items && p.items.length) {
+          html.push('<div class="out"><b>Smart packing</b> \u2014 ' + p.items.length + " items for your dates:<pre>" + esc(JSON.stringify(p.items, null, 1)) + "</pre></div>");
+        }
+        out.innerHTML = html.join("");
+        out.appendChild(btn("Continue \u2014 route map", function () { nextStep(); }));
+      } catch (e) {
+        out.innerHTML = '<div class="err">' + esc(e.message) + "</div>";
+        out.appendChild(btn("Retry", function () { renderWeather(); }));
+      }
+    }));
+  }
+
+  /* ------------------------------------------------------------------ Step 6 \u2014 Map */
+  function renderMap() {
+    panel.innerHTML = "<h2>Step 7 \u2014 Route map</h2><div class='sub'>Your Coimbatore \u2192 Chennai route on Google Maps.</div>";
+    var q = encodeURIComponent(state.trip && state.trip.origin ? state.trip.origin + " to " + state.trip.destination : "Coimbatore to Chennai");
+    panel.innerHTML += '<iframe class="mapframe" loading="lazy" src="https://www.google.com/maps?q=' + q + '&output=embed"></iframe>';
+    panel.innerHTML += '<div class="out muted">Tip: the planner page (/pages/planner.html) embeds a full interactive map with a draggable starting-point picker.</div>';
+    panel.appendChild(btn("Continue \u2014 travel simulation", function () { state.simIdx = 0; nextStep(); }));
+  }
+
+  /* ------------------------------------------------------------------ Step 7 \u2014 Travel simulation */
+  function renderSim() {
+    panel.innerHTML = "<h2>Step 8 \u2014 Travel simulation</h2><div class='sub'>Run the journey event by event \u2014 the itinerary ticks onward as you travel.</div>";
+    panel.innerHTML += '<div id="simout"></div>';
+    var out = document.getElementById("simout");
+    (async function () {
+      try {
+        var cur = await collectedItems();
+        var items = cur.items;
+        var box = document.createElement("div"); box.id = "simlist"; out.appendChild(box);
+        var controls = document.createElement("div"); controls.className = "btnrow"; out.appendChild(controls);
+        controls.appendChild(btn("Depart from home", function () { state.simIdx = 1; paintSim(items); }));
+        controls.appendChild(btn("Advance to next event", function () { if (state.simIdx < items.length) { state.simIdx++; paintSim(items); } }));
+        controls.appendChild(btn("Arrive \u2014 show disruption", function () {
+          var m = {};
+          items.forEach(function (i) { m["Day " + i.day + " \u00b7 " + i.title] = (i.startTime || "").slice(11, 16) || "\u2013"; });
+          state.simSnapshot = JSON.stringify(m, null, 1);
+          state.simIdx = items.length;
+          paintSim(items, true);
+        }));
+        function paintSim(items, finish) {
+          var list = document.getElementById("simlist");
+          var html = "";
+          items.forEach(function (i, idx) {
+            var done = idx < state.simIdx, now = idx === state.simIdx && state.simIdx > 0;
+            html += '<div class="item" style="opacity:' + (done ? .5 : 1) + '">' +
+              '<span class="tm">' + time(i.startTime) + "</span>" +
+              "<span>" + esc(i.title) + ' <span class="tag">' + esc(i.type || "") + "</span></span>" +
+              '<span class="st ' + (done ? "BOOKED" : now ? "DELAYED" : (i.status || "PLANNED")) + '">' + (done ? "DONE" : now ? "NOW" : esc(i.status || "PLANNED")) + "</span></div>";
+          });
+          list.innerHTML = html;
+          if (state.simIdx >= items.length) {
+            var cont = document.querySelectorAll("#simout .btnrow")[1];
+            if (cont) cont.innerHTML = "";
+          }
+        }
+        paintSim(items);
+        out.insertAdjacentHTML("beforeend", '<div class="out"><button class="btn ghost small" onclick="document.getElementById(' + "'simgo'" + ').scrollIntoView()">Jump to disruption step \u2192</button><span class="muted">  or click the rail.</span></div>');
+        out.appendChild(btn("Continue \u2014 simulate disruption", function () { nextStep(); }));
+      } catch (e) { out.innerHTML = '<div class="err">' + esc(e.message) + "</div>"; }
+    })();
+  }
+
+  /* ------------------------------------------------------------------ Step 8 \u2014 Disruption */
+  function renderDisrupt() {
+    panel.innerHTML = "<h2>Step 9 \u2014 Disruption</h2><div class='sub'>Trains run late. Simulate a 3-hour delay and watch TripMind AI flag every affected activity automatically.</div>";
+    panel.innerHTML += '<div id="disout"></div>';
+    var out = document.getElementById("disout");
+    out.appendChild(btn("Simulate 3-hour TRAIN delay", async function (ev) {
+      ev.target.disabled = true;
+      spin(out, "Applying delay & analysing impact\u2026");
+      try {
+        var r = await api.simulateDelay(state.tripId, 180);
+        var html = ['<div class="statrow">' +
+          '<div class="stat"><b>' + esc(r.severity || "") + "</b>Severity</div>" +
+          '<div class="stat"><b>' + (r.affectedItems || []).length + "</b>Items affected</div></div>"];
+        html.push('<div class="out"><b>Affected items:</b>');
+        (r.affectedItems || []).forEach(function (a) {
+          html.push("<div>" + esc(a.title) + ' <span class="tag">' + esc(a.status || "") + "</span></div>");
+        });
+        html.push('<div class="err" style="margin-top:.6rem">The plan is now out of date \u2014 TripMind AI offers an automatic replan.</div></div>');
+        out.innerHTML = html.join("");
+        out.appendChild(btn("Continue \u2014 automatic replanning", function () { nextStep(); }));
+      } catch (e) {
+        out.innerHTML = '<div class="err">' + esc(e.message) + "</div>";
+        out.appendChild(btn("Retry", function () { renderDisrupt(); }));
+      }
+    }));
+  }
+
+  /* ------------------------------------------------------------------ Step 9 \u2014 Replan */
+  function renderReplan() {
+    panel.innerHTML = "<h2>Step 10 \u2014 Automatic replanning</h2><div class='sub'>Before \u2192 after: TripMind AI reschedules your whole journey around the delay.</div>";
+    panel.innerHTML += '<div id="repout"></div>';
+    var out = document.getElementById("repout");
+    out.appendChild(btn("Replan automatically", async function (ev) {
+      ev.target.disabled = true;
+      spin(out, "Replanning around the 3-hour delay\u2026");
+      try {
+        var cur = await collectedItems();
+        var before = cur.items;
+        var r = await api.replan(state.tripId, 180);
+        var afterCur = await collectedItems();
+        var after = afterCur.items;
+
+        var bm = {};
+        var am = {};
+        before.forEach(function (i) {
+          bm[i._id || (i.day + "|" + i.title + "|" + i.type)] = { day: i.day, t: (i.startTime || "").slice(11, 16), status: i.status, title: i.title };
+        });
+        after.forEach(function (i) {
+          am[i._id || (i.day + "|" + i.title + "|" + i.type)] = { day: i.day, t: (i.startTime || "").slice(11, 16), status: i.status, title: i.title };
+        });
+
+        var html = ['<div class="statrow">' +
+          '<div class="stat"><b>' + money(r.additionalCost || 0) + "</b>Additional cost</div>" +
+          '<div class="stat"><b>' + (r.affectedItems || []).length + "</b>Re-planned items</div></div>"];
+
+        html.push('<div class="out"><div class="diff"><div><b>BEFORE (Day/Time \u00b7 Status)</b>');
+        Object.keys(bm).forEach(function (k) {
+          var i = bm[k];
+          html.push("<div style='margin:.15rem 0'>Day " + i.day + " " + (i.t || "\u2013") + " <span class='tag'>" + esc(i.status || "") + "</span> " + esc(i.title) + "</div>");
+        });
+        html.push("</div><div class='arrow'>\u2192</div><div><b>AFTER (replanned)</b>");
+        Object.keys(am).forEach(function (k) {
+          var i = am[k];
+          html.push("<div style='margin:.15rem 0'>Day " + i.day + " " + (i.t || "\u2013") + " <span class='tag'>" + esc(i.status || "") + "</span> " + esc(i.title) + "</div>");
+        });
+        html.push("</div></div>");
+        html.push('<div class="ok" style="margin-top:.7rem">Journey replanned around the delay \u2014 you can keep travelling.</div></div>');
+        out.innerHTML = html.join("");
+
+        out.appendChild(btn("Show relaunched events", async function () {
+          try {
+            var evs = await api.getEvents(state.tripId);
+            out.insertAdjacentHTML("beforeend", '<div class="out"><b>Journey events:</b>' + evs.slice(0, 6).map(function (e) {
+              return "<div>" + esc(e.title || "") + " <span class='tag'>" + esc(e.severity || e.type || "") + "</span> " + esc((e.occurredAt || "").slice(0, 16).replace("T", " ")) + "</div>";
+            }).join("") + "</div>");
+          } catch (e) {}
+        }, "ghost"));
+        out.appendChild(btn("Restart demo (fresh trip)", function () { location.href = window.location.pathname + "?reset=1"; }, "ghost"));
+      } catch (e) {
+        out.innerHTML = '<div class="err">Replan failed: ' + esc(e.message) + "</div>";
+        out.appendChild(btn("Retry", function () { renderReplan(); }));
+      }
+    }));
+  }
+
+  /* ------------------------------------------------------------------ Router */
+  function renderPanel(i, extra) {
+    switch (i) {
+      case 0: renderLogin(); break;
+      case 1: renderPlan(); break;
+      case 2: renderEdit(); break;
+      case 3: renderBook(); break;
+      case 4: renderQR(); break;
+      case 5: renderWeather(); break;
+      case 6: renderMap(); break;
+      case 7: renderSim(); break;
+      case 8: renderDisrupt(); break;
+      case 9: renderReplan(); break;
+    }
+  }
+
+  async function boot() {
+    state.user = await loadUser();
+    renderUserbar();
+    renderRail();
+    if (!state.user) { setStep(0); return; }
+    setStep(1);
+  }
+  boot();
+})();
+</script>
+</body>
+</html>

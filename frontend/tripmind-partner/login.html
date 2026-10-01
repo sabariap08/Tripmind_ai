@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Partner sign in &#8212; TripMind Partner Hub</title>
+    <meta name="description" content="Sign in to the TripMind Partner Hub to manage your services, boarding points and bookings.">
+    <meta name="theme-color" content="#06202b">
+    <meta name="robots" content="noindex, follow">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+    <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="../css/theme.css">
+    <link rel="stylesheet" href="css/partner.css">
+</head>
+<body>
+    <a class="ph-skip" href="#phSignIn">Skip to sign in</a>
+
+    <div class="ph-auth">
+        <aside class="ph-auth__art">
+            <img class="bg" src="/img/hero-journey.jpg" alt="" aria-hidden="true" loading="lazy">
+            <a class="ph-wordmark" href="/tripmind-partner">
+                <span class="ph-wordmark__mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="#06202b"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                <span class="ph-wordmark__text">
+                    <span class="ph-wordmark__name">TripMind AI</span>
+                    <span class="ph-wordmark__hub">Partner Hub</span>
+                </span>
+            </a>
+            <div class="ph-auth__body">
+                <p class="tm-eyebrow tm-eyebrow--on-dark">Partner sign in</p>
+                <h2>Back to your services, boarding points and bookings.</h2>
+                <ul class="ph-auth__points">
+                    <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2Z"/></svg>Your own dashboard &#8212; no traveller tools mixed in.</li>
+                    <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2Z"/></svg>Live bookings, seats sold and revenue.</li>
+                    <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2Z"/></svg>Map-based boarding points that feed traveller fares.</li>
+                </ul>
+            </div>
+            <p class="tm-2xs" style="color:var(--tm-on-dark-2);margin:0">Travelling with TripMind instead? <a href="/" style="color:var(--tm-gold-soft)">Go to the traveller site</a>.</p>
+        </aside>
+
+        <main class="ph-auth__main" id="phSignIn">
+            <div class="ph-auth__box">
+                <a class="ph-backlink" href="/tripmind-partner">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12 15.4 5.4Z"/></svg>
+                    TripMind Partner Hub
+                </a>
+                <h1 class="tm-h2" style="margin-top:1.5rem">Sign in</h1>
+                <p class="tm-sm tm-muted" style="margin:.5rem 0 1.75rem">Use the email and password on your partner account.</p>
+
+                <form id="phLoginForm" novalidate>
+                    <div class="tm-field">
+                        <label class="tm-label" for="phEmail">Email</label>
+                        <input class="tm-input" type="email" id="phEmail" name="email" autocomplete="email"
+                               placeholder="you@operator.com" data-validate="required,email">
+                        <span class="tm-error" aria-live="polite"></span>
+                    </div>
+                    <div class="tm-field">
+                        <label class="tm-label" for="phPassword">Password</label>
+                        <input class="tm-input" type="password" id="phPassword" name="password"
+                               autocomplete="current-password" placeholder="Your password" data-validate="required">
+                        <span class="tm-error" aria-live="polite"></span>
+                    </div>
+                    <div class="tm-field tm-field--row" style="justify-content:space-between;align-items:center">
+                        <label class="tm-switch" for="phRemember" style="margin:0">
+                            <input type="checkbox" id="phRemember" name="remember" style="position:absolute;opacity:0">
+                            <span class="tm-switch__track" aria-hidden="true"></span>
+                            <span class="tm-switch__text">Keep me signed in</span>
+                        </label>
+                    </div>
+                    <button class="tm-btn tm-btn--primary tm-btn--block" type="submit" id="phLoginBtn">Sign in</button>
+                    <p class="tm-formnote" id="phLoginNote" data-show="false" role="status"></p>
+                </form>
+
+                <div class="ph-auth__alt">
+                    New to TripMind as a partner?
+                    <a href="/tripmind-partner/register">Start your partner account</a>.
+                </div>
+                <p class="tm-2xs tm-muted" style="margin-top:1.25rem">
+                    Hotel, restaurant, tour, guide or rail partner? Sign in to the
+                    <a href="/portal.html" style="color:var(--tm-ink-soft)">provider console</a>.
+                </p>
+            </div>
+        </main>
+    </div>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/ui.js"></script>
+    <script src="js/partner.js"></script>
+    <script>
+        (function () {
+            var form = document.getElementById('phLoginForm');
+            var btn = document.getElementById('phLoginBtn');
+            var note = document.getElementById('phLoginNote');
+
+            function say(message, kind) {
+                note.textContent = message;
+                note.dataset.show = 'true';
+                note.className = 'tm-formnote' + (kind === 'error' ? ' tm-formnote--error' : kind === 'warn' ? ' tm-formnote--warn' : '');
+            }
+
+            TM.forms(form, {
+                onSubmit: async function () {
+                    TM.button(btn, true);
+                    note.dataset.show = 'false';
+                    try {
+                        var res = await api.login({
+                            email: document.getElementById('phEmail').value.trim(),
+                            password: document.getElementById('phPassword').value,
+                            remember: document.getElementById('phRemember').checked
+                        });
+                        var user = res.user || {};
+                        var next = TM_PARTNER.safeNext();
+                        var partnerRoles = TM_PARTNER.PARTNER_ROLES || ['TRANSPORT_ADMIN'];
+                        if (user.role === 'ADMIN' || user.role === 'RAILWAY_ADMIN') {
+                            say(user.role === 'ADMIN'
+                                ? 'Administrator accounts use the TripMind provider console.'
+                                : 'Railway accounts use the TripMind provider console.', 'warn');
+                            TM.button(btn, false);
+                            setTimeout(function () { location.href = '/portal.html'; }, 1400);
+                            return;
+                        }
+                        if (partnerRoles.indexOf(user.role) > -1) {
+                            location.href = next || '/tripmind-partner/dashboard';
+                            return;
+                        }
+                        if (user.role === 'USER') {
+                            say('That is a traveller account. The Partner Hub is for transport, hotel, restaurant, spot and guide partners.', 'warn');
+                            TM.button(btn, false);
+                            return;
+                        }
+                        say('This account is a provider for another TripMind category \u2014 open the provider console instead.', 'warn');
+                        TM.button(btn, false);
+                    } catch (e) {
+                        say(e.message, 'error');
+                        TM.button(btn, false);
+                    }
+                }
+            });
+        })();
+    </script>
+    <script src="/js/pwa.js" defer></script>
+</body>
+</html>

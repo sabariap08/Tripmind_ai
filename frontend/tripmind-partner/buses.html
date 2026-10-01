@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>My services &#8212; TripMind Partner Hub</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#06202b">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="../css/theme.css">
+    <link rel="stylesheet" href="css/partner.css">
+</head>
+<body>
+    <a class="ph-skip" href="#phMain">Skip to content</a>
+
+    <header class="ph-topbar">
+        <div class="ph-topbar__inner">
+            <button class="ph-burger" type="button" data-ph-burger aria-expanded="false" aria-controls="phDrawer" aria-label="Open menu"><span></span></button>
+            <a class="ph-wordmark" href="/tripmind-partner/dashboard">
+                <span class="ph-wordmark__mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="#06202b"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                <span class="ph-wordmark__text">
+                    <span class="ph-wordmark__name" data-ph-role-note>TripMind AI</span>
+                    <span class="ph-wordmark__hub">Partner Hub</span>
+                </span>
+            </a>
+            <div class="ph-topbar__spacer"></div>
+            <span class="ph-user">
+                <span class="ph-user__avatar" data-ph-user-avatar aria-hidden="true">P</span>
+                <span class="ph-user__name" data-ph-user-name>Partner</span>
+            </span>
+            <button class="tm-btn tm-btn--on-dark-ghost tm-btn--sm" type="button" data-ph-signout>Sign out</button>
+        </div>
+    </header>
+
+    <div class="ph-drawer" data-ph-drawer id="phDrawer" hidden>
+        <div class="ph-drawer__scrim" data-ph-drawer-scrim></div>
+        <div class="ph-drawer__panel" role="dialog" aria-modal="true" aria-label="Partner Hub menu">
+            <div class="ph-drawer__head">
+                <span class="ph-wordmark" style="color:var(--tm-ink)">
+                    <span class="ph-wordmark__mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="#06202b"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                    <span class="ph-wordmark__text">
+                        <span class="ph-wordmark__name">TripMind AI</span>
+                        <span class="ph-wordmark__hub" style="color:var(--tm-clay)">Partner Hub</span>
+                    </span>
+                </span>
+                <button class="ph-drawer__close" type="button" data-ph-drawer-close aria-label="Close menu">&times;</button>
+            </div>
+            <p class="ph-drawer__group">Operating</p>
+            <ul class="ph-drawer__links" data-ph-nav></ul>
+            <div class="ph-drawer__foot">
+                <span class="tm-2xs tm-muted">Signed in as <b data-ph-partner-type>travel partner</b></span>
+                <a href="/portal.html">Open the provider console</a>
+                <a href="/">Traveller site</a>
+                <button class="tm-btn tm-btn--ghost tm-btn--sm" type="button" data-ph-signout style="margin-top:.5rem">Sign out</button>
+            </div>
+        </div>
+    </div>
+
+    <main class="ph-main" id="phMain">
+        <div class="ph-head">
+            <div>
+                <p class="tm-eyebrow">Fleet</p>
+                <h1>My services</h1>
+                <p>Every bus and vehicle you have listed with TripMind, with its live status.</p>
+            </div>
+            <div class="ph-head__actions">
+                <a class="tm-btn tm-btn--ghost" href="/tripmind-partner/boarding-points">Boarding points</a>
+                <a class="tm-btn tm-btn--primary" href="#add">Add a service</a>
+            </div>
+        </div>
+
+        <section class="ph-panel" id="add">
+            <div class="ph-panel__head">
+                <div>
+                    <h2 id="phFormTitle">Add a bus</h2>
+                    <p id="phFormSub">Set the route, schedule, seats and fare. The TripMind team reviews it before
+                        travellers can book it.</p>
+                </div>
+            </div>
+            <div class="ph-panel__body">
+                <div class="ph-choice" style="margin-bottom:1.5rem" role="radiogroup" aria-label="Service type">
+                    <label class="ph-choice__opt">
+                        <input type="radio" name="svcType" value="BUS" checked>
+                        <span>Bus<small>Fixed route, scheduled seats</small></span>
+                    </label>
+                    <label class="ph-choice__opt">
+                        <input type="radio" name="svcType" value="CAB">
+                        <span>Cab<small>Point-to-point, per-km fare</small></span>
+                    </label>
+                    <label class="ph-choice__opt">
+                        <input type="radio" name="svcType" value="AUTO">
+                        <span>Auto<small>Short distance, per-km fare</small></span>
+                    </label>
+                </div>
+
+                <form id="phSvcForm" novalidate class="ph-form">
+                    <p class="ph-form__legend">Service</p>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="svcNumber"><span data-ph-number-label>Bus number</span> <span class="req">*</span></label>
+                            <input class="tm-input" type="text" id="svcNumber" name="number" placeholder="e.g. TN 22 AB 1234" maxlength="24" required>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                        <div class="tm-field" style="margin:0" data-ph-only-bus>
+                            <label class="tm-label" for="svcSeater">Seater seats</label>
+                            <input class="tm-input" type="number" id="svcSeater" name="seaterSeats" min="0" step="1" value="0" inputmode="numeric">
+                            <span class="tm-hint" data-ph-total-hint>Sleeper + seater must equal the total.</span>
+                        </div>
+                        <div class="tm-field" style="margin:0" data-ph-only-bus>
+                            <label class="tm-label" for="svcSleeper">Sleeper seats</label>
+                            <input class="tm-input" type="number" id="svcSleeper" name="sleeperSeats" min="0" step="1" value="0" inputmode="numeric">
+                        </div>
+                    </div>
+                    <div class="ph-form__row" data-ph-only-bus>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="svcTotal">Total seats <span class="req">*</span></label>
+                            <input class="tm-input" type="number" id="svcTotal" name="totalSeats" min="1" step="1" value="1" inputmode="numeric" required>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="svcFare">Fare (&#8377;) <span class="req">*</span></label>
+                            <input class="tm-input" type="number" id="svcFare" name="fare" min="1" step="1" placeholder="450" inputmode="numeric" required>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                    </div>
+
+                    <div class="ph-form__row" data-ph-only-cab hidden>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="svcCapacity">Seating capacity</label>
+                            <input class="tm-input" type="number" id="svcCapacity" name="seatingCapacity" min="1" step="1" value="4" inputmode="numeric">
+                        </div>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="svcPerKm">Fare per km (&#8377;) <span class="req">*</span></label>
+                            <input class="tm-input" type="number" id="svcPerKm" name="pricePerKm" min="1" step="0.5" placeholder="18" inputmode="decimal" required>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="svcBaseFare">Base fare (&#8377;)</label>
+                            <input class="tm-input" type="number" id="svcBaseFare" name="baseFare" min="0" step="1" value="50" inputmode="numeric">
+                        </div>
+                    </div>
+
+                    <p class="ph-form__legend">Route</p>
+                    <div class="ph-form__row">
+                        <div class="tm-field" style="margin:0" data-ph-only-bus>
+                            <label class="tm-label" for="svcFrom">Boarding point <span class="req">*</span></label>
+                            <input class="tm-input" type="text" id="svcFrom" name="boardingPoint" placeholder="Search a stop or depot" maxlength="120" required>
+                            <input type="hidden" id="svcFromLat" name="boardingLat">
+                            <input type="hidden" id="svcFromLng" name="boardingLng">
+                            <div class="ph-map" id="svcFromMap" data-ready="false" aria-label="Boarding point map"></div>
+                            <div class="ph-coords" id="svcFromCoords"></div>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                        <div class="tm-field" style="margin:0" data-ph-only-bus>
+                            <label class="tm-label" for="svcTo">Dropping point <span class="req">*</span></label>
+                            <input class="tm-input" type="text" id="svcTo" name="droppingPoint" placeholder="City, town or stop" maxlength="120" required>
+                            <input type="hidden" id="svcToLat" name="droppingLat">
+                            <input type="hidden" id="svcToLng" name="droppingLng">
+                            <span class="tm-hint">The boarding point is what travellers see on the map &#8212; pick it carefully.</span>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                    </div>
+                    <div class="ph-form__row" data-ph-only-cab hidden>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="svcArea">Service area <span class="req">*</span></label>
+                            <input class="tm-input" type="text" id="svcArea" name="serviceArea" placeholder="e.g. Coimbatore city" maxlength="120" required>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="svcBase">Base location</label>
+                            <input class="tm-input" type="text" id="svcBase" name="baseLocation" placeholder="Where the vehicle starts" maxlength="120">
+                        </div>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="svcAc">Air conditioned</label>
+                            <select class="tm-select" id="svcAc" name="ac">
+                                <option value="0">No</option>
+                                <option value="1">Yes</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <p class="ph-form__legend" data-ph-only-bus>Schedule</p>
+                    <div class="ph-form__row" data-ph-only-bus>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="svcDay">Boarding day <span class="req">*</span></label>
+                            <input class="tm-input" type="number" id="svcDay" name="boardingDay" min="0" max="29" step="1" value="0" inputmode="numeric" required>
+                            <span class="tm-hint">0 is the first day of the journey.</span>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="svcTime">Boarding time <span class="req">*</span></label>
+                            <input class="tm-input" type="time" id="svcTime" name="boardingTime" value="06:00" required>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="svcDropDay">Dropping day</label>
+                            <input class="tm-input" type="number" id="svcDropDay" name="droppingDay" min="0" max="29" step="1" value="0" inputmode="numeric">
+                        </div>
+                        <div class="tm-field" style="margin:0">
+                            <label class="tm-label" for="svcDropTime">Dropping time</label>
+                            <input class="tm-input" type="time" id="svcDropTime" name="droppingTime" value="09:00">
+                        </div>
+                    </div>
+
+                    <div class="ph-actions">
+                        <button class="tm-btn tm-btn--primary" type="submit" id="svcSubmit">Submit for review</button>
+                        <button class="tm-btn tm-btn--ghost" type="reset" id="svcReset">Clear form</button>
+                        <p class="ph-actions__note">New services are reviewed by TripMind before they reach travellers.</p>
+                    </div>
+                    <p class="tm-formnote" id="svcNote" data-show="false" role="status"></p>
+                </form>
+            </div>
+        </section>
+
+        <section class="ph-panel">
+            <div class="ph-panel__head">
+                <div>
+                    <h2>Listed services</h2>
+                    <p>Live means travellers can see and book it in the planner.</p>
+                </div>
+            </div>
+            <div class="ph-panel__body ph-panel__body--flush" id="phList"></div>
+        </section>
+    </main>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/ui.js"></script>
+    <script src="js/partner.js"></script>
+    <!-- maps.js lives at the app root, not in tripmind-partner/js/. A relative
+         "js/maps.js" from this directory 404s, which is why the drop-point map
+         on the bus form never initialised. -->
+    <script src="../js/maps.js"></script>
+    <script src="js/services.js"></script>
+    <script src="/js/pwa.js" defer></script>
+</body>
+</html>

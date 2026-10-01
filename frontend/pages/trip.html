@@ -1,0 +1,1679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Journey &#8212; TripMind AI</title>
+    <meta name="description" content="Your TripMind itinerary: day-by-day journey, real fares and costs, smart packing, Digital Trip Twin and an assistant that can change the plan.">
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        /* Journey layout (system lives in css/theme.css) */
+        /* The rail has to stack *below* the site nav, not on top of it.
+           It used to be `top: 0; z-index: 30`, which parked it underneath the
+           nav (z-index 900) the moment you scrolled: the links slid out of
+           sight behind the header, and because sticky resolved against the
+           viewport the rail also overlapped the nav's own row. The shared
+           system rail (.tm-rail in theme.css) already gets this right -
+           `top: var(--tm-nav-h); z-index: 700` - so this matches it. */
+        .jr-rail { position: sticky; top: var(--tm-nav-h); z-index: 700; background: rgba(247, 244, 238, .93); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--tm-line); }
+        .jr-rail__inner { display: flex; gap: .25rem; overflow-x: auto; scrollbar-width: none; padding-block: .5rem; }
+        .jr-rail__inner::-webkit-scrollbar { display: none; }
+        .jr-rail__link { flex: 0 0 auto; padding: .45rem .8rem; border-radius: var(--tm-pill); font-size: var(--tm-f-xs); font-weight: 600; color: var(--tm-ink-soft); text-decoration: none; white-space: nowrap; }
+        .jr-rail__link:hover { background: var(--tm-white); color: var(--tm-ink); }
+        .jr-rail__link[aria-current="true"] { background: var(--tm-ink); color: var(--tm-white); }
+        .jr-wrap { max-width: 60rem; margin-inline: auto; }
+        /* The rail is sticky, so a naive scrollIntoView parks the section heading
+           underneath it. Reserve the rail's height for every jump.
+
+           This must add ONLY the rail height, not the nav height: theme.css
+           already sets `html { scroll-padding-top: calc(var(--tm-nav-h) + 16px) }`,
+           and scroll-padding on the scroll container and scroll-margin on the
+           target are cumulative. Including --tm-nav-h here as well was
+           double-counting it and left every section landing ~68px lower than
+           intended, with a band of blank page above the heading. */
+        .jr-sec, [id^="sec"] { scroll-margin-top: calc(var(--jr-rail-h, 3.25rem) + 1rem); }
+        .jr-sec { padding-block: clamp(2.25rem, 5vw, 3.5rem); border-top: 1px solid var(--tm-line); }
+        .jr-sec:first-of-type { border-top: 0; }
+        .jr-sec__head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--tm-s4); flex-wrap: wrap; margin-bottom: var(--tm-s5); }
+        .jr-kv { display: grid; grid-template-columns: minmax(8rem, 12rem) 1fr; gap: .35rem 1rem; padding: .6rem 0; border-bottom: 1px solid var(--tm-line-2); align-items: baseline; }
+        @media (max-width: 560px) { .jr-kv { grid-template-columns: 1fr; } }
+        .jr-kv__k { font-size: var(--tm-f-2xs); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--tm-muted); }
+        .jr-kv__v { font-size: var(--tm-f-sm); color: var(--tm-ink); overflow-wrap: anywhere; }
+        .jr-kv__v.is-unavailable { color: var(--tm-muted); font-style: italic; }
+        /* Included / breakdown cards */
+        .jr-bd-grid { display: grid; gap: var(--tm-s4); grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+        .jr-bd { border: 1px solid var(--tm-line); border-radius: var(--tm-r-2); background: var(--tm-white); padding: var(--tm-s4); display: flex; flex-direction: column; gap: .35rem; }
+        .jr-bd__head { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; }
+        .jr-bd__title { font-size: var(--tm-f-sm); font-weight: 650; color: var(--tm-ink); margin: 0; }
+        .jr-bd__cost { font-family: var(--tm-font); font-size: var(--tm-f-sm); font-weight: 700; color: var(--tm-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .jr-bd__blurb { font-size: var(--tm-f-2xs); color: var(--tm-muted); margin: 0 0 .35rem; }
+        .jr-bd__list { list-style: none; margin: 0; padding: 0; }
+        .jr-bd__row { display: grid; grid-template-columns: 1.25rem 1fr auto; gap: .1rem .5rem; align-items: baseline; padding: .38rem 0; border-top: 1px solid var(--tm-line-2); font-size: var(--tm-f-xs); }
+        .jr-bd__row:first-child { border-top: 0; }
+        .jr-bd__icon { color: var(--tm-ink-soft); }
+        .jr-bd__name { color: var(--tm-ink); overflow-wrap: anywhere; }
+        .jr-bd__row-cost { color: var(--tm-ink-soft); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+        .jr-bd__row .jr-flag { grid-column: 2 / -1; }
+        .jr-bd__foot { font-size: var(--tm-f-2xs); color: var(--tm-muted); margin: .4rem 0 0; }
+        /* Providers */
+        .jr-prov { display: grid; gap: var(--tm-s3); grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
+        .jr-prov__card { border: 1px solid var(--tm-line); border-radius: var(--tm-r-2); background: var(--tm-white); padding: var(--tm-s3) var(--tm-s4); }
+        .jr-prov__name { font-size: var(--tm-f-body); font-weight: 680; color: var(--tm-ink); }
+        .jr-prov__kinds { font-size: var(--tm-f-2xs); text-transform: uppercase; letter-spacing: .08em; color: var(--tm-muted); margin-top: .15rem; }
+        .jr-prov__meta { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-top: .45rem; font-size: var(--tm-f-xs); color: var(--tm-ink-soft); }
+        .jr-prov__rating { font-weight: 700; color: var(--tm-gold-soft); }
+        .jr-prov__rating.is-muted { font-weight: 500; color: var(--tm-muted); }
+        /* Replan panel */
+        .jr-replan { display: grid; gap: var(--tm-s4); grid-template-columns: minmax(0, 18rem) minmax(0, 1fr); align-items: start; }
+        @media (max-width: 780px) { .jr-replan { grid-template-columns: 1fr; } }
+        .jr-replan__controls { display: grid; gap: .55rem; }
+        .jr-replan__label { font-size: var(--tm-f-2xs); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--tm-muted); }
+        .jr-replan__select { width: 100%; padding: .5rem .6rem; border: 1px solid var(--tm-line); border-radius: var(--tm-r-1); background: var(--tm-white); color: var(--tm-ink); font: inherit; font-size: var(--tm-f-sm); }
+        .jr-replan__presets { display: flex; flex-wrap: wrap; gap: .35rem; }
+        .jr-replan__preset { padding: .35rem .6rem; border: 1px solid var(--tm-line); border-radius: var(--tm-pill); background: var(--tm-white); color: var(--tm-ink-soft); font: inherit; font-size: var(--tm-f-xs); font-weight: 600; cursor: pointer; }
+        .jr-replan__preset[aria-pressed="true"] { background: var(--tm-ink); border-color: var(--tm-ink); color: var(--tm-white); }
+        .jr-replan__preset:focus-visible, .jr-replan__select:focus-visible { outline: 2px solid var(--tm-gold); outline-offset: 2px; }
+        .jr-replan__result { border: 1px solid var(--tm-line); border-radius: var(--tm-r-2); background: var(--tm-white); padding: var(--tm-s4); }
+        .jr-replan__result.is-error { border-color: var(--tm-clay); }
+        .jr-replan__summary { font-size: var(--tm-f-sm); color: var(--tm-ink); margin: 0 0 .75rem; }
+        .jr-replan__cost { display: grid; gap: .3rem; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); padding: .6rem 0; border-block: 1px solid var(--tm-line-2); margin-bottom: .75rem; }
+        .jr-replan__cost-k { font-size: var(--tm-f-2xs); text-transform: uppercase; letter-spacing: .08em; color: var(--tm-muted); }
+        .jr-replan__cost-v { font-family: var(--tm-font); font-size: var(--tm-f-body); font-weight: 700; color: var(--tm-ink); font-variant-numeric: tabular-nums; }
+        .jr-replan__cost-v.is-up { color: var(--tm-clay); }
+        .jr-replan__changes { list-style: none; margin: 0 0 .75rem; padding: 0; max-height: 18rem; overflow-y: auto; }
+        .jr-replan__change { display: grid; grid-template-columns: auto 1fr; gap: .15rem .6rem; padding: .45rem 0; border-top: 1px solid var(--tm-line-2); font-size: var(--tm-f-xs); }
+        .jr-replan__change:first-child { border-top: 0; }
+        .jr-replan__change-kind { font-size: var(--tm-f-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding-top: .1rem; }
+        .jr-replan__change--moved .jr-replan__change-kind { color: var(--tm-gold-soft); }
+        .jr-replan__change--dropped .jr-replan__change-kind { color: var(--tm-clay); }
+        .jr-replan__change-title { color: var(--tm-ink); font-weight: 600; }
+        .jr-replan__change-why { color: var(--tm-muted); }
+        .jr-replan__warn { font-size: var(--tm-f-xs); color: var(--tm-ink-soft); margin: 0 0 .35rem; padding-left: 1.1rem; }
+        .jr-replan__warn li { margin-bottom: .2rem; }
+        .jr-replan__actions { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+        /* Day + item timeline on a single continuous rail */
+        .jr-day { list-style: none; margin: 0 0 var(--tm-s6); padding: 0; }
+        .jr-day__head { display: flex; align-items: baseline; gap: .6rem; margin: var(--tm-s5) 0 var(--tm-s3); }
+        .jr-day:first-child .jr-day__head { margin-top: 0; }
+        .jr-day__n { font-family: var(--tm-font); font-size: 1.15rem; font-weight: 650; letter-spacing: -.01em; color: var(--tm-ink); }
+        .jr-day__d { font-size: var(--tm-f-xs); color: var(--tm-muted); }
+        .jr-items { list-style: none; margin: 0; padding: 0 0 0 clamp(1.5rem, 4vw, 2.5rem); position: relative; }
+        .jr-items::before { content: ""; position: absolute; left: 9px; top: .4rem; bottom: .4rem; width: 1px; background: var(--tm-line); }
+        .jr-item { position: relative; display: grid; grid-template-columns: 4.25rem 1fr auto; gap: .35rem .9rem; padding: .8rem 0; border-bottom: 1px solid var(--tm-line-2); align-items: start; }
+        @media (max-width: 700px) { .jr-item { grid-template-columns: 1fr auto; } .jr-item__time { grid-column: 1 / -1; } }
+        .jr-item__time { font-size: var(--tm-f-xs); font-weight: 700; color: var(--tm-ink); font-variant-numeric: tabular-nums; padding-top: .1rem; }
+        .jr-item__dot { position: absolute; left: calc(-1 * clamp(1.5rem, 4vw, 2.5rem) + 4px); top: 1.05rem; width: 11px; height: 11px; border-radius: 50%; background: var(--tm-white); border: 2px solid var(--tm-ink-soft); }
+        .jr-item--booked .jr-item__dot { background: var(--tm-jade); border-color: var(--tm-jade); }
+        .jr-item--delayed .jr-item__dot { background: var(--tm-clay); border-color: var(--tm-clay); }
+        .jr-item__type { display: inline-flex; align-items: center; gap: .35rem; font-size: var(--tm-f-2xs); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--tm-muted); }
+        .jr-item__type svg { width: 14px; height: 14px; }
+        .jr-item__t { font-size: 1rem; font-weight: 620; color: var(--tm-ink); margin-top: .1rem; }
+        .jr-item__m { font-size: var(--tm-f-xs); color: var(--tm-muted); margin-top: .15rem; }
+        .jr-item__thumb { float: right; margin: .1rem 0 .3rem .7rem; width: 76px; height: 56px; border-radius: 8px; overflow: hidden; border: 1px solid var(--tm-line); display: block; }
+        .jr-item__thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .jr-item__side { text-align: right; display: grid; gap: .35rem; justify-items: end; }
+        .jr-item__cost { font-weight: 680; color: var(--tm-ink); white-space: nowrap; }
+        .jr-item__cost.is-error { font-size: var(--tm-f-xs); font-weight: 600; color: var(--tm-clay); max-width: 15rem; white-space: normal; }
+        /* money ledger */
+        .jr-money { display: grid; gap: .1rem; }
+        .jr-money__row { display: grid; grid-template-columns: 8.5rem 1fr auto; gap: .75rem; align-items: center; padding: .7rem 0; border-bottom: 1px solid var(--tm-line-2); }
+        @media (max-width: 560px) { .jr-money__row { grid-template-columns: 1fr auto; } .jr-money__bar { grid-column: 1 / -1; } }
+        .jr-money__k { font-size: var(--tm-f-sm); color: var(--tm-ink-soft); }
+        .jr-money__bar { height: 6px; border-radius: var(--tm-pill); background: var(--tm-sand-3); overflow: hidden; }
+        .jr-money__bar i { display: block; height: 100%; border-radius: inherit; }
+        .jr-money__v { font-weight: 650; color: var(--tm-ink); white-space: nowrap; }
+        .jr-total { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; padding-top: 1rem; margin-top: .4rem; border-top: 2px solid var(--tm-ink); }
+        .jr-total b { font-size: clamp(1.4rem, 1.1rem + 1vw, 1.9rem); letter-spacing: -.02em; }
+
+        /* ---- budget utilisation -------------------------------------- */
+        .jr-bud {
+            display: grid;
+            gap: var(--tm-s4);
+            padding: var(--tm-s4);
+            margin-bottom: var(--tm-s4);
+            border: 1px solid var(--tm-line-2);
+            border-radius: var(--tm-r-md);
+            background: var(--tm-surface, var(--tm-white));
+        }
+        .jr-bud__hero { display: grid; gap: .15rem; }
+        .jr-bud__hero-k { font-size: var(--tm-f-2xs); text-transform: uppercase; letter-spacing: .08em; color: var(--tm-ink-soft); }
+        .jr-bud__hero-v { font-size: clamp(1.5rem, 1.2rem + 1.1vw, 2.1rem); font-weight: 680; letter-spacing: -.02em; color: var(--tm-ink); line-height: 1.1; }
+        .jr-bud__hero-m { font-size: var(--tm-f-sm); color: var(--tm-ink-soft); }
+        /* Height held constant so the bars below do not jump when the text
+           above wraps to two lines. */
+        .jr-bud__meter { height: 8px; border-radius: var(--tm-pill); background: var(--tm-sand-3); overflow: hidden; }
+        .jr-bud__meter-fill { display: block; height: 100%; border-radius: inherit; background: var(--tm-jade); transition: width var(--tm-dur-3) var(--tm-ease-out); }
+        .jr-bud__meter-fill--jade { background: var(--tm-jade); }
+        .jr-bud__meter-fill--amber { background: var(--tm-amber); }
+        .jr-bud__meter-fill--coral { background: var(--tm-coral); }
+        .jr-bud__meter-fill--slate { background: var(--tm-ink-3); }
+        .jr-bud__grid { display: grid; gap: var(--tm-s3); grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); }
+        .jr-bud__stat { display: grid; gap: .1rem; padding: .6rem .7rem; border-radius: var(--tm-r-sm, var(--tm-r-md)); background: var(--tm-bg-soft, var(--tm-sand-2)); }
+        .jr-bud__stat-k { font-size: var(--tm-f-2xs); color: var(--tm-ink-soft); }
+        .jr-bud__stat-v { font-weight: 650; color: var(--tm-ink); }
+        .jr-bud__stat-v.is-bad { color: var(--tm-coral); }
+        .jr-bud__cats { display: grid; gap: var(--tm-s3); padding-top: var(--tm-s3); border-top: 1px solid var(--tm-line-2); }
+        .jr-bud__h { margin: 0; font-size: var(--tm-f-sm); font-weight: 650; color: var(--tm-ink); }
+        .jr-bud__cat { display: grid; gap: .3rem; }
+        .jr-bud__cat-top { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+        .jr-bud__cat-k { font-size: var(--tm-f-sm); color: var(--tm-ink); }
+        .jr-bud__cat-v { font-size: var(--tm-f-sm); font-weight: 650; color: var(--tm-ink); white-space: nowrap; }
+        .jr-bud__cat-bar { height: 6px; border-radius: var(--tm-pill); background: var(--tm-sand-3); overflow: hidden; }
+        .jr-bud__cat-bar i { display: block; height: 100%; border-radius: inherit; background: var(--tm-ink-3); }
+        .jr-bud__cat-m { font-size: var(--tm-f-2xs); color: var(--tm-ink-soft); }
+        .jr-bud__caveat { margin: 0; padding: .6rem .7rem; border-left: 3px solid var(--tm-amber); background: var(--tm-bg-soft, var(--tm-sand-2)); font-size: var(--tm-f-2xs); color: var(--tm-ink-soft); }
+        /* The meter animates its width, which is motion the user did not ask
+           for. Honour the OS setting rather than animating regardless. */
+        @media (prefers-reduced-motion: reduce) { .jr-bud__meter-fill { transition: none; } }
+        /* other plans */
+        .jr-plans { display: grid; gap: 0; border-top: 1px solid var(--tm-line); }
+        .jr-plan { display: grid; grid-template-columns: 1fr auto auto; gap: .5rem 1rem; align-items: center; padding: .9rem 0; border-bottom: 1px solid var(--tm-line-2); width: 100%; text-align: left; background: none; border-left: 0; border-right: 0; border-top: 0; cursor: pointer; font: inherit; }
+        .jr-plan:hover { background: var(--tm-white); }
+        .jr-plan__t { font-weight: 620; color: var(--tm-ink); }
+        .jr-plan__m { font-size: var(--tm-f-xs); color: var(--tm-muted); grid-column: 1; }
+        .jr-plan__v { font-weight: 650; white-space: nowrap; }
+        /* booking */
+        .jr-book { background: var(--tm-ink); color: var(--tm-on-dark); border-radius: var(--tm-r-lg); padding: clamp(1.5rem, 4vw, 2.5rem); display: grid; gap: var(--tm-s4); justify-items: start; }
+        .jr-book h2 { color: var(--tm-white); margin: 0; }
+        .jr-book__row { display: flex; flex-wrap: wrap; gap: 1rem 2rem; align-items: baseline; width: 100%; justify-content: space-between; }
+        .jr-book__total { font-size: clamp(1.6rem, 1.2rem + 1.6vw, 2.2rem); font-weight: 700; color: var(--tm-white); letter-spacing: -.02em; }
+        .jr-note { font-size: var(--tm-f-xs); color: var(--tm-on-dark-2); max-width: 62ch; }
+        /* assistant */
+        .jr-ask { display: grid; gap: var(--tm-s3); }
+        .jr-ask__chips { display: flex; flex-wrap: wrap; gap: .5rem; }
+        .jr-ask__chip { border: 1px solid var(--tm-line); background: var(--tm-white); border-radius: var(--tm-pill); padding: .45rem .9rem; font: inherit; font-size: var(--tm-f-xs); color: var(--tm-ink); cursor: pointer; }
+        .jr-ask__chip:hover { border-color: var(--tm-ink); }
+        .jr-loading { display: grid; place-items: center; gap: var(--tm-s4); padding: clamp(3rem, 10vw, 6rem) 0; text-align: center; }
+        .jr-skeleton { width: min(38rem, 100%); display: grid; gap: .8rem; }
+        .jr-skeleton i { display: block; height: 12px; border-radius: var(--tm-pill); background: linear-gradient(90deg, var(--tm-sand-2), var(--tm-sand-3), var(--tm-sand-2)); background-size: 200% 100%; animation: jr-shimmer 1.6s linear infinite; }
+        .jr-skeleton i:nth-child(2) { width: 78%; } .jr-skeleton i:nth-child(3) { width: 56%; }
+        @keyframes jr-shimmer { to { background-position: -200% 0; } }
+        .jr-flag { display: inline-flex; align-items: center; gap: .3rem; font-size: var(--tm-f-2xs); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+        .jr-flag--delay { color: var(--tm-clay); } .jr-flag--booked { color: var(--tm-jade); }
+        .jr-disclosure { border-bottom: 1px solid var(--tm-line); }
+        .jr-disclosure > summary { cursor: pointer; padding: 1rem 0; font-weight: 620; color: var(--tm-ink); display: flex; justify-content: space-between; gap: 1rem; list-style: none; }
+        .jr-disclosure > summary::-webkit-details-marker { display: none; }
+        .jr-disclosure > summary::after { content: "+"; color: var(--tm-muted); }
+        .jr-disclosure[open] > summary::after { content: "\2212"; }
+        .jr-disclosure__body { padding-bottom: 1rem; }
+    </style>
+    <meta name="theme-color" content="#06202b">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+    <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TripMind AI">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-1290x2796.jpg">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-1170x2532.jpg">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-828x1792.jpg">
+    <link rel="stylesheet" href="/css/theme.css">
+    <script src="/js/ui.js"></script>
+</head>
+<body>
+    <a class="skip-link" href="#secItinerary">Skip to your itinerary</a>
+
+    <nav class="tm-nav" id="tripNav">
+        <div class="tm-nav__inner">
+            <a href="/" class="tm-brand" aria-label="TripMind AI home">
+                <span class="tm-brand__mark"><svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                <span class="tm-brand__text">
+                    <span class="tm-brand__name">TripMind AI</span>
+                    <span class="tm-brand__tag">Traveling Uniquely</span>
+                </span>
+            </a>
+            <div class="tm-nav__links">
+                <a class="tm-nav__link" href="dashboard.html">My Trips</a>
+                <a class="tm-nav__link" href="/">Explore</a>
+            </div>
+            <div class="tm-nav__actions">
+                <a class="tm-btn tm-btn--secondary tm-btn--sm" href="planner.html">Plan another trip</a>
+            </div>
+            <button class="tm-burger" type="button" data-tm-drawer-open="tripDrawer" aria-label="Open menu" aria-expanded="false" aria-controls="tripDrawer"><span></span></button>
+        </div>
+    </nav>
+
+    <div class="tm-drawer" id="tripDrawer" data-open="false" role="dialog" aria-modal="true" aria-label="Menu">
+        <div class="tm-drawer__scrim" data-tm-drawer-close></div>
+        <div class="tm-drawer__panel">
+            <div class="tm-drawer__head">
+                <a href="/" class="tm-brand">
+                    <span class="tm-brand__mark"><svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                    <span class="tm-brand__text"><span class="tm-brand__name">TripMind AI</span><span class="tm-brand__tag">Traveling Uniquely</span></span>
+                </a>
+                <button class="tm-drawer__close" type="button" data-tm-drawer-close aria-label="Close menu">&times;</button>
+            </div>
+            <nav class="tm-drawer__links">
+                <a class="tm-drawer__link" href="dashboard.html">My Trips <span>01</span></a>
+                <a class="tm-drawer__link" href="planner.html">Plan another trip <span>02</span></a>
+            </nav>
+            <div class="tm-drawer__foot">
+                <a class="tm-btn tm-btn--primary tm-btn--block" href="#secBook" data-tm-drawer-close>Go to booking</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Route hero -->
+    <section class="tm-pagehead tm-pagehead--tall" id="routeHero">
+        <div class="tm-pagehead__bg"><img src="../img/pagehead-journey.jpg" alt="" aria-hidden="true" width="2000" height="900"></div>
+        <div class="tm-container">
+            <nav aria-label="Breadcrumb" class="tm-eyebrow tm-eyebrow--on-dark" style="margin-bottom:.6rem;">
+                <a href="dashboard.html" style="color:inherit;">My trips</a> <span aria-hidden="true">/</span> <span id="heroCrumb">Itinerary</span>
+            </nav>
+            <h1 class="tm-h1" id="tripTitle" style="margin-bottom:.5rem;">Your journey</h1>
+            <p class="tm-on-dark-2" id="tripMeta" style="margin:0;"></p>
+            <div id="tripHeaderGrid" class="jr-kv" style="margin-top:1.25rem;max-width:38rem;"></div>
+        </div>
+    </section>
+
+    <!-- Section rail: the old tab bar, now a scroll rail -->
+    <div class="jr-rail" id="jrRail" hidden>
+        <div class="tm-container jr-rail__inner" role="navigation" aria-label="Sections of your trip">
+            <a class="jr-rail__link" href="#secPlan" data-rail="secPlan">Summary</a>
+            <a class="jr-rail__link" href="#secItinerary" data-rail="secItinerary">Itinerary</a>
+            <a class="jr-rail__link" href="#secBreakdown" data-rail="secBreakdown">Included</a>
+            <a class="jr-rail__link" href="#secMoney" data-rail="secMoney">Cost</a>
+            <a class="jr-rail__link" href="#secPacking" data-rail="secPacking">Packing</a>
+            <a class="jr-rail__link" href="#secTwin" data-rail="secTwin">Digital Twin</a>
+            <!-- Hidden until renderEvents() finds events; see secEvents. Without
+                 this link the rail spy could never mark it current and the
+                 relabelling logic in renderEvents() had nothing to write to. -->
+            <a class="jr-rail__link" href="#secEvents" data-rail="secEvents" hidden>Events</a>
+            <a class="jr-rail__link" href="#secAssistant" data-rail="secAssistant">Assistant</a>
+            <a class="jr-rail__link" href="#secReplan" data-rail="secReplan">Replan</a>
+            <a class="jr-rail__link" href="#secProviders" data-rail="secProviders">Providers</a>
+            <a class="jr-rail__link" href="#secAlternatives" data-rail="secAlternatives">Other plans</a>
+            <a class="jr-rail__link" href="#secInputs" data-rail="secInputs">Your inputs</a>
+            <a class="jr-rail__link" href="#secBook" data-rail="secBook">Book</a>
+        </div>
+    </div>
+
+    <div id="loading" class="tm-container jr-loading">
+        <div class="tm-center" style="display:grid;gap:1rem;justify-items:center;">
+            <div class="spinner"></div>
+            <p class="tm-sm tm-muted" style="margin:0;">Loading your journey&#8230;</p>
+            <div class="jr-skeleton" aria-hidden="true"><i></i><i></i><i></i></div>
+        </div>
+    </div>
+
+    <main id="tripContent" class="tm-section hidden">
+        <div class="tm-container jr-wrap">
+
+            <!-- 1 &#8212; the plan in words -->
+            <section class="jr-sec" id="secPlan" aria-labelledby="hPlan">
+                <div class="jr-sec__head">
+                    <div>
+                        <span class="tm-eyebrow">The plan</span>
+                        <h2 class="tm-h2" id="hPlan">Why this trip works</h2>
+                    </div>
+                </div>
+                <div id="boxPlan"></div>
+            </section>
+
+            <!-- 2 &#8212; the journey itself -->
+            <section class="jr-sec" id="secItinerary" aria-labelledby="hItin">
+                <div class="jr-sec__head">
+                    <div>
+                        <span class="tm-eyebrow">Day by day</span>
+                        <h2 class="tm-h2" id="hItin">Your itinerary</h2>
+                    </div>
+                    <p class="tm-sm tm-muted" style="max-width:34ch;margin:0;">Distances and fares come from live route data. If a fare is unavailable we say so instead of guessing.</p>
+                </div>
+                <div id="boxTimeline"></div>
+            </section>
+
+            <!-- 2b &#8212; what you actually booked, grouped by kind -->
+            <section class="jr-sec" id="secBreakdown" aria-labelledby="hBreak">
+                <div class="jr-sec__head">
+                    <div>
+                        <span class="tm-eyebrow">What this covers</span>
+                        <h2 class="tm-h2" id="hBreak">Transport, stay and activities</h2>
+                    </div>
+                    <p class="tm-sm tm-muted" style="max-width:34ch;margin:0;">The same items as the timeline, grouped so you can see at a glance what is included and what is not.</p>
+                </div>
+                <div id="boxBreakdown"></div>
+            </section>
+
+            <!-- 2c &#8212; who actually provides each service -->
+            <section class="jr-sec" id="secProviders" aria-labelledby="hProv">
+                <div class="jr-sec__head">
+                    <div>
+                        <span class="tm-eyebrow">Where these come from</span>
+                        <h2 class="tm-h2" id="hProv">Providers in this trip</h2>
+                    </div>
+                    <p class="tm-sm tm-muted" style="max-width:34ch;margin:0;">Every service below is supplied by a listed partner or by TripMind itself. Ratings come from real reviews; availability is what the plan currently holds.</p>
+                </div>
+                <div id="boxProviders"></div>
+            </section>
+
+            <!-- 3 &#8212; money -->
+            <section class="jr-sec" id="secMoney" aria-labelledby="hMoney">
+                <div class="jr-sec__head">
+                    <div>
+                        <span class="tm-eyebrow">Money</span>
+                        <h2 class="tm-h2" id="hMoney">What this trip costs</h2>
+                    </div>
+                </div>
+                <div id="boxBudget"></div>
+                <div id="boxCost"></div>
+            </section>
+
+            <!-- 4 &#8212; packing (lazy, real weather) -->
+            <section class="jr-sec" id="secPacking" aria-labelledby="hPack">
+                <div class="jr-sec__head">
+                    <div>
+                        <span class="tm-eyebrow">Pack lighter</span>
+                        <h2 class="tm-h2" id="hPack">Smart packing</h2>
+                    </div>
+                    <p class="tm-sm tm-muted" style="max-width:34ch;margin:0;">Built from this itinerary and live weather for your dates.</p>
+                </div>
+                <div id="boxPacking"></div>
+            </section>
+
+            <!-- 5 &#8212; digital twin (lazy, real trip state) -->
+            <section class="jr-sec" id="secTwin" aria-labelledby="hTwin">
+                <div class="jr-sec__head">
+                    <div>
+                        <span class="tm-eyebrow">Live view</span>
+                        <h2 class="tm-h2" id="hTwin">Digital Trip Twin</h2>
+                    </div>
+                    <p class="tm-sm tm-muted" style="max-width:34ch;margin:0;">The structured state of your trip &#8212; what is booked, paid, estimated or simply not connected yet.</p>
+                </div>
+                <div id="boxTwin"></div>
+            </section>
+
+            <!-- 6 &#8212; assistant, part of the flow -->
+            <section class="jr-sec" id="secAssistant" aria-labelledby="hAssist">
+                <div class="jr-sec__head">
+                    <div>
+                        <span class="tm-eyebrow">Change anything</span>
+                        <h2 class="tm-h2" id="hAssist">Your trip assistant</h2>
+                    </div>
+                </div>
+                <div class="jr-ask">
+                    <p class="tm-sm tm-muted" style="margin:0;max-width:62ch;">The assistant proposes changes &#8212; nothing is applied until you confirm them. Booking, transport switches and re-planning all go through here.</p>
+                    <div class="jr-ask__chips">
+                        <button class="jr-ask__chip" type="button" onclick="sendChatMsg('Make this trip more relaxing, with less time in transit.')">Slow it down</button>
+                        <button class="jr-ask__chip" type="button" onclick="sendChatMsg('Add one must-see cultural spot I have missed.')">Add a cultural spot</button>
+                        <button class="jr-ask__chip" type="button" onclick="sendChatMsg('What is the weather like on my travel dates?')">Weather on my dates</button>
+                        <button class="jr-ask__chip" type="button" onclick="sendChatMsg('Switch the transport to a more comfortable option.')">More comfortable transport</button>
+                    </div>
+                    <div><button class="tm-btn tm-btn--primary" type="button" onclick="openAssistant()">Open the assistant</button></div>
+                </div>
+            </section>
+
+            <!-- 6b &#8212; replan after a disruption (two-phase, confirmed) -->
+            <section class="jr-sec" id="secReplan" aria-labelledby="hReplan">
+                <div class="jr-sec__head">
+                    <div>
+                        <span class="tm-eyebrow">Something went wrong?</span>
+                        <h2 class="tm-h2" id="hReplan">Replan this trip</h2>
+                    </div>
+                    <p class="tm-sm tm-muted" style="max-width:36ch;margin:0;">Tell us what changed. TripMind rebuilds the schedule around it, checks every stop is still open, and shows you the real cost difference before anything is saved.</p>
+                </div>
+
+                <div class="jr-replan">
+                    <div class="jr-replan__controls">
+                        <label class="jr-replan__label" for="replanReason">What happened?</label>
+                        <select class="jr-replan__select" id="replanReason">
+                            <option value="delay">Transport is delayed</option>
+                            <option value="missed">I missed a stop</option>
+                            <option value="weather">Weather changed</option>
+                            <option value="tired">I need a less rushed plan</option>
+                            <option value="manual">Something else</option>
+                        </select>
+
+                        <div class="jr-replan__delay" id="replanDelayWrap">
+                            <label class="jr-replan__label" for="replanDelay">Delay</label>
+                            <div class="jr-replan__presets">
+                                <button class="jr-replan__preset" type="button" data-min="30">30 min</button>
+                                <button class="jr-replan__preset" type="button" data-min="60">1 hour</button>
+                                <button class="jr-replan__preset" type="button" data-min="120">2 hours</button>
+                                <button class="jr-replan__preset" type="button" data-min="240">4 hours</button>
+                            </div>
+                        </div>
+
+                        <div><button class="tm-btn tm-btn--primary" type="button" id="replanBtn" onclick="startReplan()">Preview a new plan</button></div>
+                        <p class="jr-replan__note tm-sm tm-muted" style="margin:.15rem 0 0;">Nothing is changed until you approve the preview.</p>
+                    </div>
+
+                    <div class="jr-replan__result" id="replanResult" hidden></div>
+                </div>
+            </section>
+
+            <!-- 7 &#8212; the alternatives the AI generated -->
+            <section class="jr-sec" id="secAlternatives" aria-labelledby="hAlt">
+                <div class="jr-sec__head">
+                    <div>
+                        <span class="tm-eyebrow">Options</span>
+                        <h2 class="tm-h2" id="hAlt">Other plans for this trip</h2>
+                    </div>
+                    <p class="tm-sm tm-muted" style="max-width:32ch;margin:0;">Generated from the same real fares. Selecting one updates this page.</p>
+                </div>
+                <div id="boxCompare"></div>
+            </section>
+
+            <!-- 8 &#8212; exactly what the AI was told -->
+            <section class="jr-sec" id="secInputs" aria-labelledby="hInputs">
+                <div class="jr-sec__head">
+                    <div>
+                        <span class="tm-eyebrow">Transparency</span>
+                        <h2 class="tm-h2" id="hInputs">What the AI was given</h2>
+                    </div>
+                </div>
+                <div id="boxInputs"></div>
+            </section>
+
+            <!-- 9 &#8212; real recorded events, only when they exist -->
+            <section class="jr-sec" id="secEvents" aria-labelledby="hEvents" hidden>
+                <div class="jr-sec__head">
+                    <div>
+                        <span class="tm-eyebrow">Live record</span>
+                        <h2 class="tm-h2" id="hEvents">Events on this trip</h2>
+                    </div>
+                </div>
+                <div id="boxEvents"></div>
+            </section>
+
+            <!-- 10 &#8212; the only place booking lives -->
+            <section class="jr-sec" id="secBook" aria-labelledby="hBook">
+                <div class="jr-book">
+                    <span class="tm-eyebrow" style="color:var(--tm-gold-soft);">Ready when you are</span>
+                    <h2 class="tm-h2" id="hBook">Book this trip</h2>
+                    <p class="jr-note">Confirm &amp; Book checks live availability with each provider, creates the bookings and pays from your wallet in one step. If your wallet is short, bookings are created with payment pending so you can top up.</p>
+                    <div class="jr-book__row">
+                        <div>
+                            <div class="tm-2xs" style="color:var(--tm-on-dark-2);">Estimated total for <span id="bookTravelers">1</span> traveller(s)</div>
+                            <div class="jr-book__total" id="bookTotal">Not estimated</div>
+                        </div>
+                        <button class="tm-btn tm-btn--accent tm-btn--lg" id="bookBtn" type="button" onclick="bookTrip()">Book This Trip</button>
+                    </div>
+                    <p class="jr-note" id="bookNote"></p>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Booking confirmation -->
+    <div id="bookingModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="bookingTitle">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title" id="bookingTitle">Booking confirmation</div>
+                <button class="modal-close" type="button" onclick="closeModal('bookingModal')" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body" id="bookingModalBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" type="button" onclick="closeModal('bookingModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Removal confirmation (replaces the browser confirm dialog) -->
+    <div id="confirmModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title" id="confirmTitle">Remove this item?</div>
+                <button class="modal-close" type="button" data-confirm-no aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body"><p id="confirmText" class="text-sm text-muted" style="margin:0;"></p></div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" type="button" data-confirm-no>Keep it</button>
+                <button class="btn btn-primary" type="button" data-confirm-yes>Remove</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Item detail (VIEW) - type-appropriate image + provider facts -->
+    <div id="itemViewModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="itemViewTitle">
+        <div class="modal" style="max-width:min(680px,94vw);">
+            <div class="modal-header">
+                <div class="modal-title" id="itemViewTitle">Details</div>
+                <button class="modal-close" type="button" onclick="closeModal('itemViewModal')" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body" id="itemViewBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" type="button" onclick="closeModal('itemViewModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Widget (modification chatbot: propose -> confirm / keep) -->
+    <div class="chat-widget">
+        <div id="chatPanel" class="chat-panel">
+            <div class="chat-header">Trip assistant</div>
+            <div id="chatMessages" class="chat-messages"></div>
+            <div id="chatSuggestions" class="chat-suggestions"></div>
+            <div class="chat-input-area">
+                <input id="chatInput" type="text" placeholder="Ask about your trip or describe a change&#8230;" aria-label="Message the trip assistant">
+                <button id="chatSend" class="chat-send" type="button">Send</button>
+            </div>
+        </div>
+        <button id="chatToggle" class="chat-toggle" type="button" aria-label="Open trip assistant" aria-expanded="false">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </button>
+    </div>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/chat.js"></script>
+    <script>
+        let tripData = null;
+        let selectedPlanIndex = 0;
+        let genNotice = '';
+        const tripId = new URLSearchParams(window.location.search).get('id');
+
+        async function loadTrip() {
+            if (!(await guardLogin())) return;
+            if (!tripId) { window.location = 'dashboard.html'; return; }
+            try {
+                tripData = await api.getTrip(tripId);
+                if (!tripData.itineraries || !tripData.itineraries.length) {
+                    document.getElementById('loading').innerHTML =
+                        '<div class="tm-center" style="display:grid;gap:1rem;justify-items:center;"><div class="spinner"></div><p class="tm-sm tm-muted" style="margin:0;">The AI is generating your itinerary (usually 20\u201340 seconds)\u2026</p><div class="jr-skeleton" aria-hidden="true"><i></i><i></i><i></i></div></div>';
+                    const gen = await api.generatePlans(tripId).catch(() => null);
+                    genNotice = (gen && (gen.message || gen.aiExplanation)) || '';
+                    tripData = await api.getTrip(tripId);
+                }
+                renderTrip();
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('tripContent').classList.remove('hidden');
+                document.getElementById('jrRail').hidden = false;
+                initChat(tripId);
+                initRailSpy();
+                initReplan();
+                watchLazySections();
+            } catch (e) {
+                document.getElementById('loading').innerHTML = `<p class="tm-sm" style="color:var(--tm-clay);">Could not load this trip: ${esc(e.message)}</p>`;
+            }
+        }
+
+        function renderTrip() {
+            document.title = `${tripData.origin || 'Trip'} \u2192 ${tripData.destination || ''} \u2014 TripMind AI`;
+            document.getElementById('tripTitle').innerHTML = `${esc(tripData.origin || '')} <span aria-hidden="true" style="color:var(--tm-gold-soft);">&rarr;</span> ${esc(tripData.destination || '')} ${getStatusBadge(tripData.status)}`;
+            document.getElementById('heroCrumb').textContent = (tripData.destination || 'Itinerary');
+            document.getElementById('tripMeta').textContent =
+                `${formatDate(tripData.startDate)} \u2013 ${formatDate(tripData.endDate)} \u00b7 ${tripData.travelers} traveller${tripData.travelers === 1 ? '' : 's'} \u00b7 ${tripData.budgetUnlimited ? 'Unlimited budget' : formatCurrency(tripData.budget) + ' per traveller'}${tripData.returnTrip ? ' \u00b7 round trip' : ''}`;
+            document.getElementById('bookTravelers').textContent = tripData.travelers || 1;
+            const bookBtn = document.getElementById('bookBtn');
+            const booked = tripData.status === 'BOOKED';
+            bookBtn.disabled = booked;
+            bookBtn.textContent = booked ? 'Trip booked' : 'Book This Trip';
+            document.getElementById('bookNote').textContent = booked
+                ? 'This trip is already booked \u2014 the references are in your Digital Trip Twin and in My Trips.'
+                : 'You can change your itinerary with the assistant before you book.';
+            renderHeaderGrid();
+            renderPlan();
+            renderTimeline();
+            renderBreakdown();
+            renderProviders();
+            renderBudget();
+            renderCost();
+            renderCompare();
+            renderInputs();
+            renderEvents();
+        }
+
+        /* FROM / TO / DATES / TRAVELLERS / RETURN / PREMIUM / PREFERENCES. */
+        function renderHeaderGrid() {
+            const ps = tripData.premiumServices || [];
+            const rows = [
+                ['Dates', `${formatDate(tripData.startDate)} \u2013 ${formatDate(tripData.endDate)}`],
+                ['Travellers', esc(String(tripData.travelers || 1))],
+                ['Journey', tripData.returnTrip ? 'Round trip' : 'One way'],
+                ['Premium services', ps.length ? esc(ps.map(p => psLabels[p] || p).join(', ')) : 'None'],
+                ['Your description', esc(tripData.preferences || 'Not provided')],
+            ];
+            document.getElementById('tripHeaderGrid').innerHTML = rows
+                .map(([k, v]) => `<div class="jr-kv__k" style="color:var(--tm-on-dark-2);">${k}</div><div class="jr-kv__v" style="color:var(--tm-white);">${v}</div>`)
+                .join('');
+        }
+
+        function getSelectedItinerary() {
+            return tripData.itineraries?.find(i => i.status === 'SELECTED');
+        }
+
+        function planTotal(itin) {
+            if (!itin) return null;
+            if (typeof itin.totalCost === 'number' && itin.totalCost > 0) return itin.totalCost;
+            const sum = (itin.items || []).reduce((s, it) => s + (Number(it.cost) || 0), 0);
+            return sum > 0 ? sum : null;
+        }
+
+        /* ---------------------------------------------- 1. the plan in words */
+        function renderPlan() {
+            const rec = tripData.recommendations?.[0];
+            const itin = getSelectedItinerary();
+            let html = '';
+            if (rec && (rec.reasoning || rec.recommendation)) {
+                html += `<p class="tm-lead" style="margin:0;">${esc(rec.reasoning || rec.recommendation)}</p>`;
+            }
+            if (itin) {
+                const total = planTotal(itin);
+                const facts = [
+                    ['Selected plan', `${esc(itin.planType || 'Plan')}${itin.status === 'SELECTED' ? ' \u2014 the one TripMind recommends' : ''}`],
+                    ['Comfort', itin.comfortScore != null ? `${Math.round(itin.comfortScore * 100)}%` : 'Not scored'],
+                    ['Optimisation', itin.optimizationScore != null ? `${Math.round(itin.optimizationScore * 100)}%` : 'Not scored'],
+                    ['Total time travelling', itin.travelTime || 'Not estimated'],
+                    ['Estimated total', total != null ? formatCurrency(total) : 'Not estimated'],
+                ];
+                html += `<div style="margin-top:${rec ? 'var(--tm-s5)' : '0'};">` + facts.map(([k, v]) =>
+                    `<div class="jr-kv"><div class="jr-kv__k">${k}</div><div class="jr-kv__v">${v}</div></div>`).join('') + `</div>`;
+            }
+            if (genNotice && !itin) {
+                html += `<div class="tm-panel" style="border-left:3px solid var(--tm-clay);margin-top:var(--tm-s4);">
+                    <h3 style="margin:0 0 .35rem;font-size:1rem;">The plans were not generated</h3>
+                    <p class="tm-sm tm-muted" style="margin:0;">${esc(genNotice)}</p></div>`;
+            }
+            document.getElementById('boxPlan').innerHTML = html ||
+                '<p class="tm-sm tm-muted" style="margin:0;">No summary was returned for this trip yet.</p>';
+        }
+
+        /* ------------------------------------------- 2. cinematic timeline */
+        function durationLabel(a, b) {
+            const t1 = new Date(a), t2 = new Date(b);
+            if (isNaN(t1) || isNaN(t2)) return '';
+            let mins = Math.round((t2 - t1) / 60000);
+            if (mins <= 0) return '';
+            const h = Math.floor(mins / 60), m = mins % 60;
+            if (h && m) return h + 'h ' + m + 'm';
+            if (h) return h + 'h';
+            return m + 'm';
+        }
+
+        const ITEM_KIND = {
+            HOTEL: 'Stay', STAY: 'Stay', TRAIN: 'Train', BUS: 'Bus', FLIGHT: 'Flight',
+            CAB: 'Cab', AUTO: 'Auto', TRANSFER: 'Transfer', ACTIVITY: 'Activity',
+            TOUR: 'Tour', GUIDE: 'Guide', FOOD: 'Food', RESTAURANT: 'Restaurant'
+        };
+
+        /* VIEW: open one itinerary item with a type-appropriate image and its
+           real provider facts. No image is invented - if the plan carried none
+           for this item, we say so rather than showing an unrelated photo. */
+        function viewItineraryItem(id) {
+            const item = (window.__itinIndex || {})[id];
+            if (!item) return false;
+            const body = document.getElementById('itemViewBody');
+            const title = document.getElementById('itemViewTitle');
+            const kind = ITEM_KIND[String(item.type || '').toUpperCase()] || (item.type || 'Item');
+            if (title) title.textContent = kind + ' \u2014 ' + (item.title || '');
+            const img = (item.images && item.images[0]) ? item.images[0] : '';
+            const rows = [];
+            if (item.provider) rows.push(['Provider', item.provider]);
+            if (item.operator && item.operator !== item.provider) rows.push(['Operator', item.operator]);
+            if (item.rating != null) rows.push(['Rating', '\u2605 ' + Number(item.rating).toFixed(1) + (item.stars ? ' \u00b7 ' + item.stars + '-star' : '')]);
+            if (item.location) rows.push(['Location', item.location]);
+            if (item.startTime) rows.push(['Starts', formatDate(item.startTime) + ' \u00b7 ' + formatTime(item.startTime)]);
+            if (item.endTime) rows.push(['Ends', formatDate(item.endTime) + ' \u00b7 ' + formatTime(item.endTime)]);
+            const dur = (item.startTime && item.endTime) ? durationLabel(item.startTime, item.endTime) : '';
+            if (dur) rows.push(['Duration', dur]);
+            if (item.distanceKm) rows.push(['Distance', item.distanceKm + ' km']);
+            if (item.vehicle) rows.push(['Vehicle', item.vehicle]);
+            if (item.cost != null) rows.push(['Price', formatCurrency(item.cost)]);
+            if (item.status) rows.push(['Status', item.status]);
+            if (item.fareError) rows.push(['Fare note', item.fareError]);
+            body.innerHTML =
+                (img
+                    ? '<img src="' + esc(img) + '" alt="" style="width:100%;max-height:320px;object-fit:cover;border-radius:12px;margin-bottom:var(--tm-s3);">'
+                    : '<p class="text-sm text-muted" style="margin:0 0 var(--tm-s3);">No image is on file for this item.</p>')
+                + '<dl style="display:grid;grid-template-columns:auto 1fr;gap:.4rem 1rem;margin:0;">'
+                + rows.map(r => '<dt class="text-sm text-muted" style="margin:0;">' + esc(r[0]) + '</dt><dd class="text-sm" style="margin:0;">' + esc(String(r[1])) + '</dd>').join('')
+                + '</dl>';
+            document.getElementById('itemViewModal').classList.add('active');
+            return false;
+        }
+
+        function renderTimeline() {
+            const box = document.getElementById('boxTimeline');
+            const itin = getSelectedItinerary();
+            if (!itin || !itin.items || !itin.items.length) {
+                box.innerHTML = '<p class="tm-sm tm-muted" style="margin:0;">No itinerary items yet. If generation is still running, reopen this page in a moment \u2014 nothing is faked in the meantime.</p>';
+                return;
+            }
+            const days = {};
+            window.__itinIndex = {};
+            itin.items.forEach(item => { const d = item.day || 1; if (!days[d]) days[d] = []; days[d].push(item); if (item._id) window.__itinIndex[item._id] = item; });
+            let html = '<div>';
+            Object.keys(days).sort((a, b) => a - b).forEach(day => {
+                const items = days[day];
+                let dayDate = '';
+                for (const it of items) { if (it.startTime) { dayDate = formatDate(it.startTime); break; } }
+                html += `<div class="jr-day"><div class="jr-day__head"><span class="jr-day__n">Day ${day}</span><span class="jr-day__d">${dayDate}</span></div><ul class="jr-items">`;
+                items.forEach(item => {
+                    const delayed = item.status === 'DELAYED' || item.status === 'RESCHEDULED';
+                    const flag = delayed ? '<span class="jr-flag jr-flag--delay">\u26a0 ' + esc(item.status) + '</span>'
+                        : item.status === 'BOOKED' ? '<span class="jr-flag jr-flag--booked">\u2713 booked</span>' : '';
+                    const side = item.fareError
+                        ? `<div class="jr-item__cost is-error">Fare unavailable \u2014 ${esc(item.fareError)}</div>`
+                        : `<div class="jr-item__cost">${formatCurrency(item.cost)}</div>`;
+                    const thumb = (item.images && item.images[0]) ? item.images[0] : '';
+                    const rate = item.rating ? '\u2605 ' + Number(item.rating).toFixed(1) : '';
+                    const opName = item.operator && item.operator !== item.provider ? item.operator : '';
+                    const dur = (item.startTime && item.endTime) ? durationLabel(item.startTime, item.endTime) : '';
+                    html += `<li class="jr-item${item.status === 'BOOKED' ? ' jr-item--booked' : ''}${delayed ? ' jr-item--delayed' : ''}">
+                        <span class="jr-item__time">${item.startTime ? formatTime(item.startTime) + (item.endTime ? '<br><span style="font-weight:500;color:var(--tm-muted);">' + formatTime(item.endTime) + '</span>' : '') : '\u2014'}</span>
+                        <div style="min-width:0;">
+                            <span class="jr-item__dot" aria-hidden="true"></span>
+                            ${thumb ? `<a class="jr-item__thumb" href="#" onclick="return viewItineraryItem('${item._id}')"><img data-thumb="${esc(thumb)}" alt="" loading="lazy"></a>` : ''}
+                            <div class="jr-item__type">${getTypeIcon(item.type) || ''} ${esc(item.type || 'Item')}</div>
+                            <div class="jr-item__t">${esc(item.title)}</div>
+                            ${item.provider ? `<div class="jr-item__m">${esc(item.provider)}${opName ? ' \u00b7 ' + esc(opName) : ''}${rate ? ' \u00b7 ' + rate : ''}</div>` : (opName || rate ? `<div class="jr-item__m">${esc(opName)}${rate ? (opName ? ' \u00b7 ' : '') + rate : ''}</div>` : '')}
+                            ${dur ? `<div class="jr-item__m">${dur}</div>` : ''}
+                            ${item.location ? `<div class="jr-item__m">${esc(item.location)}</div>` : ''}
+                            ${item.distanceKm ? `<div class="jr-item__m">${item.distanceKm} km road distance</div>` : ''}
+                            ${flag ? `<div style="margin-top:.3rem;">${flag}</div>` : ''}
+                        </div>
+                        <div class="jr-item__side">${side}<button class="tm-btn tm-btn--ghost tm-btn--sm" type="button" onclick="viewItineraryItem('${item._id}')">View</button>${item.status !== 'BOOKED' ? `<button class="tm-btn tm-btn--ghost tm-btn--sm" type="button" onclick="removeItineraryItem('${item._id}')">Remove</button>` : ''}</div>
+                    </li>`;
+                });
+                html += '</ul></div>';
+            });
+            box.innerHTML = html + '</div>';
+            box.querySelectorAll('img[data-thumb]').forEach(img => { img.src = img.dataset.thumb; });
+        }
+
+        /* The timeline answers "what happens when". This answers "what am I
+           actually paying for", grouped by kind. It is deliberately derived
+           from the same `itin.items` array rather than a second data source,
+           so it can never disagree with the timeline. */
+        const BREAKDOWN_GROUPS = [
+            { key: 'transport', label: 'Transport', blurb: 'How you get there and back.',
+              types: ['BUS', 'TRAIN', 'FLIGHT', 'TRANSPORT'] },
+            { key: 'transfer', label: 'Local transfers', blurb: 'Cabs and autos between stops.',
+              types: ['TRANSFER', 'CAB', 'AUTO'] },
+            { key: 'stay', label: 'Stay', blurb: 'Hotels and check-ins.',
+              types: ['HOTEL', 'STAY'] },
+            { key: 'activities', label: 'Activities and food', blurb: 'Things to do and places to eat.',
+              types: ['ACTIVITY', 'FOOD', 'RESTAURANT', 'TOUR', 'GUIDE'] }
+        ];
+
+        function renderBreakdown() {
+            const box = document.getElementById('boxBreakdown');
+            if (!box) return;
+            const itin = getSelectedItinerary();
+            const items = (itin && itin.items) || [];
+            if (!items.length) {
+                box.innerHTML = '<p class="tm-sm tm-muted" style="margin:0;">Nothing to summarise yet.</p>';
+                return;
+            }
+
+            const seen = new Set();
+            const cards = BREAKDOWN_GROUPS.map(group => {
+                const rows = items.filter(it =>
+                    group.types.indexOf(String(it.type || '').toUpperCase()) !== -1);
+                rows.forEach(r => seen.add(r._id));
+                if (!rows.length) return '';
+                const cost = rows.reduce((s, it) => s + (Number(it.cost) || 0), 0);
+                const booked = rows.filter(it => it.status === 'BOOKED').length;
+                const unverified = rows.filter(it => it.costVerified === false).length;
+
+                return `<div class="jr-bd">
+                    <div class="jr-bd__head">
+                        <h3 class="jr-bd__title">${esc(group.label)}</h3>
+                        <span class="jr-bd__cost">${formatCurrency(cost)}</span>
+                    </div>
+                    <p class="jr-bd__blurb">${esc(group.blurb)}</p>
+                    <ul class="jr-bd__list">
+                        ${rows.map(it => {
+                            const flag = it.status === 'BOOKED'
+                                ? '<span class="jr-flag jr-flag--booked">\u2713 booked</span>'
+                                : it.status === 'DELAYED' || it.status === 'RESCHEDULED'
+                                    ? `<span class="jr-flag jr-flag--delay">\u26a0 ${esc(it.status)}</span>` : '';
+                            return `<li class="jr-bd__row">
+                                <span class="jr-bd__icon" aria-hidden="true">${getTypeIcon(it.type) || ''}</span>
+                                <span class="jr-bd__name">${esc(it.title)}</span>
+                                ${flag}
+                                <span class="jr-bd__row-cost">${formatCurrency(it.cost)}</span>
+                            </li>`;
+                        }).join('')}
+                    </ul>
+                    <p class="jr-bd__foot">
+                        ${rows.length} item${rows.length === 1 ? '' : 's'}
+                        ${booked ? ' \u00b7 ' + booked + ' booked' : ''}
+                        ${unverified ? ' \u00b7 ' + unverified + ' price' + (unverified === 1 ? '' : 's') + ' carried from the plan, not a live quote' : ''}
+                    </p>
+                </div>`;
+            }).join('');
+
+            // Anything whose type is not in a group above must still be visible,
+            // otherwise an unknown item type would silently vanish from the page.
+            const orphans = items.filter(it => !seen.has(it._id));
+            const orphanCard = orphans.length
+                ? `<div class="jr-bd">
+                    <div class="jr-bd__head">
+                        <h3 class="jr-bd__title">Other</h3>
+                        <span class="jr-bd__cost">${formatCurrency(orphans.reduce((s, it) => s + (Number(it.cost) || 0), 0))}</span>
+                    </div>
+                    <ul class="jr-bd__list">
+                        ${orphans.map(it => `<li class="jr-bd__row">
+                            <span class="jr-bd__name">${esc(it.title)}</span>
+                            <span class="jr-bd__row-cost">${formatCurrency(it.cost)}</span>
+                        </li>`).join('')}
+                    </ul>
+                    <p class="jr-bd__foot">${orphans.length} item${orphans.length === 1 ? '' : 's'} with an unrecognised type.</p>
+                </div>` : '';
+
+            box.innerHTML = `<div class="jr-bd-grid">${cards}${orphanCard}</div>`;
+        }
+
+        async function removeItineraryItem(itemId) {
+            askConfirm('This removes the item from your itinerary and recalculates the total. You can ask the assistant to bring it back.', async () => {
+                const res = await api.editItineraryItems(tripId, 'remove', { itemId });
+                const current = getSelectedItinerary();
+                if (current && res.itinerary) {
+                    current.items = res.itinerary.items || [];
+                    if (res.itinerary.version) current.version = res.itinerary.version;
+                    current.totalCost = (res.itinerary.items || []).reduce((s, it) => s + (it.cost || 0), 0);
+                    tripData.totalEstimatedCost = current.totalCost;
+                }
+                renderTimeline();
+                renderBreakdown();
+                renderCost();
+                renderPlan();
+                updateBookBar();
+                // The budget view is derived server-side, so removing an item
+                // invalidates it. Ask for the new numbers rather than
+                // recomputing here, which would reintroduce the second
+                // implementation of this arithmetic that caused the original
+                // disagreement. Failure is silent: the section keeps showing the
+                // previous figures with no error state to clean up.
+                refreshBudget();
+                TM.toast('Item removed from your itinerary.', 'success');
+            });
+        }
+
+        function askConfirm(message, onYes) {
+            const box = document.getElementById('confirmModal');
+            document.getElementById('confirmText').textContent = message;
+            box.classList.add('active');
+
+            const yesBtn = box.querySelector('[data-confirm-yes]');
+            const noBtn = box.querySelector('[data-confirm-no]');
+
+            // The previous version bound BOTH handlers to BOTH buttons:
+            //     [...yes, no].forEach(b => { add(yes); add(no); })
+            // so clicking "Yes" ran the confirm path and then immediately ran
+            // the cancel path as well, and dismissing the dialog without
+            // clicking either left both listeners attached to the shared
+            // buttons for the next caller. Two dialogs open at once, or one
+            // "Remove item" appearing to confirm itself, were both possible.
+            // Each button now gets exactly one handler, and teardown is
+            // idempotent and runs on every exit path.
+            let closed = false;
+            const close = () => {
+                if (closed) return;
+                closed = true;
+                box.classList.remove('active');
+                if (yesBtn) yesBtn.removeEventListener('click', yes);
+                if (noBtn) noBtn.removeEventListener('click', no);
+                // Any other exit (Escape, overlay click) must also detach.
+                document.removeEventListener('keydown', onKey);
+            };
+            const yes = () => { close(); if (typeof onYes === 'function') onYes(); };
+            const no = () => close();
+            const onKey = e => { if (e.key === 'Escape') no(); };
+
+            if (yesBtn) yesBtn.addEventListener('click', yes);
+            if (noBtn) noBtn.addEventListener('click', no);
+            document.addEventListener('keydown', onKey);
+        }
+
+        /* ------------------------------------------------- replan (two-phase) */
+        /* Delay chosen via the preset buttons, in minutes. Null means "no delay",
+           which is the correct value for the non-delay reasons. */
+        let replanDelayMinutes = 60;
+
+        function initReplan() {
+            const wrap = document.getElementById('replanDelayWrap');
+            const reason = document.getElementById('replanReason');
+            if (!wrap || !reason) return;
+
+            const syncReason = () => {
+                // The delay control is meaningless unless the disruption is a
+                // delay, so it is hidden rather than left to send a number the
+                // server would then have to guess the meaning of.
+                wrap.hidden = reason.value !== 'delay';
+                if (reason.value === 'delay') {
+                    replanDelayMinutes = replanDelayMinutes || 60;
+                } else {
+                    replanDelayMinutes = 0;
+                }
+            };
+            reason.addEventListener('change', syncReason);
+            syncReason();
+
+            document.querySelectorAll('.jr-replan__preset').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    replanDelayMinutes = parseInt(btn.dataset.min, 10) || 60;
+                    document.querySelectorAll('.jr-replan__preset').forEach(other => {
+                        other.setAttribute('aria-pressed', String(other === btn));
+                    });
+                });
+                btn.setAttribute('aria-pressed',
+                    String((parseInt(btn.dataset.min, 10) || 60) === replanDelayMinutes));
+            });
+        }
+
+        function replanMoney(value, extraClass) {
+            const n = Number(value) || 0;
+            const cls = n > 0 ? (extraClass || 'is-up') : (n < 0 ? 'is-down' : '');
+            return `<span class="jr-replan__cost-v ${cls}">${formatCurrency(Math.abs(n))}${n < 0 ? ' less' : ''}</span>`;
+        }
+
+        function renderReplanProposal(data) {
+            const box = document.getElementById('replanResult');
+            if (!box) return;
+            const cost = data.cost || {};
+            const changes = data.changes || [];
+            const warnings = data.warnings || [];
+            const dropped = data.dropped || [];
+            const diff = data.diff || {};
+
+            const noChange = !changes.length && !dropped.length;
+            const costDelta = Number(cost.additional) || 0;
+            const deltaLabel = costDelta > 0
+                ? 'More expensive'
+                : costDelta < 0 ? 'Cheaper' : 'No change in cost';
+
+            box.classList.remove('is-error');
+            box.hidden = false;
+            box.innerHTML = `
+                <p class="jr-replan__summary">${esc(data.summary || 'Here is what a replan would do.')}</p>
+
+                <div class="jr-replan__cost">
+                    <div><div class="jr-replan__cost-k">Was</div><div class="jr-replan__cost-v">${formatCurrency(cost.original)}</div></div>
+                    <div><div class="jr-replan__cost-k">Becomes</div><div class="jr-replan__cost-v">${formatCurrency(cost.revised)}</div></div>
+                    <div><div class="jr-replan__cost-k">${esc(deltaLabel)}</div>${replanMoney(costDelta)}</div>
+                </div>
+
+                ${noChange
+                    ? '<p class="tm-sm tm-muted" style="margin:0 0 .75rem;">Nothing in your plan was affected, so there is nothing to change.</p>'
+                    : `<ul class="jr-replan__changes">${changes.map(c => `
+                        <li class="jr-replan__change jr-replan__change--${esc(c.type)}">
+                            <span class="jr-replan__change-kind">${esc(c.type)}</span>
+                            <span class="jr-replan__change-title">${esc(c.title || 'Item')}${
+                                c.from && c.to
+                                    ? ` <span class="jr-replan__change-why">${esc(String(c.from).slice(11, 16))} &rarr; ${esc(String(c.to).slice(11, 16))}</span>`
+                                    : ''}</span>
+                            ${c.reason ? `<span class="jr-replan__change-why">${esc(c.reason)}</span>` : ''}
+                        </li>`).join('')}</ul>`}
+
+                ${dropped.length ? `<ul class="jr-replan__warn">${dropped.map(d =>
+                    `<li><strong>${esc(d.title || 'Item')}</strong> was removed: ${esc(d.reason || 'no longer fits')}.</li>`).join('')}</ul>` : ''}
+                ${warnings.length ? `<ul class="jr-replan__warn">${warnings.map(w =>
+                    `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
+
+                ${cost.allCostsVerified === false
+                    ? '<p class="jr-replan__change-why" style="margin:0 0 .5rem;">Some prices are carried from the original plan rather than a live quote. They are marked as unverified in your trip record.</p>'
+                    : ''}
+
+                <div class="jr-replan__actions">
+                    <button class="tm-btn tm-btn--primary" type="button" id="replanApplyBtn" ${noChange ? 'disabled' : ''}
+                        onclick="applyReplan(${Number(data.delayMinutes) || 0})">
+                        ${noChange ? 'Nothing to apply' : 'Apply this plan'}
+                    </button>
+                    <button class="tm-btn tm-btn--ghost" type="button" onclick="cancelReplan()">Keep my current plan</button>
+                    <span class="tm-sm tm-muted" style="margin:0;">${
+                        (diff.moved || 0)} moved, ${(diff.dropped || 0)} removed</span>
+                </div>`;
+        }
+
+        function renderReplanError(message) {
+            const box = document.getElementById('replanResult');
+            if (!box) return;
+            box.hidden = false;
+            box.classList.add('is-error');
+            box.innerHTML = `<p class="jr-replan__summary" style="color:var(--tm-clay);">${esc(message)}</p>
+                <div class="jr-replan__actions"><button class="tm-btn tm-btn--ghost" type="button" onclick="cancelReplan()">Dismiss</button></div>`;
+        }
+
+        async function startReplan() {
+            const btn = document.getElementById('replanBtn');
+            const reason = document.getElementById('replanReason');
+            const box = document.getElementById('replanResult');
+            if (!btn || !reason) return;
+            const reasonValue = reason.value;
+            const minutes = reasonValue === 'delay' ? (replanDelayMinutes || 60) : 0;
+            TM.button(btn, true);
+            if (box) { box.hidden = true; box.classList.remove('is-error'); }
+            try {
+                // Phase 1: preview. The server writes nothing until we confirm.
+                const data = await api.replan(tripId, minutes, { reason: reasonValue });
+                renderReplanProposal(data);
+            } catch (e) {
+                renderReplanError(e.message || 'Could not build a new plan.');
+            } finally {
+                TM.button(btn, false);
+            }
+        }
+
+        async function applyReplan(minutes) {
+            const reason = document.getElementById('replanReason');
+            const btn = document.getElementById('replanApplyBtn');
+            const box = document.getElementById('replanResult');
+            const reasonValue = reason ? reason.value : 'manual';
+            if (btn) TM.button(btn, true);
+            try {
+                // Phase 2: commit.
+                const data = await api.replan(tripId, minutes, { confirm: true, reason: reasonValue });
+                tripData = await api.getTrip(tripId);
+                renderTrip();
+                renderEvents();
+                if (box) {
+                    box.classList.remove('is-error');
+                    box.innerHTML = `<p class="jr-replan__summary">${esc(data.explanation || 'Your plan was updated.')}</p>
+                        <div class="jr-replan__actions">
+                            <button class="tm-btn tm-btn--ghost" type="button" onclick="cancelReplan()">Close</button>
+                        </div>`;
+                }
+                TM.toast('Itinerary updated.', 'success');
+            } catch (e) {
+                renderReplanError(e.message || 'Could not apply the new plan.');
+            } finally {
+                if (btn) TM.button(btn, false);
+            }
+        }
+
+        function cancelReplan() {
+            const box = document.getElementById('replanResult');
+            if (box) { box.hidden = true; box.classList.remove('is-error'); box.innerHTML = ''; }
+        }
+
+        function updateBookBar() {
+            const total = planTotal(getSelectedItinerary());
+            document.getElementById('bookTotal').textContent = total != null ? formatCurrency(total) : 'Not estimated';
+        }
+
+        /* 2c - providers. Derived from the same items, so it can never claim a
+           partner the itinerary does not actually use. Ratings are averaged
+           from the real items; "held" counts what this plan currently has. */
+        function renderProviders() {
+            const box = document.getElementById('boxProviders');
+            if (!box) return;
+            const itin = getSelectedItinerary();
+            const items = (itin && itin.items) || [];
+            const byProvider = {};
+            items.forEach(it => {
+                const name = String(it.provider || it.operator || '').trim();
+                if (!name) return;
+                const kind = ITEM_KIND[String(it.type || '').toUpperCase()] || (it.type || 'Item');
+                const g = byProvider[name] || (byProvider[name] = { name: '', kinds: new Set(), ratings: [], held: 0, booked: 0 });
+                g.name = name;
+                g.kinds.add(kind);
+                if (it.rating != null && !isNaN(Number(it.rating))) g.ratings.push(Number(it.rating));
+                g.held += 1;
+                if (it.status === 'BOOKED') g.booked += 1;
+            });
+            const list = Object.values(byProvider).sort((a, b) => b.held - a.held);
+            if (!list.length) {
+                box.innerHTML = '<p class="tm-sm tm-muted" style="margin:0;">No providers are attached to this plan yet.</p>';
+                return;
+            }
+            box.innerHTML = '<div class="jr-prov">' + list.map(p => {
+                const avg = p.ratings.length
+                    ? (p.ratings.reduce((s, n) => s + n, 0) / p.ratings.length).toFixed(1) : null;
+                return `<div class="jr-prov__card">
+                    <div class="jr-prov__name">${esc(p.name)}</div>
+                    <div class="jr-prov__kinds">${esc(Array.from(p.kinds).join(' \u00b7 '))}</div>
+                    <div class="jr-prov__meta">
+                        ${avg ? `<span class="jr-prov__rating">\u2605 ${avg}</span>` : '<span class="jr-prov__rating is-muted">No rating yet</span>'}
+                        <span>${p.held} service${p.held === 1 ? '' : 's'} held</span>
+                        ${p.booked ? `<span class="jr-flag jr-flag--booked">${p.booked} booked</span>` : ''}
+                    </div>
+                </div>`;
+            }).join('') + '</div>';
+        }
+
+        /* ------------------------------------------------- 3. real numbers */
+        function renderCost() {
+            const box = document.getElementById('boxCost');
+            const itin = getSelectedItinerary();
+            if (!itin) { box.innerHTML = '<p class="tm-sm tm-muted" style="margin:0;">No cost data yet.</p>'; return; }
+            const breakdown = itin.items?.reduce((acc, item) => {
+                const key = item.type === 'FLIGHT' || item.type === 'HOTEL' ? (item.type === 'FLIGHT' ? 'flights' : 'hotel') : (item.type === 'TRANSFER' || item.type === 'BUS' || item.type === 'TRAIN' || item.type === 'CAB' || item.type === 'AUTO' || item.type === 'TRANSPORT') ? 'transport' : (item.type === 'ACTIVITY' ? 'activities' : 'food');
+                acc[key] = (acc[key] || 0) + (Number(item.cost) || 0);
+                return acc;
+            }, {}) || {};
+            const entries = Object.entries(breakdown);
+            const total = entries.reduce((a, b) => a + b[1], 0);
+            const maxVal = Math.max(...entries.map(e => e[1]), 1);
+            let html = '<div class="jr-money">';
+            entries.forEach(([key, val]) => {
+                const pct = (val / maxVal) * 100;
+                html += `<div class="jr-money__row">
+                    <span class="jr-money__k">${key.charAt(0).toUpperCase() + key.slice(1)}</span>
+                    <span class="jr-money__bar"><i style="width:${pct}%;background:${getCostBarColor(key)};"></i></span>
+                    <span class="jr-money__v">${formatCurrency(val)}</span>
+                </div>`;
+            });
+            html += `</div><div class="jr-total"><span>Estimated total</span><b>${formatCurrency(total)}</b></div>`;
+
+            /* Savings \u2014 computed ONLY from real numbers; never fabricated. */
+            html += `<div style="margin-top:1.5rem;">`;
+            if (tripData.budgetUnlimited || !tripData.budget) {
+                html += kv('Against your budget', 'Not estimated (unlimited budget)', true);
+            } else if (total > 0) {
+                const budgetTotal = tripData.budget * (tripData.travelers || 1);
+                const diff = budgetTotal - total;
+                html += kv(`Against your budget (${formatCurrency(budgetTotal)} total)`,
+                    diff >= 0 ? `You save ${formatCurrency(diff)}` : `${formatCurrency(-diff)} over budget`);
+            } else {
+                html += kv('Against your budget', 'Not estimated', true);
+            }
+            const others = (tripData.itineraries || []).filter(i => i.status !== 'SELECTED' && planTotal(i) != null);
+            const sel = planTotal(itin);
+            if (others.length && sel != null) {
+                const cheapest = Math.min(sel, ...others.map(planTotal));
+                const priciest = Math.max(sel, ...others.map(planTotal));
+                if (sel === cheapest && priciest > cheapest) {
+                    html += kv(`Cheapest of ${others.length + 1} generated plans`, `You save ${formatCurrency(priciest - sel)} vs the priciest plan`);
+                } else if (priciest > cheapest) {
+                    html += kv('vs the cheapest generated plan', `${formatCurrency(sel - cheapest)} more for this plan's comfort level`, true);
+                }
+            }
+            html += `</div>`;
+            box.innerHTML = html;
+            updateBookBar();
+        }
+
+        function kv(k, v, unavailable) {
+            return `<div class="jr-kv"><div class="jr-kv__k">${esc(k)}</div><div class="jr-kv__v${unavailable ? ' is-unavailable' : ''}">${esc(v)}</div></div>`;
+        }
+
+        /* ------------------------------------------------ 3b. budget usage
+           The numbers come from /api/trips/<id>/budget rather than being
+           recomputed here. There used to be three different implementations of
+           this arithmetic (this page, the API response, and the planner), and
+           they disagreed - notably on whether a trip was unlimited. One source
+           now, so the page cannot show a different total from the API.
+
+           Every field is a number or null, and null means "not known", never
+           zero. That distinction is the whole point: a total that silently
+           omits unpriced bookings is worse than no total. */
+        function renderBudget() {
+            const box = document.getElementById('boxBudget');
+            if (!box) return;
+            const b = tripData.budgetView;
+
+            // No itinerary yet: say so rather than showing an empty gauge.
+            if (!b || !b.hasItinerary) {
+                box.innerHTML = '';
+                return;
+            }
+
+            const TONE = {
+                comfortable: 'jade', tight: 'amber', over: 'coral',
+                unlimited: 'slate', unknown: 'slate'
+            };
+            const STATUS_TEXT = {
+                comfortable: 'Comfortably within budget',
+                tight: 'Close to your budget limit',
+                over: 'Over budget',
+                unlimited: 'No budget limit set on this trip',
+                unknown: 'Not enough priced items to judge against your budget'
+            };
+            const tone = TONE[b.status] || 'slate';
+            const pct = b.utilisationPct != null
+                ? Math.min(100, Math.max(0, b.utilisationPct))
+                : null;
+
+            let html = '<div class="jr-bud">';
+
+            // Headline: how much of the budget is gone.
+            html += `<div class="jr-bud__hero">
+                <div class="jr-bud__hero-k">${b.unlimited ? 'Estimated total'
+                    : (pct != null ? Math.round(pct) + '% of budget used' : 'Estimated total')}</div>
+                <div class="jr-bud__hero-v">${b.estimatedTotal != null
+                    ? formatCurrency(b.estimatedTotal) : 'Not estimated'}</div>
+                <div class="jr-bud__hero-m">${esc(STATUS_TEXT[b.status] || '')}</div>
+            </div>`;
+
+            // The bar. Only drawn when there is a budget to be a percentage of.
+            if (pct != null) {
+                const over = b.status === 'over';
+                html += `<div class="jr-bud__meter" role="img"
+                    aria-label="${esc(Math.round(b.utilisationPct))}% of your budget used">
+                    <i class="jr-bud__meter-fill jr-bud__meter-fill--${tone}"
+                       style="width:${pct}%"></i>
+                    ${over ? '<i class="jr-bud__meter-over"></i>' : ''}
+                </div>`;
+            }
+
+            html += '<div class="jr-bud__grid">';
+
+            if (b.budgetTotal != null) {
+                html += budStat('Budget for the whole trip',
+                    formatCurrency(b.budgetTotal)
+                    + (b.travelers > 1 ? ' (' + b.travelers + ' travellers)' : ''));
+                html += budStat('Per traveller', formatCurrency(b.budgetPerTraveller));
+                if (b.perTravellerEstimated != null) {
+                    html += budStat('Estimated per traveller',
+                        formatCurrency(b.perTravellerEstimated));
+                }
+            } else {
+                html += budStat('Budget', 'No limit set', true);
+            }
+
+            if (b.bookedTotal != null) {
+                html += budStat('Already booked and paid',
+                    formatCurrency(b.bookedTotal)
+                    + (b.bookings.priced > 1
+                        ? ' (' + b.bookings.priced + ' bookings)' : ''));
+            } else if (b.bookings.unpriced > 0) {
+                html += budStat('Already booked', 'Not priced yet', true);
+            }
+
+            if (b.headroom != null) {
+                html += budStat(b.headroom >= 0 ? 'Left in budget' : 'Over budget by',
+                    formatCurrency(Math.abs(b.headroom)),
+                    b.headroom < 0);
+            }
+
+            html += '</div>';  // grid
+
+            // Per-category: what the money is actually going on. Bar length is
+            // share of spend, and the budget share is printed alongside so a
+            // big category that happens to be small relative to the budget is
+            // not mistaken for the biggest line item.
+            if (b.categories && b.categories.length) {
+                html += '<div class="jr-bud__cats"><h3 class="jr-bud__h">Where the money goes</h3>';
+                b.categories.forEach(c => {
+                    const share = c.shareOfSpend || 0;
+                    html += `<div class="jr-bud__cat">
+                        <div class="jr-bud__cat-top">
+                            <span class="jr-bud__cat-k">${esc(c.label)}</span>
+                            <span class="jr-bud__cat-v">${formatCurrency(c.amount)}</span>
+                        </div>
+                        <div class="jr-bud__cat-bar">
+                            <i style="width:${Math.min(100, share)}%"></i>
+                        </div>
+                        <div class="jr-bud__cat-m">${share}% of estimated spend${c.shareOfBudget != null
+                            ? ' \u00b7 ' + c.shareOfBudget + '% of budget' : ''}</div>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+
+            // Honesty footer. A total that quietly drops unpriced items is not a
+            // total the traveller can rely on, so the gap is named out loud.
+            const caveats = [];
+            if (b.unpricedItems > 0) {
+                caveats.push(b.unpricedItems + ' item' + (b.unpricedItems === 1 ? '' : 's')
+                    + ' in this plan have no price yet');
+            }
+            if (b.bookings && b.bookings.unpriced > 0) {
+                caveats.push(b.bookings.unpriced + ' booking' + (b.bookings.unpriced === 1 ? '' : 's')
+                    + ' not priced yet');
+            }
+            if (b.bookings && b.bookings.cancelled > 0) {
+                caveats.push(b.bookings.cancelled + ' cancelled booking'
+                    + (b.bookings.cancelled === 1 ? '' : 's') + ' excluded');
+            }
+            if (caveats.length) {
+                html += '<p class="jr-bud__caveat">Excludes: '
+                    + esc(caveats.join('; ')) + '. The totals above are not final.</p>';
+            }
+
+            html += '</div>';
+            box.innerHTML = html;
+        }
+
+        function budStat(label, value, bad) {
+            return `<div class="jr-bud__stat">
+                <div class="jr-bud__stat-k">${esc(label)}</div>
+                <div class="jr-bud__stat-v${bad ? ' is-bad' : ''}">${esc(value)}</div>
+            </div>`;
+        }
+
+        /* Re-fetch the derived budget numbers after anything that changes the
+           itinerary or the bookings. Never throws: on failure the previous
+           figures stay on screen, which is stale but not wrong-looking, and a
+           thrown error here would leave the removal flow reporting failure for
+           a change that in fact succeeded. */
+        async function refreshBudget() {
+            try {
+                const res = await api.getBudget(tripId);
+                if (res && res.budget) {
+                    tripData.budgetView = res.budget;
+                    renderBudget();
+                }
+            } catch (e) {
+                // Deliberately swallowed. Stale money beats no money, and the
+                // page has no error slot for this.
+            }
+        }
+
+        /* ------------------------------------------ 4. the other real plans */
+        function renderCompare() {
+            const box = document.getElementById('boxCompare');
+            const itins = tripData.itineraries || [];
+            if (!itins.length) { box.innerHTML = '<p class="tm-sm tm-muted" style="margin:0;">No plans to compare.</p>'; return; }
+            box.innerHTML = '<div class="jr-plans">' + itins.map((itin, idx) => {
+                const sel = itin.status === 'SELECTED';
+                const total = planTotal(itin);
+                const days = itin.items?.[itin.items.length - 1]?.day || '?';
+                return `<button class="jr-plan" type="button" onclick="selectPlan(${idx})"${sel ? ' aria-current="true"' : ''}>
+                    <span class="jr-plan__t">${esc(itin.planType || 'Plan')}${sel ? ' <span class="tm-chip tm-chip--jade">Selected</span>' : ''}</span>
+                    <span class="jr-plan__v">${total != null ? formatCurrency(total) : 'Not estimated'}</span>
+                    <span class="jr-plan__m">Comfort ${itin.comfortScore != null ? Math.round(itin.comfortScore * 100) + '%' : '\u2014'} \u00b7 optimised ${itin.optimizationScore != null ? Math.round(itin.optimizationScore * 100) + '%' : '\u2014'} \u00b7 ${days} day(s) \u00b7 ${esc(itin.travelTime || 'travel time not estimated')}</span>
+                </button>`;
+            }).join('') + '</div>';
+        }
+
+        function selectPlan(idx) {
+            selectedPlanIndex = idx;
+            const itin = (tripData.itineraries || [])[idx];
+            if (itin) TM.toast(`${itin.planType || 'That plan'} is the one TripMind selected. Other plans stay available for comparison.`);
+            renderCompare();
+        }
+
+        const styleLabels = { BUDGET: 'Budget', BALANCED: 'Balanced', COMFORT: 'Comfort', PREMIUM: 'Premium' };
+        const psLabels = { TRANSPORT: 'Comfortable transport', HOTELS: 'Better hotels', ACTIVITIES: 'More activities & tours', GUIDE: 'Local guide' };
+
+        /* ------------------------------------------- 5. what the AI was told */
+        function renderInputs() {
+            const rows = [
+                ['Origin', tripData.origin || 'Not set'],
+                ['Destination', tripData.destination || 'Not set'],
+                ['Dates', `${formatDate(tripData.startDate)} \u2013 ${formatDate(tripData.endDate)}`],
+                ['Travellers', String(tripData.travelers || 1)],
+                ['Budget per traveller', tripData.budgetUnlimited || !tripData.budget ? 'Unlimited' : formatCurrency(tripData.budget)],
+                ['Travel style', styleLabels[tripData.travelStyle] || 'Balanced'],
+                ['Return trip', tripData.returnTrip ? 'Yes \u2014 round trip' : 'No \u2014 one way'],
+                ['Premium services', (tripData.premiumServices || []).length ? (tripData.premiumServices || []).map(p => psLabels[p] || p).join(', ') : 'None'],
+                ['Transport mode', tripData.transportType || 'No preference'],
+                ['Starting point', (tripData.startLocation && tripData.startLocation.address) || tripData.startLocation || 'Not set'],
+                ['Spot preference', (tripData.prioritizedSpotIds || []).length ? `${tripData.prioritizedSpotIds.length} spot(s) chosen by you` : 'No preference \u2014 AI picked'],
+                ['Description for the AI', tripData.preferences || 'Not provided'],
+            ];
+            document.getElementById('boxInputs').innerHTML =
+                `<details class="jr-disclosure"><summary>Everything you told TripMind</summary>
+                 <div class="jr-disclosure__body">
+                   <p class="tm-sm tm-muted" style="margin:0 0 .5rem;">This is exactly what was sent to the AI planner for this trip.</p>
+                   ${rows.map(([k, v]) => kv(k, esc(v))).join('')}
+                 </div></details>`;
+        }
+
+        function renderEvents() {
+            const events = tripData.events || [];
+            const sec = document.getElementById('secEvents');
+            const rail = document.querySelector('[data-rail="secEvents"]');
+            if (!sec) return;
+            if (!events.length) {
+                sec.hidden = true;
+                // Hide the rail link rather than removing it. renderEvents()
+                // re-runs after every replan, booking and assistant edit, and
+                // remove() is permanent: the second run with events present
+                // found no link to relabel, so the section could never be
+                // reached from the rail again.
+                if (rail) rail.hidden = true;
+                return;
+            }
+            sec.hidden = false;
+            if (rail) {
+                rail.hidden = false;
+                rail.textContent = 'Events (' + events.length + ')';
+                rail.href = '#secEvents';
+            }
+            document.getElementById('boxEvents').innerHTML = events.map(ev =>
+                `<div class="jr-kv" style="align-items:start;">
+                   <div class="jr-kv__k">${getSeverityBadge(ev.severity)}</div>
+                   <div><div style="font-weight:620;color:var(--tm-ink);">${esc(ev.title)}</div>
+                   <div class="jr-kv__v" style="font-size:var(--tm-f-xs);color:var(--tm-muted);">${esc(ev.description || '')}</div>
+                   <div class="jr-kv__v" style="font-size:var(--tm-f-2xs);color:var(--tm-muted);">${formatDate(ev.occurredAt)}</div></div>
+                 </div>`).join('');
+        }
+
+        /* SMART PACKING \u2014 generated server-side from the real trip + real
+           weather; loaded when the section is reached (Part 14/15). */
+        let packingLoaded = false;
+        async function renderPacking(force) {
+            const box = document.getElementById('boxPacking');
+            if (!force && packingLoaded && box.innerHTML) return;
+            box.innerHTML = '<div class="jr-loading" style="padding:2.5rem 0;"><div class="spinner"></div><p class="tm-sm tm-muted" style="margin:0;">Building your packing list from this trip and live weather\u2026</p></div>';
+            try {
+                const p = await api.tripPacking(tripId, force);
+                packingLoaded = true;
+                drawPacking(p, box);
+            } catch (e) {
+                box.innerHTML = `<div class="tm-panel" style="border-left:3px solid var(--tm-clay);">
+                    <h3 style="margin:0 0 .35rem;font-size:1rem;">Packing optimizer unavailable</h3>
+                    <p class="tm-sm tm-muted" style="margin:0;">${esc(e.message)}</p></div>`;
+            }
+        }
+
+        function drawPacking(p, box) {
+            const w = p.weather || {};
+            const ctx = p.context || {};
+            const cats = { clothing: 'Clothing', essential: 'Essentials', weather: 'Weather-specific', activity: 'Activity-specific', documents: 'Documents', tech: 'Tech', health: 'Health', optional: 'Optional' };
+            const groups = {};
+            (p.items || []).forEach(i => { (groups[i.category] = groups[i.category] || []).push(i); });
+            let html = '';
+            const facts = [
+                ['Weather', w.available ? (w.summary || '') : 'Not available \u2014 ' + (w.reason || 'weather service unavailable'), !w.available],
+                ['Trip duration', `${ctx.days || '?'} day(s)`, false],
+                ['Travellers', String(ctx.travelers || tripData.travelers || 1), false],
+                ['Activities', (ctx.activities && ctx.activities.length) ? ctx.activities.join(' \u00b7 ') : 'General sightseeing', false],
+                ['Bag estimate', `${(p.totalWeightG / 1000).toFixed(1)} kg \u00b7 ${p.itemCount} items`, false],
+            ];
+            if (w.available && w.tripForecastNote) facts.push(['Trip forecast', w.tripForecastNote, false]);
+            if (!w.available) facts.push(['Weather-specific items', 'None added \u2014 no weather data was available, so nothing was invented.', true]);
+            if (p.optimization && p.optimization.length) facts.push(['How this list was built', p.optimization.join(' \u00b7 '), false]);
+            html += facts.map(([k, v, na]) => kv(k, esc(v), na)).join('');
+            if (p.notes) html += `<p class="tm-sm tm-muted" style="margin-top:1rem;">${esc(p.notes)}</p>`;
+            Object.keys(groups).forEach(cat => {
+                html += `<h3 style="font-size:var(--tm-f-2xs);letter-spacing:.14em;text-transform:uppercase;color:var(--tm-muted);margin:1.75rem 0 .4rem;">${esc(cats[cat] || cat)}</h3>`;
+                groups[cat].forEach(i => {
+                    html += `<div class="jr-kv">
+                        <div class="jr-kv__k" style="letter-spacing:0;text-transform:none;font-size:var(--tm-f-sm);color:var(--tm-ink);">\u2713 ${i.qty} \u00d7 ${esc(i.name)}</div>
+                        <div><div class="jr-kv__v" style="font-size:var(--tm-f-xs);color:var(--tm-muted);">${esc(i.reason || '')}</div></div>
+                        <div class="jr-kv__v" style="text-align:right;">${i.weightG ? ((i.weightG * i.qty) / 1000).toFixed(2) + ' kg' : ''}</div>
+                    </div>`;
+                });
+            });
+            html += `<p class="jr-kv__v is-unavailable" style="margin-top:1.5rem;font-size:var(--tm-f-2xs);">Generated from your actual itinerary \u00b7 weather: ${w.available ? 'real data (' + esc(w.source || 'weatherapi.com') + ')' : 'unavailable (not fabricated)'} \u00b7 ${esc((p.generatedAt || '').slice(0, 16).replace('T', ' '))}</p>`;
+            box.innerHTML = html;
+        }
+
+        /* DIGITAL TRIP TWIN \u2014 a live structured view of the planned journey
+           built only from real trip state (Part 16-19). */
+        let twinLoaded = false;
+        async function renderTwin(force) {
+            const box = document.getElementById('boxTwin');
+            if (!force && twinLoaded && box.innerHTML) return;
+            box.innerHTML = '<div class="jr-loading" style="padding:2.5rem 0;"><div class="spinner"></div><p class="tm-sm tm-muted" style="margin:0;">Reading live trip state\u2026</p></div>';
+            try {
+                const t = await api.tripTwin(tripId);
+                twinLoaded = true;
+                drawTwin(t, box);
+            } catch (e) {
+                box.innerHTML = `<div class="tm-panel" style="border-left:3px solid var(--tm-clay);">
+                    <h3 style="margin:0 0 .35rem;font-size:1rem;">Digital Twin unavailable</h3>
+                    <p class="tm-sm tm-muted" style="margin:0;">${esc(e.message)}</p></div>`;
+            }
+        }
+
+        function drawTwin(t, box) {
+            const j = t.journey || {};
+            const b = t.budget || {};
+            const w = t.weather || {};
+            const stateLabel = { UPCOMING: 'Upcoming', IN_PROGRESS: 'In progress', COMPLETED: 'Completed' }[j.state] || j.state;
+            const statePos = j.currentDay ? ` \u00b7 Day ${j.currentDay} of ${j.daysTotal}` : (j.daysTotal ? ` \u00b7 ${j.daysTotal} days` : '');
+            const money = v => (v == null ? 'Not estimated' : formatCurrency(v));
+            let html = '';
+            html += kv('Journey status', esc(stateLabel + statePos));
+            html += kv('Route', esc(`${j.origin || ''} \u2192 ${j.destination || ''}${j.returnTrip ? ' \u00b7 round trip' : ''}`));
+            html += kv('Travellers', esc(`${t.traveller?.travelers || 1} \u00b7 ${styleLabels[t.traveller?.travelStyle] || ''}`));
+            html += kv('Weather', w.available ? esc(w.summary || '') : 'Not available \u2014 ' + esc(w.reason || 'weather service unavailable'), !w.available);
+            (t.legs || []).forEach(l => html += kv(`${l.domain} \u2014 ${l.title}`, `${l.status}${l.delayed ? ' \u26a0 Delayed' : ''}`));
+            html += kv('Weather connection', w.available ? (w.summary || 'Connected') : 'Not connected \u2014 no weather source', !w.available);
+            html += kv('Budget', `${money(b.paid)} paid / ${money(b.estimated)} estimated`);
+            html += kv('Delay / disruption', (t.disruptions || []).length ? `${t.disruptions.length} recorded \u2014 see Events` : 'None recorded');
+            const lug = t.luggage || {};
+            html += kv('Luggage', lug.connected ? `${lug.status || 'Unknown'}${lug.location ? ' \u00b7 ' + lug.location : ''}`
+                : 'Not connected \u2014 architecture-ready (no tracking source)', !lug.connected);
+            if ((t.bookings || []).length) {
+                html += `<h3 style="font-size:var(--tm-f-2xs);letter-spacing:.14em;text-transform:uppercase;color:var(--tm-muted);margin:1.75rem 0 .4rem;">Bookings</h3>`;
+                t.bookings.forEach(bk => html += kv(`${bk.itemTitle || bk.type || 'Booking'}`,
+                    `${bk.reference || ''} \u00b7 ${bk.status || ''} \u00b7 ${bk.paymentStatus || 'PENDING'} \u2014 ${money(bk.price)}`));
+            }
+            if ((t.disruptions || []).length) {
+                html += `<h3 style="font-size:var(--tm-f-2xs);letter-spacing:.14em;text-transform:uppercase;color:var(--tm-muted);margin:1.75rem 0 .4rem;">Disruptions</h3>`;
+                t.disruptions.forEach(dv => html += kv(getSeverityBadge(dv.severity), esc(dv.title || '') + (dv.description ? ' \u2014 ' + esc(dv.description) : '')));
+            }
+            html += `<p class="jr-kv__v is-unavailable" style="margin-top:1.5rem;font-size:var(--tm-f-2xs);">Built from real trip state (itinerary, bookings, budget, events${w.available ? ', weather' : ''}) \u2014 no simulated data \u00b7 refreshed ${esc((t.generatedAt || '').slice(0, 16).replace('T', ' '))}</p>`;
+            html += `<div style="margin-top:1rem;"><button class="tm-btn tm-btn--secondary tm-btn--sm" type="button" onclick="renderTwin(true)">Refresh the twin</button></div>`;
+            box.innerHTML = html;
+        }
+
+        function openAssistant() {
+            const panel = document.getElementById('chatPanel');
+            if (!panel.classList.contains('active')) document.getElementById('chatToggle').click();
+            panel.scrollIntoView({ behavior: TM.reducedMotion() ? 'auto' : 'smooth', block: 'nearest' });
+        }
+
+        /* Kept for anything that still asks for a "tab": now a smooth jump. */
+        function switchTab(name) {
+            const target = document.getElementById('sec' + name.charAt(0).toUpperCase() + name.slice(1));
+            if (!target) return;
+            target.scrollIntoView({ behavior: TM.reducedMotion() ? 'auto' : 'smooth', block: 'start' });
+            // A hidden rail still eats scroll-margin-top, so a manual jump has
+            // to clear the value it is about to compute.
+            target.focus({ preventScroll: true });
+        }
+
+        /* Idempotent on purpose.
+           renderTrip() is re-run after booking, after an assistant edit and
+           after a replan, and each of those used to call initRailSpy() again.
+           Every call created a fresh ResizeObserver, a fresh
+           IntersectionObserver and two more capture-phase listeners on
+           document, and nothing ever disconnected the previous ones. Three
+           renders meant three observers all writing aria-current on the same
+           links, fighting each other, plus a growing listener leak. The
+           teardown below is what makes re-running safe. */
+        let railTeardown = null;
+
+        function initRailSpy() {
+            if (railTeardown) { railTeardown(); railTeardown = null; }
+
+            const rail = document.querySelector('.jr-rail');
+            const links = Array.from(document.querySelectorAll('.jr-rail__link'));
+            if (!links.length || !('IntersectionObserver' in window)) return;
+
+            const disposers = [];
+
+            // Publish the live rail height so scroll-margin-top always matches,
+            // whatever the wrap point, font size or zoom ends up being.
+            const syncRailHeight = () => {
+                if (rail) {
+                    document.documentElement.style.setProperty(
+                        '--jr-rail-h', rail.offsetHeight + 'px');
+                }
+            };
+            syncRailHeight();
+            let ro = null;
+            if ('ResizeObserver' in window && rail) {
+                ro = new ResizeObserver(syncRailHeight);
+                ro.observe(rail);
+                disposers.push(() => ro.disconnect());
+            } else {
+                window.addEventListener('resize', syncRailHeight);
+                disposers.push(() => window.removeEventListener('resize', syncRailHeight));
+            }
+
+            // Manual jumps must also beat smooth scrolling to the section,
+            // otherwise the observer can re-highlight the previous link while
+            // the page is still animating.
+            let locked = 0;
+            const lock = () => { locked = Date.now() + 900; };
+            const onClick = e => {
+                const link = e.target.closest ? e.target.closest('.jr-rail__link') : null;
+                if (link) lock();
+            };
+            const onKey = e => {
+                if (e.key === 'Enter' || e.key === ' ' || e.key.startsWith('Arrow')) lock();
+            };
+            document.addEventListener('click', onClick, true);
+            document.addEventListener('keydown', onKey, true);
+            disposers.push(() => document.removeEventListener('click', onClick, true));
+            disposers.push(() => document.removeEventListener('keydown', onKey, true));
+
+            const byId = {};
+            links.forEach(l => { byId[l.dataset.rail] = l; });
+            const io = new IntersectionObserver(entries => {
+                if (Date.now() < locked) return;
+                entries.forEach(e => {
+                    if (!e.isIntersecting) return;
+                    links.forEach(l => l.removeAttribute('aria-current'));
+                    const link = byId[e.target.id];
+                    if (link) {
+                        link.setAttribute('aria-current', 'true');
+                        // Only scroll the rail link horizontally into view, never vertically
+                        link.scrollIntoView({ behavior: TM.reducedMotion() ? 'auto' : 'smooth', block: 'nearest', inline: 'center', preventScroll: true });
+                    }
+                });
+            }, { rootMargin: '-45% 0px -50% 0px' });
+            Object.keys(byId).forEach(id => { const s = document.getElementById(id); if (s) io.observe(s); });
+            disposers.push(() => io.disconnect());
+
+            railTeardown = () => disposers.forEach(fn => { try { fn(); } catch (e) { /* already gone */ } });
+        }
+
+        function watchLazySections() {
+            if (!('IntersectionObserver' in window)) { renderPacking(); renderTwin(); return; }
+            const io = new IntersectionObserver(entries => {
+                entries.forEach(e => {
+                    if (!e.isIntersecting) return;
+                    io.unobserve(e.target);
+                    if (e.target.id === 'secPacking') renderPacking();
+                    if (e.target.id === 'secTwin') renderTwin();
+                });
+            }, { rootMargin: '0px 0px -20% 0px' });
+            const p = document.getElementById('secPacking');
+            const t = document.getElementById('secTwin');
+            if (p) io.observe(p);
+            if (t) io.observe(t);
+        }
+
+        async function bookTrip() {
+            const btn = document.getElementById('bookBtn');
+            TM.button(btn, true);
+            try {
+                // Unified Confirm & Book: validates live availability, books and
+                // pays from the wallet in one step. Populate the wallet first if
+                // the passenger wants wallet payment for every item.
+                const result = await api.confirmBookTrip(tripId, true);
+                let html = result.walletStatus && !result.walletStatus.sufficient
+                    ? `<p class="mb-2" style="color:var(--amber);">Wallet balance \u20b9${result.walletStatus.balance.toLocaleString('en-IN')} was less than the \u20b9${result.walletStatus.required.toLocaleString('en-IN')} required \u2014 bookings created with payment PENDING. Top up your wallet and pay from My Wallet.</p>`
+                    : `<p class="mb-4">Trip booked${result.paymentStatus === 'COMPLETED' ? ' and payment completed from wallet' : ' \u2014 payment is pending'}!</p>`;
+                html += `<p class="mb-2 text-sm text-muted">${esc(result.message || '')}</p>`;
+                result.bookings.forEach(b => {
+                    html += `<div class="flex justify-between mb-2"><span>${esc(b.provider)} (${esc(b.bookingReference)})</span><span class="font-bold">${formatCurrency(b.price)}</span></div>`;
+                });
+                html += `<div class="flex justify-between mt-4" style="padding-top:1rem;border-top:1px solid var(--slate-100);"><span class="font-bold">Total</span><span class="font-bold" style="color:var(--emerald);">${formatCurrency(result.totalCost)}</span></div>`;
+                document.getElementById('bookingModalBody').innerHTML = html;
+                document.getElementById('bookingModal').classList.add('active');
+                tripData = await api.getTrip(tripId);
+                renderTrip();
+                initRailSpy();
+            } catch (e) {
+                TM.toast('Booking error: ' + e.message, 'error');
+            } finally {
+                TM.button(btn, false);
+            }
+        }
+
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+        document.querySelectorAll('.modal-overlay').forEach(m => {
+            m.addEventListener('click', (e) => { if (e.target === m) m.classList.remove('active'); });
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+        });
+
+        loadTrip();
+    </script>
+    <script src="/js/pwa.js" defer></script>
+</body>
+</html>

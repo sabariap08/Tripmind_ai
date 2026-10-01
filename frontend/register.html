@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create your TripMind account</title>
+    <meta name="description" content="Create your TripMind AI traveller account and start planning trips in seconds. Running a travel service? Use the TripMind Partner Hub.">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* Register shell. The wizard body itself is built by js/register.js,
+           which still emits the legacy .form-* / .role-card class names &#8212; those
+           are mapped onto the design system in css/theme.css. */
+        .reg-wrap { min-height: 100vh; min-height: 100dvh; display: grid; grid-template-columns: .9fr 1.1fr; }
+        @media (max-width: 1000px) { .reg-wrap { grid-template-columns: 1fr; } .reg-art { display: none; } }
+        .reg-art { position: relative; isolation: isolate; overflow: hidden; background: var(--tm-ink); color: var(--tm-on-dark); padding: clamp(1.5rem, 4vw, 3rem); display: flex; flex-direction: column; justify-content: space-between; }
+        .reg-art img.bg { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; }
+        .reg-art::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(165deg, rgba(6, 32, 43, .9), rgba(6, 32, 43, .6) 50%, rgba(6, 32, 43, .95)); }
+        .reg-art h2 { color: var(--tm-white); font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2.3rem); max-width: 16ch; }
+        .reg-art ul { list-style: none; padding: 0; margin: var(--tm-s5) 0 0; display: grid; gap: .8rem; }
+        .reg-art li { display: flex; gap: .65rem; align-items: flex-start; font-size: var(--tm-f-sm); color: var(--tm-on-dark-2); }
+        .reg-art li b { color: var(--tm-white); font-weight: 620; display: block; }
+        .reg-main { display: grid; place-items: start center; padding: clamp(1.5rem, 4vw, 3.5rem) clamp(1rem, 4vw, 3rem); background: var(--tm-sand); }
+        .reg-box { width: 100%; max-width: 40rem; }
+        .wiz-steps { display: flex; gap: .35rem; margin-bottom: var(--tm-s5); }
+        .wiz-step { flex: 1; min-width: 0; text-align: center; font-size: var(--tm-f-2xs); letter-spacing: .08em; text-transform: uppercase; font-weight: 650;
+            color: var(--tm-muted); padding: .55rem .3rem; border-radius: var(--tm-pill); background: var(--tm-sand-2); position: relative; transition: all var(--tm-dur-2) var(--tm-ease); }
+        .wiz-step.done { color: var(--tm-jade); background: #e7f4ee; }
+        .wiz-step.active { color: var(--tm-ink); background: var(--tm-white); box-shadow: inset 0 0 0 1.5px var(--tm-ink); }
+        .auth-msg { min-height: 1.5rem; margin-bottom: var(--tm-s3); }
+        .auth-msg .form-error, .auth-msg .error { color: var(--tm-clay); font-size: var(--tm-f-sm); }
+        .auth-msg .form-success, .auth-msg .success { color: var(--tm-jade); font-size: var(--tm-f-sm); }
+        .wiz-actions { display: flex; justify-content: space-between; align-items: center; margin-top: var(--tm-s5); gap: var(--tm-s3); }
+        .hint { font-size: var(--tm-f-2xs); color: var(--tm-muted); }
+        .hint2 { font-size: var(--tm-f-2xs); color: var(--tm-muted); margin-top: .25rem; }
+        .form-row { margin-bottom: var(--tm-s4); }
+        .role-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: .6rem; }
+        .detail-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0 1.25rem; }
+        .summary-note { margin-top: .5rem; font-size: var(--tm-f-xs); color: var(--tm-jade); }
+        .row-table-scroll { overflow-x: auto; }
+        .tm-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+        /* Passenger-first: single flow for traveller accounts.
+            Provider applications go through the TripMind Partner Hub (/tripmind-partner/register). */
+        body[data-reg-flow="passenger"] .wiz-step--provider { display: none; }
+        body[data-reg-flow="provider"] .reg-passenger-note { display: none; }
+        .reg-alt { margin-top: var(--tm-s6); padding-top: var(--tm-s5); border-top: 1px solid var(--tm-line); display: grid; gap: .6rem; }
+        .reg-alt__link { display: flex; flex-wrap: wrap; align-items: baseline; gap: .45rem; font-size: var(--tm-f-xs); color: var(--tm-muted); text-decoration: none; }
+        .reg-alt__link:hover { color: var(--tm-ink); }
+        .reg-alt__link b { color: var(--tm-ink-soft); font-weight: 620; text-decoration: underline; text-underline-offset: 3px; }
+    </style>
+    <meta name="theme-color" content="#06202b">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+    <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TripMind AI">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-1290x2796.jpg">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-1170x2532.jpg">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-828x1792.jpg">
+    <link rel="stylesheet" href="css/theme.css">
+    <script src="js/ui.js"></script>
+</head>
+<body>
+    <a class="skip-link" href="#wizContent">Skip to the form</a>
+
+    <div class="reg-wrap">
+        <aside class="reg-art">
+            <img class="bg" src="img/pagehead-journey.jpg" alt="" aria-hidden="true" width="2000" height="900">
+            <a href="/" class="tm-brand tm-brand--on-dark" aria-label="TripMind AI home">
+                <span class="tm-brand__mark"><svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                <span class="tm-brand__text">
+                    <span class="tm-brand__name">TripMind AI</span>
+                    <span class="tm-brand__tag">Traveling Uniquely</span>
+                </span>
+            </a>
+            <div class="reg-art__body">
+                <h2>Start planning in seconds</h2>
+                <ul>
+                    <li><svg viewBox="0 0 24 24" fill="none" stroke="var(--tm-gold-soft)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span><b>Your account is live immediately</b>No review, no waiting &#8212; create it and start planning.</span></li>
+                    <li><svg viewBox="0 0 24 24" fill="none" stroke="var(--tm-gold-soft)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span><b>Every trip in one place</b>AI itineraries, live transport, stays, food and experiences.</span></li>
+                    <li class="reg-passenger-note" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="var(--tm-gold-soft)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span><b>Running a travel service?</b>The TripMind Partner Hub is the operator side &#8212; buses, vehicles, boarding points and bookings.</span></li>
+                </ul>
+            </div>
+            <p class="tm-2xs" style="color:rgba(255,255,255,.6);margin:0;">Traveling Uniquely. You can change your details any time.</p>
+        </aside>
+
+        <main class="reg-main" id="regMain">
+            <div class="reg-box">
+                <span class="tm-eyebrow">Join TripMind</span>
+                <h1 class="tm-h2" id="wizTitle" style="margin-bottom:.4rem;">Create your account</h1>
+
+<div class="wiz-steps" id="wizSteps" aria-label="Registration progress">
+                    <div class="wiz-step">Basics</div>
+                    <div class="wiz-step">Identity & contact</div>
+                    <div class="wiz-step">Review</div>
+                </div>
+
+                <div class="auth-msg" id="authMsg" role="status" aria-live="polite"></div>
+                <div id="wizContent"></div>
+
+                <div class="wiz-actions">
+                    <button class="btn btn-outline" id="wizBack" type="button" style="display:none;">Back</button>
+                    <button class="btn btn-primary" id="wizNext" type="button">Continue</button>
+                </div>
+
+                <p class="tm-sm tm-muted" style="text-align:center;margin-top:var(--tm-s6);">
+                    Already have an account? <a href="/login.html">Sign in</a>
+                </p>
+
+                <div class="reg-alt">
+                    <a class="reg-alt__link" href="/tripmind-partner"><b>For Travel Partners</b>
+                        <span>Buses, hotels, restaurants, attractions and guides.</span></a>
+                    <a class="reg-alt__link" href="/tripmind-partner/register"><b>Continue with the TripMind Partner Hub</b>
+                        <span>One application for every TripMind service, reviewed by a Main Admin.</span></a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/maps.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/register.js"></script>
+    <script src="/js/pwa.js" defer></script>
+</body>
+</html>

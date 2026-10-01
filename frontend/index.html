@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TripMind AI &#8212; Traveling Uniquely</title>
+    <meta name="description" content="TripMind AI plans the whole journey: live cab fares and distances, an AI-built day-by-day itinerary, weather-aware packing and changes you approve before they happen.">
+    <link rel="preconnect" href="https://images.unsplash.com" crossorigin>
+    <link rel="dns-prefetch" href="https://images.unsplash.com">
+    <link rel="stylesheet" href="css/style.css">
+    <meta name="theme-color" content="#06202b">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+    <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TripMind AI">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-1290x2796.jpg">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-1170x2532.jpg">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-828x1792.jpg">
+    <link rel="stylesheet" href="/css/theme.css">
+    <link rel="preload" href="img/hero-journey.jpg" as="image" fetchpriority="high">
+    <style>
+        /* Landing-only pieces (system lives in css/theme.css) */
+        .lp-flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--tm-s4); counter-reset: lp; }
+        .lp-flow__step { position: relative; padding-top: 2.6rem; }
+        .lp-flow__step::before {
+            counter-increment: lp; content: counter(lp, decimal-leading-zero);
+            position: absolute; top: 0; left: 0; width: 30px; height: 30px; border-radius: 50%;
+            display: grid; place-items: center; font-size: .68rem; font-weight: 700;
+            background: var(--tm-white); border: 1px solid var(--tm-line); color: var(--tm-ink-soft);
+        }
+        .lp-flow__step::after {
+            content: ""; position: absolute; top: 15px; left: 38px; right: -8px; height: 1px;
+            background-image: linear-gradient(90deg, var(--tm-line) 55%, transparent 55%);
+            background-size: 8px 1px;
+        }
+        .lp-flow__step:last-child::after { display: none; }
+        .lp-flow__t { font-weight: 640; color: var(--tm-ink); font-size: var(--tm-f-sm); }
+        .lp-flow__d { font-size: var(--tm-f-2xs); color: var(--tm-muted); margin-top: .15rem; }
+        @media (max-width: 860px) {
+            .lp-flow { grid-template-columns: 1fr; gap: 0; }
+            .lp-flow__step { padding: 0 0 1.1rem 2.6rem; }
+            .lp-flow__step::after { top: 32px; bottom: 0; left: 15px; right: auto; width: 1px; height: auto; background-image: linear-gradient(180deg, var(--tm-line) 55%, transparent 55%); background-size: 1px 8px; }
+        }
+        .lp-panel { border-radius: var(--tm-r-lg); overflow: hidden; box-shadow: var(--tm-sh-3); border: 1px solid var(--tm-line); background: var(--tm-white); }
+        .lp-panel-bar { display: flex; gap: .4rem; padding: .6rem .8rem; background: var(--tm-sand-2); border-bottom: 1px solid var(--tm-line); }
+        .lp-panel-bar i { width: 9px; height: 9px; border-radius: 50%; background: var(--tm-sand-3); }
+        .dest-grid { display: grid; gap: 1px; background: var(--tm-line); border-block: 1px solid var(--tm-line); }
+        @media (min-width: 700px) { .dest-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (min-width: 1100px) { .dest-grid { grid-template-columns: repeat(4, 1fr); } }
+        .dest-tile { position: relative; display: block; min-height: 190px; overflow: hidden; background: var(--tm-ink-2); }
+        .dest-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform .6s var(--tm-ease); }
+        .dest-tile:hover .dest-img { transform: scale(1.05); }
+        .dest-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(6, 32, 43, .1), rgba(6, 32, 43, .82)); }
+        .dest-cap { position: absolute; inset: auto 0 0; padding: .9rem 1rem; color: #fff; }
+        .dest-state { display: block; font-size: .65rem; letter-spacing: .16em; text-transform: uppercase; color: var(--tm-gold-soft); }
+        .dest-cap b { display: block; font-family: var(--tm-font); font-size: 1.1rem; font-weight: 650; letter-spacing: -.015em; }
+        /* Home page only: let the browser skip style/layout/paint work for the
+           landing sections until they scroll near the viewport. The hero is not
+           matched, so the first paint is unaffected. */
+        main > .tm-section,
+        main > .cin-section,
+        main > .cin-band { content-visibility: auto; contain-intrinsic-size: auto 640px; }
+    </style>
+    <script src="js/ui.js"></script>
+</head>
+<body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <div class="tm-splash" data-tm-splash data-tm-splash-max="1400" aria-hidden="true">
+        <div class="tm-splash__inner">
+            <div class="tm-splash__mark">
+                <svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg>
+            </div>
+            <div class="tm-splash__name">TripMind AI</div>
+            <div class="tm-splash__tag">Traveling Uniquely</div>
+            <svg class="tm-splash__path" viewBox="0 0 240 34" fill="none" aria-hidden="true">
+                <path d="M4 26C60 4 150 30 236 8" />
+                <path class="tm-fly" d="M4 26C60 4 150 30 236 8" />
+            </svg>
+            <div class="tm-splash__bar"><i></i></div>
+        </div>
+    </div>
+
+    <!-- Transparent nav over the hero; becomes solid on scroll -->
+    <nav class="tm-nav tm-nav--on-dark" id="siteNav">
+        <div class="tm-nav__inner">
+            <a href="/" class="tm-brand tm-brand--on-dark" aria-label="TripMind AI home">
+                <span class="tm-brand__mark">
+                    <svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg>
+                </span>
+                <span class="tm-brand__text">
+                    <span class="tm-brand__name">TripMind AI</span>
+                    <span class="tm-brand__tag">Traveling Uniquely</span>
+                </span>
+            </a>
+
+            <div class="tm-nav__links">
+                <a class="tm-nav__link" href="/pages/planner.html">Trip Planning</a>
+                <a class="tm-nav__link" href="#explore">Explore</a>
+                <a class="tm-nav__link" href="#how">How it works</a>
+                <a class="tm-nav__link" id="memberLink" href="/pages/dashboard.html" hidden>My Trips</a>
+                <a class="tm-nav__link" id="travellerLink" href="/pages/passengers.html" hidden>Passenger Details</a>
+            </div>
+
+            <div class="tm-nav__actions">
+                <a class="tm-btn tm-btn--on-dark-ghost tm-btn--sm" id="loginLink" href="/login.html">Sign In</a>
+                <a class="tm-btn tm-btn--accent tm-btn--sm" id="registerLink" href="/login.html?signup=1">Create Account</a>
+            </div>
+
+            <button class="tm-burger" type="button" data-tm-drawer-open="navDrawer" aria-label="Open menu" aria-expanded="false" aria-controls="navDrawer">
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Mobile drawer -->
+    <div class="tm-drawer" id="navDrawer" data-open="false" role="dialog" aria-modal="true" aria-label="Menu">
+        <div class="tm-drawer__scrim" data-tm-drawer-close></div>
+        <div class="tm-drawer__panel">
+            <div class="tm-drawer__head">
+                <a href="/" class="tm-brand">
+                    <span class="tm-brand__mark"><svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                    <span class="tm-brand__text">
+                        <span class="tm-brand__name">TripMind AI</span>
+                        <span class="tm-brand__tag">Traveling Uniquely</span>
+                    </span>
+                </a>
+                <button class="tm-drawer__close" type="button" data-tm-drawer-close aria-label="Close menu">&times;</button>
+            </div>
+            <nav class="tm-drawer__links">
+                <a class="tm-drawer__link" href="/pages/planner.html">Trip Planning <span>01</span></a>
+                <a class="tm-drawer__link" href="#explore">Explore <span>02</span></a>
+                <a class="tm-drawer__link" href="#how">How it works <span>03</span></a>
+                <a class="tm-drawer__link" id="drawerMemberLink" href="/pages/dashboard.html" hidden>My Trips <span>04</span></a>
+                <a class="tm-drawer__link" id="drawerTravellerLink" href="/pages/passengers.html" hidden>Passenger Details <span>05</span></a>
+            </nav>
+            <div class="tm-drawer__foot">
+                <a class="tm-btn tm-btn--primary tm-btn--block" href="/pages/planner.html">Plan Your Trip</a>
+                <a class="tm-btn tm-btn--secondary tm-btn--block" id="drawerLoginLink" href="/login.html">Sign In</a>
+            </div>
+        </div>
+    </div>
+
+    <main id="main">
+        <!-- ============================================ HERO -->
+        <section class="tm-hero">
+            <div class="tm-hero__bg">
+                <img src="img/hero-journey.jpg" alt="A road curving towards the sunrise over layered mountain ridges" width="2400" height="1350" fetchpriority="high" decoding="async">
+            </div>
+            <div class="tm-hero__scrim"></div>
+            <div class="tm-container tm-container--wide">
+                <div class="tm-hero__inner">
+                    <span class="tm-eyebrow tm-eyebrow--on-dark" data-reveal>TripMind AI &#183; Traveling Uniquely</span>
+                    <h1 class="tm-display tm-hero__title" data-reveal>Plan Smarter.<br><em>Travel Uniquely.</em></h1>
+                    <p class="tm-hero__sub" data-reveal>One platform for the whole journey &#8212; real cab fares and road distances, an AI-built day-by-day itinerary, packing that knows the weather, and changes you approve before they happen.</p>
+                    <div class="tm-hero__cta" data-reveal>
+                        <a class="tm-btn tm-btn--accent tm-btn--lg" href="/pages/planner.html">Plan Your Trip</a>
+                        <a class="tm-btn tm-btn--on-dark tm-btn--lg" href="#explore">Explore TripMind</a>
+                    </div>
+                    <div class="tm-hero__stats" data-reveal>
+                        <div class="tm-hero__stat"><b>Live</b><span>Road distance &amp; cab fare</span></div>
+                        <div class="tm-hero__stat"><b>Ollama</b><span>AI itinerary, your infra</span></div>
+                        <div class="tm-hero__stat"><b>Real</b><span>Weather-aware packing</span></div>
+                        <div class="tm-hero__stat"><b>Yours</b><span>Approve every change</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="tm-hero__scroll" aria-hidden="true"><i></i>Scroll</div>
+        </section>
+
+        <!-- ============================================ JOURNEY FLOW -->
+        <section class="tm-section tm-section--tight" id="how">
+            <div class="tm-container">
+                <div class="tm-block__head" data-reveal>
+                    <div>
+                        <span class="tm-eyebrow">The journey</span>
+                        <h2 class="tm-h2">From &#8220;where to?&#8221; to booked</h2>
+                    </div>
+                    <p class="tm-sm tm-muted" style="max-width:34ch;">One continuous flow. No dashboards, no hunting through tabs.</p>
+                </div>
+                <div class="lp-flow" data-stagger>
+                    <div class="lp-flow__step">
+                        <div class="lp-flow__t">Pick your start</div>
+                        <div class="lp-flow__d">Drop a pin on the map &#8212; the only field that needs one.</div>
+                    </div>
+                    <div class="lp-flow__step">
+                        <div class="lp-flow__t">Choose where to</div>
+                        <div class="lp-flow__d">Type a city, or pick the spots you actually want to see.</div>
+                    </div>
+                    <div class="lp-flow__step">
+                        <div class="lp-flow__t">Let AI build it</div>
+                        <div class="lp-flow__d">Ollama assembles the day-by-day plan with real fares.</div>
+                    </div>
+                    <div class="lp-flow__step">
+                        <div class="lp-flow__t">Pack &amp; track</div>
+                        <div class="lp-flow__d">Packing from your trip and weather, plus a live trip twin.</div>
+                    </div>
+                    <div class="lp-flow__step">
+                        <div class="lp-flow__t">Book it</div>
+                        <div class="lp-flow__d">One final review, then confirm every booking in one step.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================ EXPLORE -->
+        <section class="tm-section tm-section--flush-top" id="explore">
+            <div class="tm-container tm-container--wide">
+                <div class="tm-block__head" data-reveal>
+                    <div>
+                        <span class="tm-eyebrow">Explore</span>
+                        <h2 class="tm-h2">Where people are going</h2>
+                    </div>
+                    <a class="tm-btn tm-btn--secondary" href="/pages/planner.html">Plan any destination</a>
+                </div>
+            </div>
+            <div class="dest-grid" id="destGrid" data-reveal></div>
+            <div class="tm-container tm-container--wide tm-section--tight">
+                <p class="tm-2xs tm-muted" style="margin:0;">Spots and imagery come from the TripMind catalogue. If a spot has no photo yet, a generated placeholder is shown instead of a broken image.</p>
+            </div>
+        </section>
+
+        <!-- ============================================ WHAT YOU GET (dark) -->
+        <section class="tm-section tm-section--ink">
+            <div class="tm-container">
+                <div class="tm-block__head" data-reveal>
+                    <div>
+                        <span class="tm-eyebrow tm-eyebrow--on-dark">Inside every trip</span>
+                        <h2 class="tm-h2">A complete journey, not a list of cards</h2>
+                    </div>
+                </div>
+                <div class="tm-tiles tm-grid-3" data-stagger>
+                    <div class="tm-tile" style="background:linear-gradient(170deg,#0b3040,#06202b);">
+                        <div class="tm-tile__k" style="color:var(--tm-on-dark-2);">Itinerary</div>
+                        <div class="tm-tile__v" style="color:#fff;">Timeline, not a grid</div>
+                        <div class="tm-tile__n" style="color:var(--tm-on-dark-2);">Each day reads like a real travel day &#8212; times, places and the reason for each stop.</div>
+                    </div>
+                    <div class="tm-tile" style="background:linear-gradient(170deg,#0b3040,#06202b);">
+                        <div class="tm-tile__k" style="color:var(--tm-on-dark-2);">Money</div>
+                        <div class="tm-tile__v" style="color:#fff;">Costs you can trace</div>
+                        <div class="tm-tile__n" style="color:var(--tm-on-dark-2);">Every line ties back to a real fare, hotel or activity. Savings are only shown when they are real.</div>
+                    </div>
+                    <div class="tm-tile" style="background:linear-gradient(170deg,#0b3040,#06202b);">
+                        <div class="tm-tile__k" style="color:var(--tm-on-dark-2);">Flexibility</div>
+                        <div class="tm-tile__v" style="color:#fff;">Propose, then confirm</div>
+                        <div class="tm-tile__n" style="color:var(--tm-on-dark-2);">Ask the assistant for a change; nothing moves until you approve it.</div>
+                    </div>
+                    <div class="tm-tile" style="background:linear-gradient(170deg,#0b3040,#06202b);">
+                        <div class="tm-tile__k" style="color:var(--tm-on-dark-2);">Packing</div>
+                        <div class="tm-tile__v" style="color:#fff;">Weather-aware list</div>
+                        <div class="tm-tile__n" style="color:var(--tm-on-dark-2);">Built from your dates, activities and the actual forecast.</div>
+                    </div>
+                    <div class="tm-tile" style="background:linear-gradient(170deg,#0b3040,#06202b);">
+                        <div class="tm-tile__k" style="color:var(--tm-on-dark-2);">Trip twin</div>
+                        <div class="tm-tile__v" style="color:#fff;">Live journey state</div>
+                        <div class="tm-tile__n" style="color:var(--tm-on-dark-2);">Transport, stay, budget and disruptions in one honest view.</div>
+                    </div>
+                    <div class="tm-tile" style="background:linear-gradient(170deg,#0b3040,#06202b);">
+                        <div class="tm-tile__k" style="color:var(--tm-on-dark-2);">On your phone</div>
+                        <div class="tm-tile__v" style="color:#fff;">Installable</div>
+                        <div class="tm-tile__n" style="color:var(--tm-on-dark-2);">Add TripMind to your home screen and plan on the move.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================ AI TRANSPARENCY -->
+        <section class="tm-section">
+            <div class="tm-container">
+                <div class="tm-split">
+                    <div data-reveal>
+                        <span class="tm-eyebrow">What the AI does</span>
+                        <h2 class="tm-h2">It plans. You decide.</h2>
+                        <p class="tm-lead">Ollama turns your origin, destination, dates and travel style into a real itinerary with timings, providers and costs. The progress you see while it works is tied to the actual request &#8212; we never tick off a step that has not happened.</p>
+                        <ul class="tm-listcheck" style="margin-top:var(--tm-s5);">
+                            <li>Distances and cab fares come from live map data.</li>
+                            <li>If a fare cannot be fetched, TripMind says so instead of guessing.</li>
+                            <li>If the model&#8217;s reply is cut short, complete parts are recovered instead of failing the trip.</li>
+                        </ul>
+                        <div class="tm-row" style="margin-top:var(--tm-s6);">
+                            <a class="tm-btn tm-btn--primary" href="/pages/planner.html">Start planning</a>
+                            <a class="tm-btn tm-btn--ghost" href="/login.html">Sign in to your trips</a>
+                        </div>
+                    </div>
+                    <div data-reveal="scale">
+                        <div class="lp-panel">
+                            <div class="lp-panel-bar"><i></i><i></i><i></i></div>
+                            <div style="padding:var(--tm-s5);background:linear-gradient(170deg,#0b3040,#06202b);">
+                                <span class="tm-eyebrow tm-eyebrow--on-dark">Live preview</span>
+                                <h3 style="color:#fff;">Planning your journey</h3>
+                                <div class="tm-progress" style="margin-top:var(--tm-s5);">
+                                    <div class="tm-progress__steps">
+                                        <div class="tm-pstep" data-state="done">
+                                            <span class="tm-pstep__ico"></span>
+                                            <span class="tm-pstep__t">Checking route and dates<span class="tm-pstep__s">Distance and travel time</span></span>
+                                        </div>
+                                        <div class="tm-pstep" data-state="done">
+                                            <span class="tm-pstep__ico"></span>
+                                            <span class="tm-pstep__t">Building your itinerary<span class="tm-pstep__s">Ollama &#183; day by day</span></span>
+                                        </div>
+                                        <div class="tm-pstep" data-state="active">
+                                            <span class="tm-pstep__ico"></span>
+                                            <span class="tm-pstep__t">Optimising travel<span class="tm-pstep__s">Live fares and timings</span></span>
+                                        </div>
+                                        <div class="tm-pstep" data-state="idle">
+                                            <span class="tm-pstep__ico"></span>
+                                            <span class="tm-pstep__t">Preparing your trip<span class="tm-pstep__s">Packing, twin, budget</span></span>
+                                        </div>
+                                    </div>
+                                    <div class="tm-progress__bar"><i style="width:72%"></i></div>
+                                </div>
+                                <p class="tm-2xs" style="color:rgba(255,255,255,.45);margin-top:var(--tm-s4);">This is the real progress component used during planning.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================ CTA -->
+        <section class="tm-section tm-section--tight" style="background:var(--tm-sand-2);border-top:1px solid var(--tm-line);">
+            <div class="tm-container tm-center">
+                <span class="tm-eyebrow" style="justify-content:center;" data-reveal>Ready when you are</span>
+                <h2 class="tm-h1" data-reveal>Your journey begins here.</h2>
+                <p class="tm-lead tm-mx-auto" data-reveal>Create an account, plan your first trip, and keep every itinerary, fare and change in one place.</p>
+                <div class="tm-row" style="justify-content:center;margin-top:var(--tm-s6);" data-reveal>
+                    <a class="tm-btn tm-btn--primary tm-btn--lg" href="/pages/planner.html">Plan Your Trip</a>
+                    <a class="tm-btn tm-btn--secondary tm-btn--lg" href="/login.html?signup=1">Create Account</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer style="border-top:1px solid var(--tm-line);padding-block:var(--tm-s6) var(--tm-s5);">
+        <div class="tm-container">
+            <div class="tm-row tm-row--between">
+                <a href="/" class="tm-brand">
+                    <span class="tm-brand__mark"><svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                    <span class="tm-brand__text">
+                        <span class="tm-brand__name">TripMind AI</span>
+                        <span class="tm-brand__tag">Traveling Uniquely</span>
+                    </span>
+                </a>
+                <nav class="tm-row" aria-label="Footer">
+                    <a class="tm-sm" href="/pages/planner.html">Trip Planning</a>
+                    <a class="tm-sm" href="#explore">Explore</a>
+                    <a class="tm-sm" href="/login.html">Sign In</a>
+                    <a class="tm-sm" href="/tripmind-partner">For Travel Partners</a>
+                </nav>
+            </div>
+            <p class="tm-2xs tm-muted" style="margin:var(--tm-s5) 0 0;">AI planning runs on Ollama. Fares, distances and weather are live third-party data; where they are unavailable, TripMind says so rather than inventing a number.</p>
+        </div>
+    </footer>
+
+    <script src="js/api.js"></script>
+    <script src="js/destinations.js"></script>
+    <script>
+        tmRenderDestGrid('#destGrid');
+        if (typeof tmReveal === 'function') tmReveal(document);
+
+        // ?signup=1 on this page forwards straight to the Create Account state.
+        if (new URLSearchParams(location.search).get('signup') === '1') {
+            location.replace('/login.html?signup=1');
+        }
+
+        // Hero nav: transparent over the hero, solid once the user scrolls.
+        (function () {
+            var nav = document.getElementById('siteNav');
+            var hero = document.querySelector('.tm-hero');
+            if (!nav || !hero || !('IntersectionObserver' in window)) return;
+            new IntersectionObserver(function (entries) {
+                nav.classList.toggle('tm-nav--on-dark', entries[0].isIntersecting);
+                nav.classList.toggle('tm-nav--scrolled', !entries[0].isIntersecting);
+            }, { threshold: 0 }).observe(hero);
+        })();
+
+        // Auth-aware navigation (visitor vs signed-in member).
+        (async () => {
+            const loginLink = document.getElementById('loginLink');
+            const registerLink = document.getElementById('registerLink');
+            const memberLink = document.getElementById('memberLink');
+            const travellerLink = document.getElementById('travellerLink');
+            const drawerLogin = document.getElementById('drawerLoginLink');
+            const drawerMember = document.getElementById('drawerMemberLink');
+            const drawerTraveller = document.getElementById('drawerTravellerLink');
+            const signOut = async (e) => { if (e) e.preventDefault(); await api.logout(); location.href = '/'; };
+            try {
+                const res = await api.me();
+                const u = res && res.user;
+                if (u && u.id !== 'demo-user-1' && u.email !== 'demo@tripmind.ai') {
+                    if (registerLink) registerLink.hidden = true;
+                    if (memberLink) memberLink.hidden = false;
+                    if (travellerLink) travellerLink.hidden = false;
+                    if (drawerMember) drawerMember.hidden = false;
+                    if (drawerTraveller) drawerTraveller.hidden = false;
+                    if (loginLink) { loginLink.textContent = 'Sign out'; loginLink.href = '#'; loginLink.addEventListener('click', signOut); }
+                    if (drawerLogin) { drawerLogin.textContent = 'Sign out'; drawerLogin.href = '#'; drawerLogin.addEventListener('click', signOut); }
+                }
+            } catch (e) { /* visitor: keep Create Account / Sign In */ }
+        })();
+    </script>
+    <script src="/js/pwa.js" defer></script>
+</body>
+</html>

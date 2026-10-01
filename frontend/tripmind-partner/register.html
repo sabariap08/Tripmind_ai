@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Become a TripMind partner &#8212; Partner Hub</title>
+    <meta name="description" content="Apply to list your bus, hotel, restaurant, attraction or guiding service on TripMind. One application, Main Admin reviewed.">
+    <meta name="theme-color" content="#06202b">
+    <meta name="robots" content="noindex, follow">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+    <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="../css/theme.css">
+    <link rel="stylesheet" href="css/partner.css">
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body class="ph-reg">
+    <a class="ph-skip" href="#phApply">Skip to the form</a>
+
+    <div class="ph-auth">
+        <aside class="ph-auth__art">
+            <img class="bg" src="/img/hero-journey.jpg" alt="" aria-hidden="true" loading="lazy">
+            <a class="ph-wordmark" href="/tripmind-partner">
+                <span class="ph-wordmark__mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="#06202b"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                <span class="ph-wordmark__text">
+                    <span class="ph-wordmark__name">TripMind AI</span>
+                    <span class="ph-wordmark__hub">Partner Hub</span>
+                </span>
+            </a>
+            <div class="ph-auth__body">
+                <p class="tm-eyebrow tm-eyebrow--on-dark">Partner application</p>
+                <h2>One application for every TripMind service.</h2>
+                <ul class="ph-auth__points">
+                    <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2Z"/></svg>Operators, hotels, restaurants, attractions and guides all apply here.</li>
+                    <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2Z"/></svg>We only ask for what your role genuinely needs &#8212; nothing invented.</li>
+                    <li><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2Z"/></svg>Every application is reviewed by a TripMind Main Admin.</li>
+                </ul>
+            </div>
+            <p class="tm-2xs" style="color:var(--tm-on-dark-2);margin:0">Already a partner? <a href="/tripmind-partner/login" style="color:var(--tm-gold-soft)">Sign in instead</a>.</p>
+        </aside>
+
+        <main class="ph-auth__main" id="phApply">
+            <div class="ph-auth__box ph-auth__box--wide">
+                <a class="ph-backlink" href="/tripmind-partner">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12 15.4 5.4Z"/></svg>
+                    TripMind Partner Hub
+                </a>
+
+                <h1 class="tm-h2" style="margin-top:1.5rem">Apply to partner</h1>
+                <p class="tm-sm tm-muted" style="margin:.5rem 0 1.5rem">
+                    Tell us what you run. The form changes to match your service, and every
+                    requirement is labelled <strong>required</strong>, <strong>conditional</strong>
+                    or <strong>optional</strong> with the rule it comes from.
+                </p>
+
+                <div id="phMetaError" class="tm-alert tm-alert--error" hidden></div>
+
+                <!-- Role chooser -->
+                <section id="phRoleStep" class="ph-step" aria-labelledby="phRoleStepH">
+                    <h2 class="ph-form__legend" id="phRoleStepH">1. What kind of partner are you?</h2>
+                    <div class="ph-rolegrid" id="phRoleGrid" role="radiogroup" aria-label="Partner type">
+                        <p class="tm-sm tm-muted">Loading partner types&#8230;</p>
+                    </div>
+                </section>
+
+                <!-- Everything below is rendered from the server schema -->
+                <form id="phRegForm" novalidate hidden>
+                    <ol class="ph-steps" id="phStepBar" aria-label="Application steps"></ol>
+
+                    <div class="ph-step" data-step="account">
+                        <h2 class="ph-form__legend">2. Your sign-in details</h2>
+                        <div id="phAccountFields"></div>
+                    </div>
+
+                    <div class="ph-step" data-step="business">
+                        <h2 class="ph-form__legend" id="phBusinessLegend">3. About your service</h2>
+                        <div id="phBusinessFields"></div>
+                    </div>
+
+                    <div class="ph-step" data-step="location" id="phLocationStep">
+                        <h2 class="ph-form__legend">4. Business location</h2>
+                        <div id="phLocationFields"></div>
+                    </div>
+
+                    <div class="ph-step" data-step="hours" id="phHoursStep">
+                        <h2 class="ph-form__legend">5. Weekly operating hours</h2>
+                        <div id="phScheduleFields"></div>
+                    </div>
+
+                    <div class="ph-step" data-step="photos" id="phPhotosStep">
+                        <h2 class="ph-form__legend">6. Photos</h2>
+                        <div id="phImageFields"></div>
+                    </div>
+
+                    <div class="ph-step" data-step="documents">
+                        <h2 class="ph-form__legend">7. Verification documents</h2>
+                        <div id="phDocumentFields"></div>
+                    </div>
+
+                    <div class="ph-step" data-step="review">
+                        <h2 class="ph-form__legend">8. Review &amp; submit</h2>
+                        <div id="phReview"></div>
+                    </div>
+
+                    <div class="ph-form__actions">
+                        <button type="button" class="tm-btn tm-btn--ghost" id="phBack" hidden>Back</button>
+                        <button type="button" class="tm-btn" id="phNext">Continue</button>
+                        <button type="submit" class="tm-btn tm-btn--primary" id="phSubmit" hidden>Submit application</button>
+                    </div>
+                </form>
+
+                <div id="phDone" hidden></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- api.js and ui.js MUST come first: register.js calls the global
+         apiRequest() and reads TM.esc/TM.button. Without them the very first
+         statement in boot() threw "apiRequest is not defined" *synchronously*,
+         so the promise chain was never built, .catch() never ran, and the page
+         sat on its "Loading partner types..." placeholder forever with no
+         error shown. Loading ui.js also restores HTML escaping of
+         server-supplied labels, which degrades to String() when TM is absent. -->
+    <script src="../js/api.js"></script>
+    <script src="../js/ui.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/maps.js"></script>
+    <script src="js/partner.js"></script>
+    <script src="js/register.js"></script>
+    <script src="../js/pwa.js" defer></script>
+</body>
+</html>

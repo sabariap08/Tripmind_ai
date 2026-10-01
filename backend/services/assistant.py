@@ -1,0 +1,787 @@
+"""Action-capable AI travel assistant.
+
+A thin Gemini layer over a deterministic, server-side tool set. The model can
+only *propose* an action (switch transport, pay a trip, remove a place from a
+plan); every mutation is executed on a separate, re-validated endpoint
+(POST /api/assistant/action) so no chat message can silently change a booking.
+
+The whole tool layer also runs on local keyword matching, so the assistant
+keeps working even when the Gemini API or key is unavailable.
+"""
+import json
+import re
+from datetime import datetime
+
+from services.mongodb import get_collection
+from services.ai_service import call_ai, is_ai_available
+from services.transport_service import available_transports
+
+
+_TOOL_DESC = {
+    "list_my_trips": "List the traveller's trips (plan/trip stage, dates, budget, payment status).",
+    "get_trip": "Return one trip's details by tripId.",
+    "list_bookings": "List the traveller's bookings and their payment status.",
+    "view_wallet": "Show the traveller's wallet balance and recent transactions.",
+    "find_alternative_transports": "Find registered, approved transports for origin->destination.",
+    "change_transport": "Propose replacing a trip's transport leg with another approved service; the itinerary re-flows around the new departure/arrival.",
+    "pay_trip": "Propose paying for all unpaid active bookings on a trip from the wallet.",
+    "remove_place": "Propose removing every itinerary item that mentions a place name from a trip plan.",
+    "edit_itinerary": "Propose an item-level itinerary edit (move an activity to another day/time, remove an activity, or add a catalogue spot/activity to a day).",
+}
+
+
+def _brief_trips(user_id):
+    out = []
+    trips = get_collection("trips").find({"userId": user_id}).sort("createdAt", 1)
+    for t in trips:
+        delay = (t.get("delay") or {}).get("status") == "ACTIVE"
+        out.append({
+            "tripId": str(t["_id"]),
+            "reference": t.get("reference"),
+            "route": "%s -> %s" % (t.get("origin"), t.get("destination")),
+            "start": t.get("startDate"),
+            "status": t.get("status"),
+            "paymentStatus": t.get("paymentStatus"),
+            "travelers": t.get("travelers"),
+            "budget": t.get("budget"),
+            "activeDelay": delay,
+        })
+    return out
+
+
+def _brief_bookings(user_id):
+    out = []
+    for b in get_collection("bookings").find({"userId": user_id}).sort("createdAt", -1):
+        out.append({
+            "reference": b.get("reference"),
+            "type": b.get("type"),
+            "title": b.get("itemTitle") or b.get("foodName") or b.get("reference"),
+            "status": b.get("status"),
+            "paymentStatus": b.get("paymentStatus"),
+            "amount": round(float(b.get("total") or 0), 2),
+            "date": b.get("date"),
+        })
+    return out[:20]
+
+
+def _brief_wallet(user_id):
+    from services.wallet_service import get_wallet
+    w = get_wallet(user_id)
+    txns = sorted(w.get("transactions") or [], key=lambda t: t.get("createdAt", ""), reverse=True)
+    return {
+        "balance": round(float(w.get("balance") or 0), 2),
+        "totalDeposited": round(float(w.get("totalDeposited") or 0), 2),
+        "totalSpent": round(float(w.get("totalSpent") or 0), 2),
+        "recentTransactions": [
+            {"type": t.get("type"), "amount": t.get("amount"), "desc": t.get("description"), "at": t.get("createdAt")}
+            for t in txns[:5]
+        ],
+    }
+
+
+def _owned_trip(user, trip_id):
+    trip = get_collection("trips").find_one({"_id": str(trip_id or "")})
+    if trip and str(trip.get("userId")) == str(user["id"]):
+        return trip
+    return None
+
+
+def _plan_text(trip, max_items=6):
+    items = []
+    for it in trip.get("itineraries", []) or []:
+        if it.get("status") == "SELECTED":
+            items = it.get("items", [])
+            break
+    if not items:
+        items = (trip.get("itineraries") or [{}])[0].get("items", [])
+    lines = []
+    for i in items[:max_items]:
+        lines.append("  - %s (%s) ~Rs %s" % (i.get("title"), i.get("type"), i.get("cost") or 0))
+    if len(items) > max_items:
+        lines.append("  ... and %d more items" % (len(items) - max_items))
+    return "\n".join(lines)
+
+
+def _sys_prompt():
+    tool_lines = "\n".join("  %s: %s" % (k, v) for k, v in _TOOL_DESC.items())
+    return (
+        "You are TripMind, an action-capable AI travel assistant for one logged-in traveller. "
+        "You may PROPOSE one tool call when it directly helps the current request. Tools:\n"
+        + tool_lines +
+        "\nReturn ONLY a JSON object with this schema and nothing else "
+        "(no markdown, no surrounding text):\n"
+        "{\"reply\":\"<short helpful reply to the traveller>\","
+        "\"tool\":{\"name\":\"<one of the tool names or null>\",\"args\":{...}},"
+        "\"change\":{\"summary\":\"<1 sentence describing the change>\","
+        "\"updates\":{\"<field>\":<value>}},"
+        "\"suggestions\":[\"<3 short follow-up prompts>\"]}\n"
+        "If no tool is needed, set tool to null. When the traveller asks to MODIFY their "
+        "current trip plan (change destination, travel style, transport mode, premium "
+        "services, round trip, or the free-text description), set 'change' with ONLY the "
+        "fields that change, using exactly these keys: destination (string), travelStyle "
+        "(BUDGET|BALANCED|PREMIUM), transportType (BUS|TRAIN|FLIGHT|CAB|AUTO), "
+        "premiumServices (array of TRANSPORT|HOTELS|ACTIVITIES|GUIDE), returnTrip (bool), "
+        "preferences (string - the full updated description). Set change to null when no "
+        "modification is requested. Never invent data; rely only on context provided. "
+        "The change is only a PROPOSAL - nothing is applied until the traveller presses "
+        "Confirm Change. For any action that changes facts (change_transport, pay_trip, "
+        "remove_place) you still only PROPOSE it; execution happens only after the "
+        "traveller confirms."
+    )
+
+
+def _local_intent(message, user, trip_id=None):
+    """Deterministic fallback used when the LLM is unavailable or returns junk."""
+    m = message.lower()
+    trip = _owned_trip(user, trip_id) if (trip_id and user) else None
+
+    # Natural phrasing first ("I don't want the train, I want a bus after 2 PM").
+    change = _transport_change_intent(message, trip)
+    if change:
+        return change
+
+    if any(k in m for k in ["change transport", "switch transport", "change bus", "switch bus",
+                            "change train", "switch train", "another transport", "different transport",
+                            "replace transport", "switch my transport", "change my transport",
+                            "switch my bus", "change my bus", "switch my train", "change my train"]):
+        routes = [(t.get("origin"), t.get("destination"), t.get("reference"), t)
+                  for t in get_collection("trips").find({"userId": user["id"]})
+                  if any(b.get("type") == "TRANSPORT" and b.get("status") not in ("CANCELLED", "REJECTED")
+                         for b in t.get("bookings", []) or [])]
+        if not routes:
+            return {"reply": "You don't have a booked transport on any trip, so there's nothing to switch.",
+                    "tool": None, "suggestions": ["Show my trips", "Check wallet balance", "Plan a trip"]}
+        target = trip or routes[0][3]
+        opts = find_transport_options(target)
+        if not opts:
+            return {"reply": "No registered, approved alternative transports are available for %s -> %s."
+                            % (target.get("origin"), target.get("destination")),
+                    "tool": None, "suggestions": ["Show my trips", "Plan a trip"]}
+        reply = ("I can switch the transport on trip %s (%s -> %s). Options currently registered:\n"
+                 % (target.get("reference"), target.get("origin"), target.get("destination")))
+        for o in opts[:5]:
+            reply += "  - %s (%s) · %s · ~Rs %s\n" % (
+                o.get("name"), o.get("mode"), str(o.get("transportId"))[:12] + "...", o.get("cost"))
+        reply += ("Confirm below and I will re-flow your plan around the new "
+                  "service. If you already hold a confirmed ticket, you will "
+                  "still need to change it with the provider - I will not mark "
+                  "it as changed unless it really is.")
+        return {"reply": reply, "tool": {
+            "name": "change_transport",
+            "args": {"trip_id": str(target["_id"]),
+                     "transport_id": str(opts[0]["transportId"]),
+                     "mode": opts[0]["mode"]}},
+            "suggestions": ["Confirm", "Show other options", "Show my bookings"]}
+
+    if any(k in m for k in ["pay trip", "pay my trip", "pay for trip", "pay for my trip",
+                            "complete payment", "pay bookings", "pay now", "pay the trip"]):
+        if not trip:
+            trips = list(get_collection("trips").find({"userId": user["id"]}))
+            unpaid = [t for t in trips if (t.get("paymentStatus") or "PENDING") not in ("WALLET", "COMPLETED")]
+            if not unpaid:
+                return {"reply": "All your trips are already paid.", "tool": None,
+                        "suggestions": ["Show my trips", "Check wallet balance"]}
+            trip = unpaid[0]
+        unpaid_b = [b for b in (trip.get("bookings") or [])
+                    if b.get("status") not in ("CANCELLED", "REJECTED")
+                    and b.get("paymentStatus") not in ("WALLET", "COMPLETED")]
+        if not unpaid_b:
+            return {"reply": "Trip %s already has no unpaid bookings." % trip.get("reference"),
+                    "tool": None, "suggestions": ["Show my trips"]}
+        total = sum(float(b.get("total") or 0) for b in unpaid_b)
+        return {"reply": ("Trip %s has %d unpaid booking(s) totalling Rs %s. "
+                          "Confirm to pay this from your wallet." % (trip.get("reference"), len(unpaid_b), total)),
+                "tool": {"name": "pay_trip", "args": {"trip_id": str(trip["_id"])}},
+                "suggestions": ["Confirm", "Show wallet balance", "Show bookings"]}
+
+    if any(k in m for k in ["remove ", "delete ", "drop "]) and trip:
+        place = _extract_place(m)
+        return {"reply": 'Confirm to remove "%s" from trip %s plan?' % (place, trip.get("reference")),
+                "tool": {"name": "remove_place", "args": {"trip_id": str(trip["_id"]), "place": place}},
+                "suggestions": ["Confirm", "Show my trips"]}
+
+    # Deterministic modification proposal (works even with no LLM): the change
+    # is appended to the trip description and the plan is regenerated only
+    # after the traveller presses Confirm Change.
+    modify_kw = ["modify", "change my trip", "change the trip", "change the plan",
+                 "update my trip", "update the plan", "regenerate", "revise",
+                 "edit my trip", "different plan", "change destination",
+                 "change the destination", "new destination", "make the trip"]
+    if trip and any(k in m for k in modify_kw):
+        base = (trip.get("preferences") or "").strip()
+        user_msg = (message or "").strip()
+        new_pref = (base + "\nAdditional request: " + user_msg) if base else user_msg
+        return {
+            "reply": ('I can apply this change to trip %s:\n"%s"\n'
+                      "Press Confirm Change to update your trip inputs and regenerate "
+                      "the plan, or Keep Current Plan to leave everything as it is."
+                      % (trip.get("reference") or trip.get("_id"), user_msg)),
+            "tool": None,
+            "change": {
+                "summary": ('Update the trip description with: "%s"' % user_msg[:120]),
+                "updates": {"preferences": new_pref[:2000]},
+            },
+            "suggestions": ["Confirm Change", "Keep Current Plan"],
+        }
+
+    return None
+
+
+def _extract_place(m):
+    for kw in ["remove", "delete", "drop", "take out"]:
+        m = m.replace(kw, " ")
+    m = re.sub(r"\s+", " ", m).strip(" .,;:!?")
+    return m or None
+
+
+def _transport_change_intent(message, trip):
+    """Natural-language transport-change proposal. Writes nothing.
+
+    "I don't want the train, I want a bus after 2 PM" is a plan change, not a
+    request for a list of options, so it is parsed here and offered as a
+    `change_transport` action the traveller has to confirm. The parsing and the
+    itinerary re-flow live in `services.ai_chat`/`services.replanner`; this
+    adapter only shapes them into the assistant's proposal contract.
+
+    Returns an assistant proposal dict or None when the message is not a
+    transport-change request.
+    """
+    if not trip:
+        return None
+    from services.ai_chat import _wants_transport_change, _propose_transport_change
+
+    if not _wants_transport_change(message):
+        return None
+
+    proposal, chosen, err = _propose_transport_change(trip, message)
+    if err:
+        return {"reply": err, "tool": None,
+                "suggestions": ["Show transport options", "Keep the current plan"]}
+
+    changed = proposal["transportChange"]
+    cost = proposal["cost"]
+    additional = cost["additional"]
+    dropped = proposal.get("dropped") or []
+    warnings = proposal.get("warnings") or []
+
+    lines = [
+        "I can change your transport from %s to %s." % (
+            changed["fromMode"], changed["toMode"]),
+        "  - Departure: %s" % (changed["departure"] or "unscheduled"),
+        "  - Arrival: %s%s" % (
+            changed["arrival"] or "unscheduled",
+            " (estimated - the operator publishes no arrival time)"
+            if changed.get("arrivalEstimated") else ""),
+    ]
+    if dropped:
+        lines.append("  - %d stop(s) no longer fit and would be removed." % len(dropped))
+    for w in warnings:
+        lines.append("  - Note: %s" % w)
+    lines.append("  - Estimated total: Rs %s (was Rs %s, %s)." % (
+        cost["revised"], cost["original"],
+        ("+%s" % additional) if additional > 0
+        else (str(additional) if additional else "no change")))
+    lines.append("Nothing has changed yet - confirm and I will apply it.")
+    if trip.get("status") in ("BOOKED", "COMPLETED"):
+        lines.append("You have a confirmed booking, so the ticket itself must "
+                     "still be changed with the provider - I will not mark it as "
+                     "changed unless it really is.")
+
+    return {
+        "reply": "\n".join(lines),
+        "tool": {"name": "change_transport",
+                 "args": {"trip_id": str(trip["_id"]),
+                          "transport_id": str(chosen["_id"]),
+                          "mode": changed["toMode"]}},
+        "suggestions": ["Confirm", "Keep my current plan", "Show other options"],
+    }
+
+
+_SLOT_NAMES = {
+    "early morning": "early morning", "morning": "morning", "late morning": "late morning",
+    "noon": "noon", "afternoon": "afternoon", "late afternoon": "late afternoon",
+    "evening": "evening", "night": "night",
+}
+
+
+def _item_edit_intent(message, user, trip_id=None):
+    """Deterministic structured itinerary edit parsing.
+
+    Understands natural phrases like:
+      - "Move St. George Fort from Day 1 to Day 2"
+      - "Move Kapaleeshwarar Temple to the morning"
+      - "Remove the food activity from Day 1"
+      - "Add Marina Beach to Day 2"
+    Returns an assistant proposal (chat), never mutates anything directly.
+    """
+    m = message.lower().strip(" .,;:!?")
+    trip = _owned_trip(user, trip_id) if (trip_id and user) else None
+    if not trip:
+        return None
+
+    op = None
+    if re.search(r"\bmove\b|\bshift\b|\breschedule\b|\brelocate\b", m) and \
+       not re.search(r"\bremove\b", m):
+        op = "move"
+    elif any(k in m for k in ("add ", "include ", "insert ", "put ")):
+        op = "add"
+    elif any(k in m for k in ("remove ", "delete ", "drop ", "take out ")):
+        op = "remove"
+
+    if op is None:
+        return None
+
+    # Extract day numbers ("day 1"/"day 2", "day one"/"day two").
+    def _daynum(s):
+        for w in s.split():
+            if w.startswith("day"):
+                nxt = w[3:].strip()
+                if nxt.isdigit():
+                    return int(nxt)
+        for n, name in enumerate(["one", "two", "three", "four", "five"], start=1):
+            if "%sday %s" % ("" if n == 1 else "", name) in s or \
+               (" day %s " % name) in (" " + s + " "):
+                return n
+        return None
+
+    days = [int(x) for x in re.findall(r"\bday\s+(\d+)\b", m)]
+    from_day, to_day = None, None
+    if days:
+        if len(days) >= 2:
+            from_day, to_day = days[0], days[1]
+        elif len(days) == 1:
+            # "move X to day 2" (single explicit day is the target)
+            if op in ("add", "move"):
+                to_day = days[0]
+            else:
+                from_day = days[0]
+
+    slot = None
+    for name in _SLOT_NAMES:
+        if "the " + name in m or name in m:
+            slot = name
+            break
+
+    # Straighten the quoted place/activity name out of the sentence.
+    def _term():
+        # "Remove the food activity from Day 1" -> "food activity"
+        for phrase in ["the food activity", "food activity", "the breakfast", "breakfast",
+                       "the lunch", "lunch", "the dinner", "dinner", "the restaurant",
+                       "restaurant", "the hotel", "hotel"]:
+            if phrase in m:
+                return phrase.lstrip("the ").strip()
+        quoted = re.findall(r"['\"]([^'\"]+)['\"]", message)
+        if quoted:
+            return quoted[0].strip()
+        # Remove move keywords + tracing words; keep the body up to "day N / the X".
+        body = m
+        for w in ["move", "shift", "reschedule", "relocate", "add", "include", "insert",
+                  "put", "remove", "delete", "drop", "take out", "please", "please "]:
+            body = body.replace(w, " ")
+        body = re.sub(r"\b(from|to|on|for|into|in|at|by|the|a|an|and|then)\b", " ", body)
+        body = re.sub(r"\s+", " ", body).strip(" .,;:!?")
+        for d in [from_day, to_day]:
+            if d is not None:
+                body = re.sub(r"day\s*%d" % d, " ", body)
+        if slot:
+            body = re.sub(re.escape(slot), " ", body)
+        body = re.sub(r"\s+", " ", body).strip(" .,;:!?")
+        return body or None
+
+    term = _term()
+    if not term or len(term) < 3:
+        return None
+
+    args = {"trip_id": str(trip["_id"]), "op": op, "item": term}
+    if from_day is not None:
+        args["from_day"] = from_day
+    if to_day is not None:
+        args["to_day"] = to_day
+    if slot:
+        args["to_time"] = slot
+
+    if op == "move":
+        label = "Confirm move"
+    elif op == "add":
+        label = "Confirm add"
+    else:
+        label = "Confirm removal"
+
+    detail = []
+    if op == "move":
+        target = "day %d" % to_day if to_day is not None else "the %s" % slot
+        detail.append("move \"%s\"" % term)
+        if from_day is not None:
+            detail.append("from day %d" % from_day)
+        detail.append("to %s" % target)
+    elif op == "remove":
+        detail.append("remove \"%s\"" % term)
+        if from_day is not None:
+            detail.append("from day %d" % from_day)
+    else:
+        detail.append("add \"%s\" to day %d" % (term, to_day) if to_day else "add \"%s\"" % term)
+        if slot:
+            detail.append("at the %s" % slot)
+
+    return {
+        "reply": "I'll update your itinerary: %s." % " ".join(detail),
+        "tool": {"name": "edit_itinerary", "args": args},
+        "suggestions": ["Confirm", "Keep Current Plan", "Show updated plan"],
+    }
+
+
+def find_transport_options(trip):
+    """Registered, approved alternate transports for the trip route.
+
+    Excludes the transport already booked on this trip so the assistant never
+    proposes switching to the same service (that stubs out with
+    "That transport is already booked on this trip.").
+    """
+    booked_ids = {
+        str(b.get("transportId"))
+        for b in (trip.get("bookings") or [])
+        if b.get("type") == "TRANSPORT"
+        and b.get("status") not in ("CANCELLED", "REJECTED")
+        and b.get("transportId")
+    }
+    out = []
+    for t in available_transports(trip.get("origin", ""), trip.get("destination", ""))[:6]:
+        if str(t["_id"]) in booked_ids:
+            continue
+        fare = t.get("fare")
+        if isinstance(fare, dict):
+            price = fare.get("price") or fare.get("baseFare") or fare.get("pricePerKm") or 0
+        else:
+            price = fare or 0
+        name = t.get("serviceName") or t.get("type")
+        out.append({"transportId": str(t["_id"]), "mode": t.get("type"),
+                    "name": name.strip(), "cost": price})
+    return out
+
+
+def _build_context(user, trip_id=None):
+    ctx = {"traveller": {"name": user.get("name"), "email": user.get("email")}}
+    ctx["trips"] = _brief_trips(user["id"])
+    ctx["bookings"] = _brief_bookings(user["id"])
+    ctx["wallet"] = _brief_wallet(user["id"])
+    if trip_id:
+        t = _owned_trip(user, trip_id)
+        if t:
+            ctx["activeTrip"] = {
+                "reference": t.get("reference"),
+                "route": "%s -> %s" % (t.get("origin"), t.get("destination")),
+                "start": t.get("startDate"),
+                "budget": t.get("budget"),
+                "status": t.get("status"),
+                "paymentStatus": t.get("paymentStatus"),
+                "itinerary": _plan_text(t),
+            }
+    return ctx
+
+
+_CHANGE_KEYS = ("destination", "travelStyle", "transportType", "premiumServices",
+                "returnTrip", "preferences")
+_CHANGE_STYLES = ("BUDGET", "BALANCED", "PREMIUM")
+_CHANGE_MODES = ("BUS", "TRAIN", "FLIGHT", "CAB", "AUTO")
+_CHANGE_SERVICES = ("TRANSPORT", "HOTELS", "ACTIVITIES", "GUIDE")
+
+
+def _sanitize_change(raw):
+    """Validate an AI-proposed trip modification. Only structured, user-visible
+    inputs pass through; anything else is dropped (never executed blindly)."""
+    if not isinstance(raw, dict):
+        return None
+    updates = raw.get("updates")
+    if not isinstance(updates, dict) or not updates:
+        return None
+    allowed = {}
+
+    if "destination" in updates and str(updates.get("destination") or "").strip():
+        allowed["destination"] = str(updates["destination"]).strip()
+
+    if "travelStyle" in updates:
+        style = str(updates.get("travelStyle") or "").upper()
+        if style in _CHANGE_STYLES:
+            allowed["travelStyle"] = style
+
+    if "transportType" in updates:
+        mode = str(updates.get("transportType") or "").upper()
+        if mode in _CHANGE_MODES:
+            allowed["transportType"] = mode
+
+    if "premiumServices" in updates and isinstance(updates.get("premiumServices"), list):
+        allowed["premiumServices"] = [str(s).upper() for s in updates["premiumServices"]
+                                      if str(s).upper() in _CHANGE_SERVICES]
+
+    if "returnTrip" in updates:
+        allowed["returnTrip"] = bool(updates.get("returnTrip"))
+
+    if "preferences" in updates and str(updates.get("preferences") or "").strip():
+        allowed["preferences"] = str(updates["preferences"]).strip()[:2000]
+
+    if not allowed:
+        return None
+    summary = str(raw.get("summary") or "").strip() or \
+        ("Update " + ", ".join(sorted(allowed)))
+    return {"summary": summary[:300], "updates": allowed}
+
+
+def _parse_tool_json(raw):
+    """Extract a usable tool call from the (possibly markdown-wrapped) LLM output."""
+    clean = raw.strip()
+    if clean.startswith("```"):
+        clean = clean.strip("`")
+        if clean.lower().startswith("json"):
+            clean = clean[4:]
+        clean = clean.strip()
+    start, end = clean.find("{"), clean.rfind("}")
+    if start == -1 or end == -1:
+        return None
+    try:
+        data = json.loads(clean[start:end + 1])
+    except ValueError:
+        m = re.search(r'"name"\s*:\s*"([a-z_]+)"', clean[start:end + 1])
+        if not m:
+            return None
+        return {"name": m.group(1), "args": {}}
+    reply = data.get("reply") or data.get("message") or ""
+    tool = data.get("tool") if isinstance(data.get("tool"), dict) else None
+    if isinstance(tool, dict):
+        name = tool.get("name")
+        args = tool.get("args") if isinstance(tool.get("args"), dict) else {}
+        if name not in _TOOL_DESC:
+            tool = None
+        else:
+            tool = {"name": name, "args": args}
+    suggestions = data.get("suggestions") if isinstance(data.get("suggestions"), list) else []
+    change = _sanitize_change(data.get("change"))
+    return {"reply": reply, "tool": tool, "change": change,
+            "suggestions": [str(s) for s in suggestions[:3]]}
+
+
+def handle_assistant_message(user, message, trip_id=None):
+    """Return a chat response plus an optional PROPOSED action (not executed)."""
+    local = _local_intent(message, user, trip_id)
+    item_edit = _item_edit_intent(message, user, trip_id)
+
+    if is_ai_available():
+        try:
+            prompt = (
+                "Traveller message: %s\n\n"
+                "Current context (JSON):\n%s\n\n"
+                "Decide whether a tool call is warranted and answer per the schema."
+                % (message, json.dumps(_build_context(user, trip_id), default=str))
+            )
+            raw = call_ai(prompt, _sys_prompt())
+            parsed = _parse_tool_json(raw)
+            if parsed:
+                tool = parsed.get("tool")
+                change = parsed.get("change") or (local or {}).get("change")
+                local_tool = (local or {}).get("tool")
+
+                # Deterministic, high-confidence mutation proposals win over the
+                # model - including when the model chose to do nothing. Without
+                # this, a parsed "I don't want the train, I want a bus" was
+                # silently dropped whenever the LLM answered with a chat reply
+                # and tool=null, which is exactly how the request used to go
+                # unactioned. The deterministic reply is shown too, so the
+                # traveller sees the real arrival/cost preview rather than the
+                # model's prose about a change that has not been described.
+                mutation = ("change_transport", "pay_trip", "remove_place")
+                deterministic = None
+                if item_edit and item_edit.get("tool"):
+                    tool = item_edit["tool"]
+                    deterministic = item_edit
+                elif local_tool and local_tool.get("name") in mutation:
+                    tool = local_tool
+                    deterministic = local
+                elif tool and tool.get("name") in mutation:
+                    # The model proposed a mutation the deterministic layer did
+                    # not corroborate. Drop it rather than act on a guess.
+                    tool = None
+
+                return {
+                    "response": (deterministic or {}).get("reply")
+                                or parsed.get("reply") or "How can I help?",
+                    "suggestions": (deterministic or {}).get("suggestions")
+                                   or parsed.get("suggestions") or _default_suggestions(),
+                    "action": _action_descriptor(tool, user) if tool else None,
+                    "change": change,
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+        except Exception:
+            pass
+
+    if item_edit:
+        return {
+            "response": item_edit["reply"],
+            "suggestions": item_edit.get("suggestions") or _default_suggestions(),
+            "action": _action_descriptor(item_edit.get("tool"), user) if item_edit.get("tool") else None,
+            "change": (local or {}).get("change") if item_edit.get("tool") is None else None,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+    if local:
+        return {
+            "response": local["reply"],
+            "suggestions": local.get("suggestions") or _default_suggestions(),
+            "action": _action_descriptor(local.get("tool"), user) if local.get("tool") else None,
+            "change": local.get("change"),
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+    if any(k in message.lower() for k in ["trip", "plan", "travel", "itinerary"]) and not trip_id:
+        trips = _brief_trips(user["id"])
+        if not trips:
+            return {"response": "You haven't planned any trips yet. Head to Plan your Trip to create one.",
+                    "suggestions": ["Plan a trip", "Check wallet balance"], "action": None,
+                    "timestamp": datetime.utcnow().isoformat()}
+        lines = "\n".join("  - %s: %s (%s, %s travelers, %s)" % (
+            t["reference"], t["route"], t["status"], t["travelers"], t["paymentStatus"]) for t in trips)
+        return {"response": "Here are your trips:\n" + lines,
+                "suggestions": ["Show bookings", "Check wallet balance", "Pay my trip"],
+                "action": None, "timestamp": datetime.utcnow().isoformat()}
+
+    if any(k in message.lower() for k in ["wallet", "balance", "money", "funds"]):
+        w = _brief_wallet(user["id"])
+        return {"response": ("Your wallet balance is Rs %s. Deposited Rs %s, spent Rs %s."
+                             % (w["balance"], w["totalDeposited"], w["totalSpent"])),
+                "suggestions": ["Pay my trip", "Show bookings"], "action": None,
+                "timestamp": datetime.utcnow().isoformat()}
+
+    return {
+        "response": ("I can check your trips, wallet and bookings, find alternative transport, "
+                     "switch your booked transport, pay a trip from the wallet, or update your plan. "
+                     "What would you like to do?"),
+        "suggestions": _default_suggestions(),
+        "action": None,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+
+def _action_descriptor(tool, user):
+    if not tool:
+        return None
+    name, args = tool["name"], tool["args"]
+    if name == "change_transport":
+        trip_id = args.get("trip_id")
+        t = get_collection("trips").find_one({"_id": str(trip_id or "")})
+        if not t or str(t.get("userId")) != str(user["id"]):
+            return None
+        return {"type": "change_transport", "label": "Confirm transport change",
+                "params": {"trip_id": trip_id, "transport_id": args.get("transport_id")}}
+    if name == "pay_trip":
+        trip_id = args.get("trip_id")
+        t = get_collection("trips").find_one({"_id": str(trip_id or "")})
+        if not t or str(t.get("userId")) != str(user["id"]):
+            return None
+        return {"type": "pay_trip", "label": "Confirm payment from wallet",
+                "params": {"trip_id": trip_id}}
+    if name == "remove_place":
+        trip_id = args.get("trip_id")
+        t = get_collection("trips").find_one({"_id": str(trip_id or "")})
+        if not t or str(t.get("userId")) != str(user["id"]):
+            return None
+        place = args.get("place")
+        if not place:
+            return None
+        return {"type": "remove_place", "label": "Confirm removal",
+                "params": {"trip_id": trip_id, "place": place}}
+    if name == "edit_itinerary":
+        trip_id = args.get("trip_id")
+        t = get_collection("trips").find_one({"_id": str(trip_id or "")})
+        if not t or str(t.get("userId")) != str(user["id"]):
+            return None
+        op = str(args.get("op") or "").lower()
+        item = args.get("item")
+        if op not in ("move", "remove", "add") or not item:
+            return None
+        labels = {"move": "Confirm move", "remove": "Confirm removal", "add": "Confirm add"}
+        return {"type": "edit_itinerary", "label": labels.get(op, "Confirm edit"),
+                "params": {"trip_id": trip_id, "op": op, "item": item,
+                           "from_day": args.get("from_day"), "to_day": args.get("to_day"),
+                           "to_time": args.get("to_time")}}
+    return None
+
+
+def _default_suggestions():
+    return ["Show my trips", "Check wallet balance", "Find alternative transport", "Pay my trip"]
+
+
+def execute_action(user, action_type, params):
+    """Execute a confirmed assistant action. Server re-validates everything."""
+    params = params or {}
+    trip_id = params.get("trip_id")
+    trip = _owned_trip(user, trip_id) if (trip_id and user) else None
+
+    if action_type == "change_transport":
+        if not trip:
+            return {"error": "Trip not found."}, 404
+        # Re-flow the itinerary (the leg plus everything downstream of its new
+        # arrival) rather than just swapping a booking record. Nothing here
+        # touches an external ticket: if the trip is already booked the change is
+        # flagged for the provider instead of being reported as done.
+        from services.ai_chat import _apply_transport_change
+        transport_id = params.get("transport_id")
+        result, err = _apply_transport_change(str(trip["_id"]), transport_id)
+        if err:
+            return {"error": err}, 400
+        changed = result["changed"]
+        message = ("Transport changed on your plan: %s -> %s. Your itinerary is "
+                   "now version %d and the estimated total is Rs %s."
+                   % (changed.get("fromMode"), changed.get("toMode"),
+                      result["version"], result["newTotalCost"]))
+        if trip.get("status") in ("BOOKED", "COMPLETED"):
+            message += (" Your itinerary is updated, but the confirmed booking "
+                        "still has to be changed with the provider - TripMind has "
+                        "not touched the ticket.")
+        return {"message": message,
+                "transportChange": changed,
+                "newTotalCost": result["newTotalCost"],
+                "version": result["version"]}, 200
+
+    if action_type == "pay_trip":
+        if not trip:
+            return {"error": "Trip not found."}, 404
+        from services.booking_service import pay_trip_bookings
+        updated, trip, errors = pay_trip_bookings(trip, user)
+        if errors and not any(b.get("paymentStatus") in ("WALLET", "COMPLETED") for b in updated):
+            return {"error": "; ".join(errors)}, 400
+        return {
+            "message": "Trip %s marked %s%s." % (
+                trip.get("reference"), trip.get("paymentStatus"),
+                (" (some bookings failed: %s)" % "; ".join(errors)) if errors else ""),
+            "paymentStatus": trip.get("paymentStatus"),
+        }, 200
+
+    if action_type == "remove_place":
+        if not trip:
+            return {"error": "Trip not found."}, 404
+        from services.ai_chat import _remove_place_from_trip
+        place = params.get("place")
+        result, err = _remove_place_from_trip(str(trip["_id"]), place)
+        if err:
+            return {"error": err}, 400
+        return {"message": "Removed: %s. New cost: Rs %s." % (
+            ", ".join(result["removed"]), result["newTotalCost"])}, 200
+
+    if action_type == "edit_itinerary":
+        if not trip:
+            return {"error": "Trip not found."}, 404
+        from services.ai_chat import edit_itinerary_items
+        op = str(params.get("op") or "").lower()
+        if op not in ("move", "remove", "add"):
+            return {"error": "edit op must be move, remove or add."}, 400
+        command = {
+            "op": op,
+            "item": params.get("item"),
+            "from_day": params.get("from_day"),
+            "to_day": params.get("to_day"),
+            "to_time": params.get("to_time"),
+        }
+        result, err = edit_itinerary_items(str(trip["_id"]), command, user["id"])
+        if err:
+            return {"error": err}, 400
+        return {"message": result["message"], "result": result}, 200
+
+    return {"error": "Unknown assistant action."}, 400

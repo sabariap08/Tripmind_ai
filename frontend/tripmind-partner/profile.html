@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Profile &#8212; TripMind Partner Hub</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#06202b">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="stylesheet" href="../css/theme.css">
+    <link rel="stylesheet" href="css/partner.css">
+</head>
+<body>
+    <a class="ph-skip" href="#phMain">Skip to content</a>
+
+    <header class="ph-topbar">
+        <div class="ph-topbar__inner">
+            <button class="ph-burger" type="button" data-ph-burger aria-expanded="false" aria-controls="phDrawer" aria-label="Open menu"><span></span></button>
+            <a class="ph-wordmark" href="/tripmind-partner/dashboard">
+                <span class="ph-wordmark__mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="#06202b"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                <span class="ph-wordmark__text">
+                    <span class="ph-wordmark__name" data-ph-role-note>TripMind AI</span>
+                    <span class="ph-wordmark__hub">Partner Hub</span>
+                </span>
+            </a>
+            <div class="ph-topbar__spacer"></div>
+            <span class="ph-user">
+                <span class="ph-user__avatar" data-ph-user-avatar aria-hidden="true">P</span>
+                <span class="ph-user__name" data-ph-user-name>Partner</span>
+            </span>
+            <button class="tm-btn tm-btn--on-dark-ghost tm-btn--sm" type="button" data-ph-signout>Sign out</button>
+        </div>
+    </header>
+
+    <div class="ph-drawer" data-ph-drawer id="phDrawer" hidden>
+        <div class="ph-drawer__scrim" data-ph-drawer-scrim></div>
+        <div class="ph-drawer__panel" role="dialog" aria-modal="true" aria-label="Partner Hub menu">
+            <div class="ph-drawer__head">
+                <span class="ph-wordmark" style="color:var(--tm-ink)">
+                    <span class="ph-wordmark__mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="#06202b"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                    <span class="ph-wordmark__text">
+                        <span class="ph-wordmark__name">TripMind AI</span>
+                        <span class="ph-wordmark__hub" style="color:var(--tm-clay)">Partner Hub</span>
+                    </span>
+                </span>
+                <button class="ph-drawer__close" type="button" data-ph-drawer-close aria-label="Close menu">&times;</button>
+            </div>
+            <p class="ph-drawer__group">Operating</p>
+            <ul class="ph-drawer__links" data-ph-nav></ul>
+            <div class="ph-drawer__foot">
+                <span class="tm-2xs tm-muted">Signed in as <b data-ph-partner-type>travel partner</b></span>
+                <a href="/portal.html">Open the provider console</a>
+                <a href="/">Traveller site</a>
+                <button class="tm-btn tm-btn--ghost tm-btn--sm" type="button" data-ph-signout style="margin-top:.5rem">Sign out</button>
+            </div>
+        </div>
+    </div>
+
+    <main class="ph-main" id="phMain">
+        <div class="ph-head">
+            <div>
+                <p class="tm-eyebrow">Account</p>
+                <h1>Profile</h1>
+                <p>Your contact information, the application the TripMind team reviewed, and the details travellers see
+                    on your listings.</p>
+            </div>
+        </div>
+
+        <div class="tm-grid tm-grid-2" style="align-items:start">
+            <section class="ph-panel" id="phServicePanel">
+                <div class="ph-panel__head">
+                    <div>
+                        <h2>Service profile</h2>
+                        <p>Shown across your listings.</p>
+                    </div>
+                </div>
+                <div class="ph-panel__body">
+                    <form id="phProfileForm" novalidate class="ph-form">
+                        <div class="tm-field">
+                            <label class="tm-label" for="pfService">Service name <span class="req">*</span></label>
+                            <input class="tm-input" type="text" id="pfService" name="serviceName" maxlength="80"
+                                   placeholder="e.g. Southern Express Lines" required>
+                            <span class="tm-hint">Applied to new services as they are created. Existing services keep
+                                the name they were listed with.</span>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                        <div class="tm-field">
+                            <label class="tm-label" for="pfContact">Contact for travellers</label>
+                            <input class="tm-input" type="text" id="pfContact" name="contact" maxlength="120"
+                                   placeholder="Phone or email travellers can reach you on">
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                        <div class="tm-field">
+                            <label class="tm-label" for="pfDescription">About your service</label>
+                            <textarea class="tm-textarea" id="pfDescription" name="description" rows="4" maxlength="600"
+                                      placeholder="Routes you cover, how often you run, anything a passenger should know."></textarea>
+                            <span class="tm-error" aria-live="polite"></span>
+                        </div>
+                        <div class="ph-actions">
+                            <button class="tm-btn tm-btn--primary" type="submit" id="pfSave">Save profile</button>
+                            <p class="ph-actions__note" id="pfStatus" role="status"></p>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <div class="tm-stack">
+                <section class="ph-panel">
+                    <div class="ph-panel__head">
+                        <div>
+                            <h2>Your account</h2>
+                            <p>Signed-in details and approval status.</p>
+                        </div>
+                    </div>
+                    <div class="ph-panel__body ph-panel__body--flush" id="phAccount"></div>
+                </section>
+
+                <section class="ph-panel">
+                    <div class="ph-panel__head">
+                        <div>
+                            <h2>Partner application</h2>
+                            <p>What you told us when you applied.</p>
+                        </div>
+                    </div>
+                    <div class="ph-panel__body ph-panel__body--flush" id="phApplication"></div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/ui.js"></script>
+    <script src="js/partner.js"></script>
+    <script src="js/profile.js"></script>
+    <script src="/js/pwa.js" defer></script>
+</body>
+</html>

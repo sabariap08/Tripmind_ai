@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Ticket &#8212; TripMind AI</title>
+    <meta name="description" content="Check a TripMind AI booking ticket or QR code.">
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        .vf-shell { min-height: 100vh; min-height: 100dvh; display: grid; grid-template-rows: auto 1fr auto; background: var(--tm-sand); }
+        .vf-main { display: grid; place-items: center; padding: clamp(1.5rem, 5vw, 3rem) 1rem; }
+        .vf-ticket { width: 100%; max-width: 30rem; background: var(--tm-white); border: 1px solid var(--tm-line); border-radius: var(--tm-r-lg); overflow: hidden; box-shadow: var(--tm-sh-2); }
+        .vf-ticket__head { padding: 1.5rem; color: var(--tm-on-dark); background: var(--tm-ink); }
+        .vf-ticket__head--ok { background: linear-gradient(150deg, #0f7a58, #06202b); }
+        .vf-ticket__head--no { background: linear-gradient(150deg, #b4531f, #4a1d0b); }
+        .vf-ticket__mark { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, .14); margin-bottom: .9rem; }
+        .vf-ticket__mark svg { width: 24px; height: 24px; stroke: #fff; }
+        .vf-ticket__state { font-size: var(--tm-f-2xs); font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: rgba(255, 255, 255, .7); }
+        .vf-ticket__title { font-family: var(--tm-font); font-size: clamp(1.4rem, 1.1rem + 1.4vw, 1.9rem); font-weight: 660; letter-spacing: -.02em; color: #fff; margin: .2rem 0 0; }
+        .vf-ticket__body { padding: 1.25rem 1.5rem 1.5rem; }
+        .vf-ticket__row { display: flex; justify-content: space-between; gap: 1rem; padding: .6rem 0; border-bottom: 1px dashed var(--tm-line); font-size: var(--tm-f-sm); }
+        .vf-ticket__row:last-child { border-bottom: 0; }
+        .vf-ticket__k { color: var(--tm-muted); }
+        .vf-ticket__v { font-weight: 620; color: var(--tm-ink); text-align: right; overflow-wrap: anywhere; }
+        .vf-ticket__note { margin-top: var(--tm-s4); font-size: var(--tm-f-xs); color: var(--tm-muted); }
+        .vf-actions { display: grid; gap: .6rem; margin-top: var(--tm-s5); }
+        .vf-foot { padding: 1.25rem 1rem calc(1.25rem + env(safe-area-inset-bottom)); text-align: center; font-size: var(--tm-f-2xs); color: var(--tm-muted); border-top: 1px solid var(--tm-line); }
+    </style>
+    <meta name="theme-color" content="#06202b">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+    <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TripMind AI">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-1290x2796.jpg">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-1170x2532.jpg">
+    <link rel="apple-touch-startup-image" href="/img/splash/splash-828x1792.jpg">
+    <link rel="stylesheet" href="/css/theme.css">
+    <script src="/js/ui.js"></script>
+</head>
+<body>
+    <div class="vf-shell">
+        <div style="border-bottom:1px solid var(--tm-line);background:var(--tm-white);">
+            <div class="tm-container" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding-block:.75rem;">
+                <a href="/" class="tm-brand" aria-label="TripMind AI home">
+                    <span class="tm-brand__mark"><svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M21 5.5 3.2 11.4c-.7.2-.7 1.2 0 1.4l5.6 1.9 2 5.5c.2.7 1.1.8 1.5.2L21 5.5Z"/></svg></span>
+                    <span class="tm-brand__text">
+                        <span class="tm-brand__name">TripMind AI</span>
+                        <span class="tm-brand__tag">Traveling Uniquely</span>
+                    </span>
+                </a>
+                <a class="tm-btn tm-btn--secondary tm-btn--sm" href="/pages/dashboard.html">My trips</a>
+            </div>
+        </div>
+
+        <main class="vf-main">
+            <div id="verifyResult" style="width:100%;max-width:30rem;">
+                <div class="tm-center" style="padding:2rem 0;display:grid;gap:1rem;justify-items:center;">
+                    <div class="spinner"></div>
+                    <p class="tm-sm tm-muted" style="margin:0;">Checking this ticket&#8230;</p>
+                </div>
+            </div>
+        </main>
+
+        <div class="vf-foot">TripMind AI &#183; ticket verification</div>
+    </div>
+
+    <script src="../js/api.js"></script>
+    <script>
+        const qs = new URLSearchParams(location.search);
+        const token = qs.get('token') || '';
+        const out = document.getElementById('verifyResult');
+
+        const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+        function render(state, headline, rows, note) {
+            const ok = state === 'ok';
+            const mark = ok
+                ? '<path d="M20 6 9 17l-5-5"/>'
+                : '<path d="M18 6 6 18M6 6l12 12"/>';
+            const label = ok ? 'Confirmed' : state === 'warn' ? 'Not confirmed' : 'Not valid';
+            out.innerHTML = `
+                <article class="vf-ticket">
+                    <header class="vf-ticket__head ${ok ? 'vf-ticket__head--ok' : state === 'warn' ? 'vf-ticket__head--no' : 'vf-ticket__head--no'}">
+                        <span class="vf-ticket__mark" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${mark}</svg>
+                        </span>
+                        <div class="vf-ticket__state">${esc(label)}</div>
+                        <h1 class="vf-ticket__title">${esc(headline)}</h1>
+                    </header>
+                    <div class="vf-ticket__body">
+                        ${rows.map(([k, v]) => `<div class="vf-ticket__row"><span class="vf-ticket__k">${esc(k)}</span><span class="vf-ticket__v">${esc(v)}</span></div>`).join('')}
+                        ${note ? `<p class="vf-ticket__note">${esc(note)}</p>` : ''}
+                        <div class="vf-actions">
+                            <a class="tm-btn tm-btn--primary tm-btn--block" href="/pages/dashboard.html">Open my trips</a>
+                            <a class="tm-btn tm-btn--secondary tm-btn--block" href="/">Back to TripMind</a>
+                        </div>
+                    </div>
+                </article>`;
+            document.title = `${label} \u00b7 ${headline} \u2014 TripMind AI`;
+        }
+
+        (async () => {
+            if (!token) {
+                render('bad', 'No ticket in this link', [], 'Scan the QR code printed on your TripMind ticket, or open the link exactly as it was issued.');
+                return;
+            }
+            try {
+                const r = await api.verifyTicket(token);
+                const rows = [
+                    ['Type', r.type || '\u2014'],
+                    ['Reference', r.reference || '\u2014'],
+                    ['Date', r.date || '\u2014'],
+                    ['Status', r.status || '\u2014'],
+                ];
+                if (r.valid && r.status === 'CONFIRMED') {
+                    render('ok', 'Valid ticket', rows, 'This ticket is confirmed for travel. Show it at boarding or at the venue.');
+                } else if (r.valid) {
+                    render('warn', 'Ticket is ' + (r.status || 'not confirmed'), rows, 'The booking exists but is not confirmed for travel. Check your trip for the latest status.');
+                } else {
+                    render('bad', 'Invalid ticket', rows, r.reason || 'This ticket could not be verified.');
+                }
+            } catch (e) {
+                render('bad', 'Verification unavailable', [], (e && e.message) || 'Please try again in a moment.');
+            }
+        })();
+    </script>
+    <script src="/js/pwa.js" defer></script>
+</body>
+</html>

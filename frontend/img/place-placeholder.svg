@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600" role="img" aria-label="TripMind destination placeholder">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0b2530"/>
+      <stop offset="0.55" stop-color="#14414f"/>
+      <stop offset="1" stop-color="#1d5b63"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f2b544" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#e2683c" stop-opacity="0.25"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="800" height="600" fill="url(#sky)"/>
+
+  <!-- stylised hills -->
+  <path d="M0 430 L170 320 L300 400 L430 300 L560 392 L690 330 L800 402 L800 600 L0 600 Z"
+        fill="#0a2b34" opacity="0.75"/>
+  <path d="M0 486 L150 404 L296 470 L430 396 L590 468 L720 418 L800 462 L800 600 L0 600 Z"
+        fill="#071e25" opacity="0.9"/>
+
+  <!-- location pin -->
+  <g transform="translate(400 214)">
+    <path d="M0 -96 c-40 0 -72 32 -72 72 0 54 72 126 72 126 s72 -72 72 -126 c0 -40 -32 -72 -72 -72 z"
+          fill="none" stroke="url(#glow)" stroke-width="7"/>
+    <circle cx="0" cy="-24" r="26" fill="none" stroke="#f2b544" stroke-width="6" opacity="0.9"/>
+  </g>
+
+  <text x="400" y="516" text-anchor="middle"
+        font-family="'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
+        font-size="34" font-weight="600" fill="#e9f2f4" opacity="0.92">TripMind AI</text>
+  <text x="400" y="552" text-anchor="middle"
+        font-family="'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
+        font-size="20" fill="#9fbcc4" opacity="0.8">Photo not available for this place</text>
+</svg>

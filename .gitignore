@@ -1,0 +1,41 @@
+# Dependencies
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment
+.env
+
+# Database
+*.db
+dev.db
+
+# Node.js (legacy)
+node_modules/
+
+# Next.js (legacy)
+.next/
+out/
+build/
+dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+*.egg-info/
+eggs/
+*.egg
+
+# Cache
+.cache/
+.pytest_cache/
