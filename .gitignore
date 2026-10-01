@@ -39,3 +39,15 @@ eggs/
 # Cache
 .cache/
 .pytest_cache/
+
+# Local secrets. .env is ignored above, but an undotted copy named "env" and a
+# key cached at backend/.secret_key are not matched by that rule.
+env
+.secret_key
+*.secret_key
+_admin_email.txt
+
+# Generated demo credential sheet: plaintext passwords for every seeded role.
+# Regenerate with backend/scripts/make_credentials_pdf.py; never commit it.
+*_credentials*.pdf
+TripMind_AI_Test_Credentials.pdf
